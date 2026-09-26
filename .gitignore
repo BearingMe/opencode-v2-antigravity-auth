@@ -47,7 +47,12 @@ opencode/
 opencode-better-antigravity-auth/
 
 # AI
-.opencode/
+.opencode/*
+!.opencode/skills/
+.opencode/skills/*
+!.opencode/skills/opencode-v1-plugins/
+!.opencode/skills/opencode-v2-plugins/
+!.opencode/skills/opencode-plugins-migration/
 .claude/
 .codex/
 .agents/
