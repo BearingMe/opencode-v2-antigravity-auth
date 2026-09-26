@@ -51,6 +51,7 @@ opencode-better-antigravity-auth/
 !.opencode/skills/
 .opencode/skills/*
 !.opencode/skills/opencode-v1-plugins/
+!.opencode/skills/opencode-v2-plugins/
 .claude/
 .codex/
 .agents/
