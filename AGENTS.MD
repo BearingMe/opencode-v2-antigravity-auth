@@ -8,17 +8,19 @@ OpenCode plugin for Google Antigravity OAuth. Intercepts `fetch()` calls to `gen
 
 ## Build & Test Commands
 
+Package and workflow scripts use Bun (`npx --yes bun@1.4.2` if bun is not directly in PATH):
+
 ```bash
-npm install                          # Install dependencies
-npm run build                        # Compile (tsc -p tsconfig.build.json)
-npm run typecheck                    # Type-check only (tsc --noEmit)
-npm test                             # Run all tests (vitest run)
-npx vitest run src/plugin/auth.test.ts          # Single test file
-npx vitest run -t "test name here"              # Single test by name
-npx vitest --watch src/plugin/auth.test.ts      # Watch mode, single file
-npm run test:coverage                # Coverage report
-npm run test:e2e:models              # E2E: model availability check
-npm run test:e2e:regression          # E2E: regression suite
+bun install                          # Install dependencies (or: npx --yes bun@1.4.2 install)
+bun run build                        # Compile (tsc -p tsconfig.build.json)
+bun run typecheck                    # Type-check only (tsc --noEmit)
+bun run test                         # Run all tests (vitest run)
+bunx vitest run src/plugin/auth.test.ts          # Single test file (or: npx --yes bun@1.4.2 x vitest ...)
+bunx vitest run -t "test name here"              # Single test by name
+bunx vitest --watch src/plugin/auth.test.ts      # Watch mode, single file
+bun run test:coverage                # Coverage report
+bun run test:e2e:models              # E2E: model availability check
+bun run test:e2e:regression          # E2E: regression suite
 ```
 
 No linter or formatter is configured. Style is enforced by convention (see below).

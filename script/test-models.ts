@@ -1,4 +1,4 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env bun
 import { spawn } from "child_process";
 
 interface ModelTest {
@@ -90,7 +90,8 @@ function printHelp(): void {
 E2E Model Test Script
 
 Usage:
-  npx tsx script/test-models.ts [options]
+  bun run script/test-models.ts [options]
+  (or: npx tsx script/test-models.ts [options])
 
 Options:
   --model <model>      Test specific model
@@ -100,9 +101,9 @@ Options:
   --help, -h           Show this help
 
 Examples:
-  npx tsx script/test-models.ts --dry-run
-  npx tsx script/test-models.ts --model google/gemini-3-flash-preview
-  npx tsx script/test-models.ts --category antigravity-claude
+  bun run script/test-models.ts --dry-run
+  bun run script/test-models.ts --model google/gemini-3-flash-preview
+  bun run script/test-models.ts --category antigravity-claude
 `);
 }
 

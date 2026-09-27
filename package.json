@@ -25,6 +25,7 @@
         "auth",
         "claude"
     ],
+    "packageManager": "bun@1.4.2",
     "engines": {
         "node": ">=20.0.0"
     },
@@ -35,15 +36,15 @@
     ],
     "scripts": {
         "build": "tsc -p tsconfig.build.json",
-        "build:schema": "npx tsx script/build-schema.ts",
+        "build:schema": "bun run script/build-schema.ts",
         "typecheck": "tsc --noEmit",
         "test": "vitest run",
         "test:watch": "vitest",
         "test:ui": "vitest --ui",
         "test:coverage": "vitest run --coverage",
-        "prepublishOnly": "npm run build",
-        "test:e2e:models": "npx tsx script/test-models.ts",
-        "test:e2e:regression": "npx tsx script/test-regression.ts"
+        "prepublishOnly": "bun run build",
+        "test:e2e:models": "bun run script/test-models.ts",
+        "test:e2e:regression": "bun run script/test-regression.ts"
     },
     "peerDependencies": {
         "typescript": "^5"
