@@ -58,8 +58,11 @@ Non-goals:
 
 ## Entry points (normative)
 
-- V1 legacy engine: `src/plugin.ts :: createAntigravityPlugin(providerId)`,
-  aliases `AntigravityCLIOAuthPlugin`, `GoogleOAuthPlugin`.
+- V1 legacy engine (REMOVED 2026-09-28, Task 2): `src/plugin.ts`
+  (`createAntigravityPlugin`, `AntigravityCLIOAuthPlugin`,
+  `GoogleOAuthPlugin`), `cli.ts`, `server.ts`, `ui/`, and the
+  `@opencode-ai/plugin` dependency were deleted. `verifyAccountAccess`
+  lives in `src/plugin/verify.ts`.
 - V2 bridge (current OpenCode V2 product path):
   `src/v2-plugin.ts` default export `Plugin.define({id:
   "opencode-antigravity-auth"})`.

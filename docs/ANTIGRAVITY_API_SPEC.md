@@ -209,35 +209,15 @@ Accept: text/event-stream
 
 ### Google Search Grounding
 
-Gemini models support Google Search grounding, but **it cannot be combined with function declarations** in the same request. This plugin implements a dedicated `google_search` tool that makes separate API calls.
+Gemini models support Google Search grounding, but **it cannot be combined with function declarations** in the same request.
 
-#### How the `google_search` Tool Works
-
-The model can call `google_search(query, urls?, thinking?)` which:
-1. Makes a **separate API call** to Antigravity with only `{ googleSearch: {} }` (no function declarations)
-2. Parses the `groundingMetadata` from the response
-3. Returns formatted markdown with sources and citations
-
-**Tool Parameters:**
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `query` | string | ✅ | The search query or question |
-| `urls` | string[] | ❌ | URLs to analyze (adds `urlContext` tool) |
-| `thinking` | boolean | ❌ | Enable deep thinking (default: true) |
-
-**Example Response:**
-```markdown
-## Search Results
-
-Spain won Euro 2024, defeating England 2-1 in the final...
-
-### Sources
-- [UEFA Euro 2024](https://uefa.com/...)
-- [Al Jazeera](https://aljazeera.com/...)
-
-### Search Queries Used
-- "UEFA Euro 2024 winner"
-```
+> **Historical note:** earlier versions of this plugin registered a dedicated
+> `google_search` tool that made separate API calls and parsed
+> `groundingMetadata` from the response. That tool has been removed. The
+> request pipeline still converts model-declared web search tools into the
+> native `{ googleSearch: {} }` format (dropping them with a warning when
+> function declarations are present), and the raw API formats below remain
+> valid reference.
 
 #### Raw API Format (for reference)
 

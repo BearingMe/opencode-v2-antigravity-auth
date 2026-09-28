@@ -6,8 +6,9 @@ Inferred (likely intent). Details live in the referenced sections.
 
 ## Routing and scope
 
-- R-ARCH-V2-DELEGATES-V1 (Explicit, §01): V2 MUST delegate all model routing
-  to the V1 loader fetch. No parallel router.
+- R-ARCH-V2-DELEGATES-V1 (Explicit, §01; retargeted Task 2): V2 MUST route
+  all model traffic through the native engine (`src/plugin/engine.ts`).
+  The V1 loader is deleted; no parallel router, no legacy fallback.
 - R-ARCH-NO-BYPASS-SDK (Explicit, §01): OAuth models MUST use
   `aisdk:<google-sdk.js>`; API-key Gemini MUST NOT receive `options.fetch`.
 - R-FETCH-SCOPE (Explicit, §05): only absolute http(s) GL model paths
@@ -51,17 +52,23 @@ Inferred (likely intent). Details live in the referenced sections.
 
 - `exchangeAntigravity` never throws (`failed{error}`); userinfo/project
   failures tolerated to degraded-but-continuable states (Explicit).
-- `invalid_grant` MUST evict project cache + clear cached auth (V1;
-  Explicit). V2 gap recorded in D-REFRESH-DUAL — do not widen.
+- `invalid_grant` MUST evict project cache + clear cached auth (Explicit;
+  single unified refresh path since Task 1, D-REFRESH-DUAL resolved).
 - Session recovery gated by `session_recovery`; dedup in-flight errors;
-  toasts never throw (Explicit).
+  toasts never throw; recovery-success toast honors `quiet_mode` and
+  `toast_scope=root_only` with explicit session ID (Explicit, Task 4).
+- Fetch-path toasts are fail-open: unknown sessions classify as ROOT
+  (session ID unavailable at the fetch call site, Oracle-verified), so
+  `toast_scope=root_only` suppression applies to update checks and
+  recovery toasts, not fetch-path toasts (Accepted exception to
+  R-LIFECYCLE-ROOT-ONLY-CHILD, Task 4).
 - Update checks root-sessions-only; once per instance; child MUST NOT
   consume the flag; all failures silent-to-debug-log (Explicit,
   R-LIFECYCLE-ROOT-ONLY-CHILD).
 - `normalizeFetchBody` MUST NOT consume the original Request (Explicit).
 - OAuth callback state equality enforced (Explicit).
-- `initializedFetch` memo cleared on auth change / mutation / loader
-  failure; refresh queue stopped before re-creation (Strong).
+- Native manager reset on auth change / mutation; refresh queue stopped
+  before re-creation (Strong).
 
 ## Architecture hygiene
 

@@ -15,9 +15,9 @@ Participants: `cli.ts` / V2 form → `antigravity/oauth.ts` →
 4. `exchangeAntigravity(code, state)` → validate state → token POST →
    userinfo GET → `loadCodeAssist` project discovery → packed
    `refresh|project`.
-5. V1 `persistOAuthAccount` / V2 `persistOAuthAccount` (dedupe by refresh
+5. V2 `persistOAuthAccount` (`src/v2-plugin.ts`; dedupe by refresh
    token or case-insensitive email, cap 10, `saveAccountsReplace` v4 +
-   per-family index) → `currentAuth` set, `initializedFetch` cleared.
+   per-family index) → `currentAuth` set, native manager reset.
 6. Post-login `verifyAccountAccess` sweep; configure-models via updater.
    Completion: account persisted, enabled, selectable by rotation.
 
@@ -28,9 +28,10 @@ failure tolerated; project failure tolerated to empty-project (deferred).
 
 Trigger: SDK call to `generativelanguage.googleapis.com/v1*/models/*:
 (generateContent|streamGenerateContent|countTokens)`.
-Participants: V2 `antigravityFetch` → `normalizeFetchBody` → V1 loader
-`fetch` → `accounts → token → project → request →
-fetch(Antigravity) → streaming transformer`.
+Participants: V2 `antigravityFetch` → `normalizeFetchBody` → native engine
+`executeAntigravityRequest` (`src/plugin/engine.ts`, sole router since
+Task 2) → `accounts → token → project → request → fetch(Antigravity) →
+streaming transformer`.
 
 1. V2: `requireOAuthAuth`; reject non-model GL paths; strip credentials for
    external origins and direct-fetch.

@@ -5,7 +5,7 @@
 | State | Owner | Persistence | Invalidation |
 |---|---|---|---|
 | Account pool (`refreshToken, projectId, managedProjectId, email, enabled, rateLimits, cooldowns, fingerprints, cachedQuota, verification`) | `plugin/accounts.ts :: AccountManager`, persisted by `plugin/storage.ts` | `antigravity-accounts.json` v4, 0600, lockfile-guarded atomic writes | `invalid_grant` evicts; `saveAccountsReplace` for deletes; `clearAccounts` on non-OAuth loader |
-| OAuth session (`currentAuth`, `initializedFetch` memo) | `v2-plugin.ts :: setup` closure; `plugin.ts :: activeAccountManager` | Memory only | Auth change / account mutation clears `initializedFetch`; loader failure clears memo for retry |
+| OAuth session (`currentAuth`, native manager) | `v2-plugin.ts :: setup` closure | Memory only | Auth change / account mutation resets native manager (stops refresh queue, clears cached state) |
 | Project context cache | `plugin/project.ts` keyed by refresh (+pending dedup) | Memory | `invalidateProjectContextCache` on refresh rotation / `invalid_grant` |
 | Auth cache (refresh→details, prefer unexpired) | `plugin/cache.ts` | Memory | `clearCachedAuth` on `invalid_grant` |
 | Thinking-signature cache | `plugin/cache.ts` + `cache/signature-cache.ts` + `stores/signature-store.ts` | Memory (1 h, 100/session, expiry-then-oldest-quarter evict) + disk (48 h, 60 s write batch, `sessionId:modelId` keys, version 1.0) | TTL; `keep_thinking=false` disables disk init |

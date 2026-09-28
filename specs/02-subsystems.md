@@ -41,10 +41,14 @@
   statusText}` on `!ok`; `invalid_grant` invalidates project cache and clears
   cached auth; preserves project ids when the server omits `refresh_token`;
   stores cached auth + invalidates project cache on success.
-- Divergence: `src/v2-plugin.ts :: refreshOAuthCredential` is a standalone
-  refresh (direct fetch, manual `Date.now()+expires_in*1000`, rotates stored
-  refresh on change) WITHOUT skew handling or `invalid_grant` eviction.
-  Oracle MUST flag edits that widen this divergence (see §07).
+- Divergence (RESOLVED 2026-09-28, Task 1 parity): refresh is unified.
+  `src/plugin/engine.ts :: refreshOAuthCredentialUnified` and
+  `src/v2-plugin.ts` authorize-callback refresh both call V1
+  `src/plugin/token.ts :: refreshAccessToken` (skew handling,
+  `invalid_grant` eviction). `src/v2-plugin.ts ::
+  refreshOAuthCredential` (legacy standalone fetch) is retained only as a
+  thin wrapper for compatibility; new code MUST use the unified path.
+  Oracle MUST flag edits that widen this divergence again (see §07).
 
 ## 2.3 Request preparation — `src/plugin/request.ts` (~1400 lines)
 
@@ -118,7 +122,8 @@ endpointOverride, headerStyle, forceThinkingRecovery, opts)`:
   threshold 100 (`rotation.ts :: selectHybridAccount`,
   `HealthScoreTracker` init 70 +1/−10/−20, 2/h recovery, max 100, min-usable
   50; `TokenBucketTracker` max 50, regen 6/min).
-- `V1 plugin.ts` adds its own capacity tiers `[5,10,20,30,60 s]`,
+- `src/plugin/engine.ts` (ported from V1 `plugin.ts` in Task 1; V1 deleted
+  in Task 2) adds its own capacity tiers `[5,10,20,30,60 s]`,
   `FIRST_RETRY 1 s / SWITCH 5 s`, dedup window 2 s, state reset 120 s,
   `MAX_CONSECUTIVE_FAILURES=5` → 30 s cooldown.
 - Quota fallback across header styles is allowed ONLY for the gemini family
@@ -190,15 +195,19 @@ non-streaming variant.
   (tolerant sorted reads, `±2` index skew handling); optional `auto_resume`
   continue with `RECOVERY_RESUME_TEXT`.
 
-## 2.12 Search, CLI/UI, server, images, version, logging
+## 2.12 Search (removed), images, version, logging
 
-- `search.ts :: executeSearch({query,urls?,thinking}, accessToken,
-  projectId, signal)`: `{systemInstruction SEARCH_SYSTEM_INSTRUCTION,
-  contents, tools[{googleSearch:{}},{urlContext?}], generationConfig temp0}`
-  wrapped `{project, model SEARCH_MODEL=gemini-2.5-flash, userAgent,
-  requestId, request{sessionId}}` POST `.../v1internal:generateContent`;
-  grounding + urlContext → markdown Sources/URLs/Queries; failures →
-  `"Search Error"` markdown. Budgets deep 16384 / fast 4096, 60 s timeout.
+- (REMOVED 2026-09-28, Task 3) `search.ts :: executeSearch` and the
+  `google_search` tool were deleted (module + tests + wiring). The
+  D-SEARCH-MUTEX guard (drop `web_search` with warn when function
+  declarations exist) stays in `transform/gemini.ts` + `request-helpers.ts`
+  for SDK-supplied search tools. Prior behavior, kept for history:
+  `{systemInstruction SEARCH_SYSTEM_INSTRUCTION, contents,
+  tools[{googleSearch:{}},{urlContext?}], generationConfig temp0}` wrapped
+  `{project, model SEARCH_MODEL=gemini-2.5-flash, userAgent, requestId,
+  request{sessionId}}` POST `.../v1internal:generateContent`; grounding +
+  urlContext → markdown Sources/URLs/Queries; failures → `"Search Error"`
+  markdown. Budgets deep 16384 / fast 4096, 60 s timeout.
 - `cli.ts`: `promptProjectId / promptAddAnotherAccount` (readline),
   `promptLoginMode` (TTY → `ui/auth-menu` loop incl. configure-models; else
   a/f/c/v/va fallback).

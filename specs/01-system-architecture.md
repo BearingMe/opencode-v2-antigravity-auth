@@ -5,11 +5,11 @@
 | Part | Paths | Responsibility |
 |---|---|---|
 | Shared identity | `src/constants.ts`, `src/shims.d.ts`, `src/google-sdk.ts` | OAuth client id/secret/scopes/redirect, endpoint orders, header styles, version pinning, hardening prompts, search tuning |
-| V1 engine | `src/plugin.ts` | Plugin factory, `auth.loader` fetch interceptor with rotation loop, login/logout flows, verification, warmup, toasts |
-| V2 bridge | `src/v2-plugin.ts` | V2 `integration/provider/model/aisdk/tool/session/event` transforms; delegates routing to V1 loader/fetch |
+| Native engine | `src/plugin/engine.ts` | Request execution + rotation loop (ported from V1, Task 1; sole router since Task 2), unified OAuth refresh, thinking warmup |
+| V2 bridge | `src/v2-plugin.ts` | V2 `integration/provider/model/aisdk/tool/session/event` transforms; routes via the native engine |
 | OAuth leaf | `src/antigravity/oauth.ts` | PKCE URL build + code exchange + `loadCodeAssist` project discovery |
 | Auto-update | `src/hooks/auto-update-checker/*` | Root-session npm check, toast or pinned rewrite + cache invalidate |
-| Core domains | `src/plugin/*` + `cache/config/core/recovery/stores/transform/ui` | Request transform, schema/thinking utils, accounts/rotation/quota/storage/fingerprint/project/refresh, recovery ×2, streaming, search, CLI/UI, server, debug/logger, version, images |
+| Core domains | `src/plugin/*` + `cache/config/core/recovery/stores/transform` | Request transform, schema/thinking utils, accounts/rotation/quota/storage/fingerprint/project/refresh, recovery ×2, streaming, debug/logger, version, images (`search`, `cli`, `ui/`, `server` removed Tasks 2–3) |
 
 ## Dependency direction (normative)
 
@@ -25,19 +25,27 @@ transform/*, request-helpers ──should stay──> pure re: I/O
                    (except cache + config reads)
 ```
 
-### Rule: R-ARCH-V2-DELEGATES-V1
+### Rule: R-ARCH-V2-DELEGATES-V1 (retargeted 2026-09-28, Task 2)
 
-**Requirement:** The V2 bridge MUST NOT reimplement request routing. All
-Antigravity model traffic MUST flow
-`aisdk.hook("sdk") → antigravityFetch → legacyPlugin.auth.loader.fetch`
-(V1 interceptor).
+**Requirement:** V2 MUST route ALL Antigravity model traffic through the
+native engine: `aisdk.hook("sdk") → antigravityFetch →
+executeAntigravityRequest` (`src/plugin/engine.ts`, ported from the V1
+hot-path loop: rotation, soft-quota gate, Retry-After/RetryInfo, thinking
+warmup, toasts, `invalid_grant` eviction, gemini-only dual-pool fallback).
+The V1 harness is deleted (`src/plugin.ts`, `cli.ts`, `server.ts`, `ui/`,
+`@opencode-ai/plugin` removed; `verifyAccountAccess` moved to
+`src/plugin/verify.ts`). No parallel router, no legacy fallback;
+`OPENCODE_ANTIGRAVITY_V2_LEGACY_FETCH` is retired.
 
 **Rationale:** Single routing implementation; prevents quota/signature drift.
 
 **Project evidence:**
 
+- `src/plugin/engine.ts :: executeAntigravityRequest`,
+  `:: refreshOAuthCredentialUnified`, `:: isNativeEngineEnabled`
 - `src/v2-plugin.ts :: loadRoutedFetch`, `:: antigravityFetch`
-- `src/v2-plugin.setup.test.ts` :: routes SDK JSON through legacy engine
+- `src/plugin/engine.test.ts` (13 parity tests),
+  `src/v2-plugin.setup.test.ts` :: routes SDK JSON through native engine
 
 **Status:** Explicit.
 
@@ -74,9 +82,11 @@ in `request.ts`, `accounts.ts`, `storage.ts`, `quota.ts`, `project.ts`.
   `hybrid`) + health/token-bucket trackers (`src/plugin/rotation.ts`).
 - `TransformContext/Result`, `StreamingCallbacks/SignatureStore`
   (`src/plugin/transform/types.ts`, `src/plugin/core/streaming/types.ts`).
-- `antigravity_accounts` + `google_search` tools
-  (`src/v2-plugin.ts :: manageAccounts`, `src/plugin/search.ts`).
+- `antigravity_accounts` tool (`src/v2-plugin.ts :: manageAccounts`).
+  (`google_search` tool + `src/plugin/search.ts` REMOVED 2026-09-28, Task 3;
+  the D-SEARCH-MUTEX guard in `transform/gemini.ts` stays.)
 - `AuthMenuAction/AccountAction` UI actions (`src/plugin/ui/auth-menu.ts`).
+  (V1 UI/CLI deleted Task 2; retained here as historical surface reference.)
 
 ## Forbidden relationships
 

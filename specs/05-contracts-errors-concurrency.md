@@ -74,8 +74,8 @@
   OpenCode instances can race (risk).
 - Refresh queue is serial (`runRefreshCheck` skips disabled/expired).
   Project-context has pending-request dedup. Rate-limit dedup window is 2 s.
-- Order-sensitive: `initializedFetch` memo MUST be cleared on auth change,
-  account mutation, and loader failure (else stale routing or stuck
-  rejection). `activeRefreshQueue` MUST be stopped before re-creation.
+- Order-sensitive: the native manager MUST be reset (`resetNativeManager()`)
+  on auth change and account mutation (else stale routing or stuck
+  rejection). Refresh queue MUST be stopped before re-creation.
 - Fire-and-forget (`setTimeout(0)`, `void` event loop) MUST never reject
   into session creation; failures go to debug log / console only.

@@ -22,9 +22,12 @@ Most settings have sensible defaults — only configure what you need.
 }
 ```
 
-**With web search enabled:**
+**With web search (historical):**
 
-The plugin provides a `google_search` tool that the model can call to search the web. No configuration is needed - the tool is always available.
+> The `google_search` tool was removed. Model requests that declare web search
+> tools are still sanitized by the request pipeline (a `web_search` tool is
+> dropped with a warning when it cannot be combined with function
+> declarations), but no dedicated search tool is registered anymore.
 
 ---
 
@@ -39,7 +42,7 @@ Settings that affect how the model thinks and responds.
 | `auto_resume` | `false` | Auto-send resume prompt after recovery |
 | `resume_text` | `"continue"` | Text to send when auto-resuming |
 
-> **Note:** The `web_search` config options are deprecated. Google Search is now implemented as a dedicated `google_search` tool that the model can call explicitly.
+> **Note:** The `web_search` config options are deprecated. Google Search grounding now relies on the model's native `{ googleSearch: {} }` tool format handled by the request pipeline; there is no dedicated search tool anymore.
 
 ### About `keep_thinking`
 

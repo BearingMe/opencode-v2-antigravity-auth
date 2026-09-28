@@ -65,6 +65,21 @@
   see `02-subsystems` and code refs (`request.test.ts`,
   `model-resolver.test.ts`, `rotation.test.ts`, `quota-fallback.test.ts`,
   `antigravity-first-fallback.test.ts`, `cross-model-integration.test.ts`).
+- `src/plugin/engine.test.ts` (2026-09-28, Task 1): 13 native-engine parity
+  tests (routing decision, quota fallback, warmup URL, wait formatting,
+  native-enable flag).
+- `src/plugin/verify.ts` + `verify.test.ts` (2026-09-28, Task 2):
+  `verifyAccountAccess` extracted from the deleted V1 harness
+  (blocked→disabled+URL, ok passthrough, error-without-disable).
+- `src/plugin/verification.ts` + `verification.test.ts` (2026-09-28,
+  Task 3): shared verification-error helpers extracted from the
+  `verify.ts` / `engine.ts` duplication (F-UP-2 closed); `verify.ts`
+  semicolon-free (F-UP-1 closed); per-session child tracker replaces the
+  setup-closure scalar (F-UP-3 closed, see F-UP-4 below).
+- (REMOVED 2026-09-28, Task 3) `src/plugin/search.ts` +
+  `search.test.ts` deleted with the `google_search` tool wiring;
+  `ANTIGRAVITY_ENDPOINT_AUTOPUSH` removed from `constants.ts` and both
+  endpoint orderings (PROD→DAILY load, DAILY→PROD fallback kept).
 - `hooks/auto-update-checker`: `checker.test.ts` (config/JSONC/entry
   forms), `index.test.ts` (prerelease skip, toast-only mode,
   once-per-instance, child ignore, local-dev warning; fake timers).
@@ -88,10 +103,13 @@
 
 ## Known divergences (normative for reviewers)
 
-1. D-REFRESH-DUAL: V1 `refreshAccessToken` (skew, `invalid_grant`
-   eviction, project-id preservation, cache store) vs V2
-   `refreshOAuthCredential` (plain fetch, no skew/eviction). SHOULD be
-   consolidated; edits MUST NOT widen the gap silently.
+1. D-REFRESH-DUAL (RESOLVED 2026-09-28, Task 1): V1 `refreshAccessToken`
+   (skew, `invalid_grant` eviction, project-id preservation, cache store)
+   is now the single refresh implementation, called via
+   `src/plugin/engine.ts :: refreshOAuthCredentialUnified` and the V2
+   authorize-callback path. `src/v2-plugin.ts :: refreshOAuthCredential`
+   remains only as a thin compatibility wrapper. Edits MUST NOT widen the
+   gap again.
 2. D-REFRESH-SEGMENTS: `oauth.exchangeAntigravity` writes 2-segment
    `refresh|project`; V2 authorize callback re-packs as
    `` `${result.refresh}|${result.projectId}` `` while ALSO calling
@@ -126,6 +144,34 @@
   rotation) is intentional pre-loader staging.
 - U6: `switch_on_first` + `pid_offset` interaction semantics (flags exist;
   detailed behavior not in context).
+
+## Task 2 deferred follow-ups (for Task 3, per 2026-09-28 reviews)
+
+- F-UP-1 (style): strip trailing semicolons in `src/plugin/verify.ts`
+  (AGENTS.md no-semicolon rule; ~67 lines).
+- F-UP-2 (hygiene): extract the 4 duplicated verification helpers
+  (`decodeEscapedText`, `normalizeGoogleVerificationUrl`,
+  `selectBestVerificationUrl`, `extractVerificationErrorDetails`) shared
+  by `src/plugin/verify.ts` and `src/plugin/engine.ts` into one module.
+- F-UP-3 (lifecycle): `isChildSession` is a single setup-closure scalar in
+  `src/v2-plugin.ts`; once any child session appears, root-session toasts
+  stay suppressed while `toast_scope=root_only`. Track per-session
+  (bounded Map/Set keyed by session) without weakening
+  R-LIFECYCLE-ROOT-ONLY-CHILD.
+- F-UP-4 (CLOSED 2026-09-28, Task 4): tracker fails open — unknown or
+  unresolvable session classifies as ROOT (toasts on) with a documented
+  no-inference limitation; recovery passes its explicit event sessionID.
+  Accepted limitation (Oracle-verified): the request's session ID is NOT
+  available at the `antigravityFetch` call site (fetch signature is
+  input+init, no hook context), so fetch-path toasts cannot be suppressed
+  for child sessions under `toast_scope=root_only`. See the R-LIFECYCLE
+  exception in §07.
+- F-UP-5 (CLOSED 2026-09-28, Task 4): `docs/CONFIGURATION.md` and
+  `docs/ANTIGRAVITY_API_SPEC.md` mark the removed `google_search` tool
+  historical.
+- F-UP-6 (FIXED 2026-09-28, coordinator): recovery-success toast in
+  `src/v2-plugin.ts :: handlePluginEvent` now honors `quiet_mode`,
+  matching the engine-wide toast gate (`engine.ts :: showToast`).
 
 ## References (repository evidence)
 
