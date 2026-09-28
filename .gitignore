@@ -50,6 +50,10 @@ opencode-better-antigravity-auth/
 # AI
 .opencode/*
 !.opencode/skills/
+!.opencode/agents/
+.opencode/agents/*
+!.opencode/agents/oracle.md
+!.opencode/skills/
 .opencode/skills/*
 !.opencode/skills/opencode-v1-plugins/
 !.opencode/skills/opencode-v2-plugins/
