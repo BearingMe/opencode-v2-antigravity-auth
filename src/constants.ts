@@ -27,19 +27,17 @@ export const ANTIGRAVITY_REDIRECT_URI = "http://localhost:51121/oauth-callback";
 /**
  * Root endpoints for the Antigravity API (in fallback order).
  * CLIProxy and Vibeproxy use the daily sandbox endpoint first,
- * then fallback to autopush and prod if needed.
+ * then fallback to prod if needed.
  */
 export const ANTIGRAVITY_ENDPOINT_DAILY = "https://daily-cloudcode-pa.sandbox.googleapis.com";
-export const ANTIGRAVITY_ENDPOINT_AUTOPUSH = "https://autopush-cloudcode-pa.sandbox.googleapis.com";
 export const ANTIGRAVITY_ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com";
 
 /**
- * Endpoint fallback order (daily → autopush → prod).
+ * Endpoint fallback order (daily → prod).
  * Shared across request handling and project discovery to mirror CLIProxy behavior.
  */
 export const ANTIGRAVITY_ENDPOINT_FALLBACKS = [
   ANTIGRAVITY_ENDPOINT_DAILY,
-  ANTIGRAVITY_ENDPOINT_AUTOPUSH,
   ANTIGRAVITY_ENDPOINT_PROD,
 ] as const;
 
@@ -50,7 +48,6 @@ export const ANTIGRAVITY_ENDPOINT_FALLBACKS = [
 export const ANTIGRAVITY_LOAD_ENDPOINTS = [
   ANTIGRAVITY_ENDPOINT_PROD,
   ANTIGRAVITY_ENDPOINT_DAILY,
-  ANTIGRAVITY_ENDPOINT_AUTOPUSH,
 ] as const;
 
 /**
@@ -240,8 +237,8 @@ export const SEARCH_TIMEOUT_MS = 60000;
 export const SEARCH_SYSTEM_INSTRUCTION = `You are an expert web search assistant with access to Google Search and URL analysis tools.
 
 Your capabilities:
-- Use google_search to find real-time information from the web
-- Use url_context to fetch and analyze content from specific URLs when provided
+- Use web search to find real-time information from the web
+- Fetch and analyze content from specific URLs when provided
 
 Guidelines:
 - Always provide accurate, well-sourced information

@@ -5,16 +5,27 @@ import { ID as ModelID, Info as ModelInfo, VariantID as ModelVariantID } from "@
 import { ID as ProviderID, Info as ProviderInfo } from "@opencode/schema/provider"
 import { IntegrationMethodID } from "@opencode/schema/integration-id"
 import { authorizeAntigravity, exchangeAntigravity } from "./antigravity/oauth.js"
-import { ANTIGRAVITY_CLIENT_ID, ANTIGRAVITY_CLIENT_SECRET, ANTIGRAVITY_PROVIDER_ID } from "./constants.js"
-import { createAntigravityPlugin, disposeAntigravityRuntimeResources, verifyAccountAccess } from "./plugin.js"
-import { accessTokenExpired, formatRefreshParts, isOAuthAuth, parseRefreshParts } from "./plugin/auth.js"
+import { ANTIGRAVITY_PROVIDER_ID } from "./constants.js"
+import { formatRefreshParts, isOAuthAuth, parseRefreshParts } from "./plugin/auth.js"
 import { loadAccounts, saveAccountsReplace, type AccountMetadataV3 } from "./plugin/storage.js"
 import { OPENCODE_MODEL_DEFINITIONS } from "./plugin/config/models.js"
-import type { OAuthAuthDetails, PluginClient, Provider } from "./plugin/types.js"
-import { refreshAccessToken } from "./plugin/token.js"
+import type { OAuthAuthDetails, PluginClient } from "./plugin/types.js"
 import { checkAccountsQuota } from "./plugin/quota.js"
-import { executeSearch } from "./plugin/search.js"
-import { createLogger } from "./plugin/logger.js"
+import { createLogger, initLogger } from "./plugin/logger.js"
+import { initRuntimeConfig, loadConfig } from "./plugin/config/index.js"
+import { AccountManager } from "./plugin/accounts.js"
+import {
+  disposeAntigravityRuntimeResources,
+  executeAntigravityRequest,
+  refreshOAuthCredentialUnified,
+} from "./plugin/engine.js"
+import { verifyAccountAccess } from "./plugin/verify.js"
+import { createSessionRecoveryHook, getRecoverySuccessToast } from "./plugin/recovery.js"
+import { initDiskSignatureCache } from "./plugin/cache.js"
+import { createProactiveRefreshQueue, type ProactiveRefreshQueue } from "./plugin/refresh-queue.js"
+import { initHealthTracker, initTokenTracker } from "./plugin/rotation.js"
+import { initAntigravityVersion } from "./plugin/version.js"
+import { createAutoUpdateCheckerHook } from "./hooks/auto-update-checker/index.js"
 
 const PLUGIN_ID = "opencode-antigravity-auth"
 const INTEGRATION_ID = "google"
@@ -35,17 +46,133 @@ function isOAuthValue(value: unknown): value is OAuthValue {
     typeof (value as Record<string, unknown>).access === "string"
 }
 
+/**
+ * Per-session child tracking for R-LIFECYCLE-ROOT-ONLY-CHILD.
+ *
+ * Limitation: the model fetch path (input plus init, no hook context) carries
+ * no supported session identifier, and one must NOT be inferred from the
+ * request payload or headers without a supported contract. An unknown or
+ * unresolvable session therefore classifies as ROOT (toasts on): failing open
+ * can only add noise, while inheriting last-active child state could wrongly
+ * silence a root session's toasts under overlapping root/child requests.
+ * Callers that DO know the session (event handlers) pass its ID explicitly.
+ */
+export function createChildSessionTracker(maxTrackedSessions = 1000) {
+  const childSessionIds = new Set<string>()
+  const evictOldestIfNeeded = () => {
+    if (childSessionIds.size < maxTrackedSessions) return
+    const oldest = childSessionIds.values().next().value
+    if (oldest !== undefined) childSessionIds.delete(oldest)
+  }
+  return {
+    remember: (sessionId: string | undefined, isChild: boolean | undefined) => {
+      if (!sessionId) return
+      if (isChild === true) {
+        evictOldestIfNeeded()
+        childSessionIds.add(sessionId)
+      } else if (isChild === false) {
+        childSessionIds.delete(sessionId)
+      }
+    },
+    isChildSession: (sessionId?: string | null): boolean => {
+      if (!sessionId) return false
+      return childSessionIds.has(sessionId)
+    },
+    trackedChildCount: (): number => childSessionIds.size,
+  }
+}
+
+export type ChildSessionTracker = ReturnType<typeof createChildSessionTracker>
+
 export default Plugin.define({
   id: PLUGIN_ID,
   async setup(ctx) {
     let currentAuth: OAuthAuthDetails | null = null
-    const legacyClient = makeLegacyClient(ctx, (next) => {
+    const bridgeClient = makeBridgeClient(ctx, (next) => {
       currentAuth = next
     })
-    const legacyPlugin = await createAntigravityPlugin(ANTIGRAVITY_PROVIDER_ID)({
-      client: legacyClient,
-      directory: ctx.location.directory,
+
+    const nativeConfig = loadConfig(ctx.location.directory)
+    initRuntimeConfig(nativeConfig)
+    initLogger(bridgeClient)
+    await initAntigravityVersion()
+
+    if (nativeConfig.health_score) {
+      initHealthTracker({
+        initial: nativeConfig.health_score.initial,
+        successReward: nativeConfig.health_score.success_reward,
+        rateLimitPenalty: nativeConfig.health_score.rate_limit_penalty,
+        failurePenalty: nativeConfig.health_score.failure_penalty,
+        recoveryRatePerHour: nativeConfig.health_score.recovery_rate_per_hour,
+        minUsable: nativeConfig.health_score.min_usable,
+        maxScore: nativeConfig.health_score.max_score,
+      })
+    }
+
+    if (nativeConfig.token_bucket) {
+      initTokenTracker({
+        maxTokens: nativeConfig.token_bucket.max_tokens,
+        regenerationRatePerMinute: nativeConfig.token_bucket.regeneration_rate_per_minute,
+        initialTokens: nativeConfig.token_bucket.initial_tokens,
+      })
+    }
+
+    if (nativeConfig.keep_thinking) {
+      initDiskSignatureCache(nativeConfig.signature_cache)
+    }
+
+    const sessionRecovery = createSessionRecoveryHook({ client: bridgeClient, directory: ctx.location.directory }, nativeConfig)
+
+    const updateChecker = createAutoUpdateCheckerHook(bridgeClient, ctx.location.directory, {
+      showStartupToast: true,
+      autoUpdate: nativeConfig.auto_update,
     })
+
+    const childSessions = createChildSessionTracker()
+    const handlePluginEvent = async (input: { event: { type: string; properties?: unknown } }) => {
+      await updateChecker.event(input)
+
+      if (input.event.type === "session.created") {
+        const props = input.event.properties as { info?: { parentID?: string }; sessionID?: string; id?: string } | undefined
+        const createdId = props?.sessionID ?? props?.id
+        const createdIsChild = !!props?.info?.parentID
+        childSessions.remember(createdId, createdIsChild)
+        bridgeLog.debug(createdIsChild ? "child-session-detected" : "root-session-detected", {})
+      }
+
+      if (sessionRecovery && input.event.type === "session.error") {
+        const props = input.event.properties as Record<string, unknown> | undefined
+        const sessionID = props?.sessionID as string | undefined
+        const messageID = props?.messageID as string | undefined
+        const error = props?.error
+
+        if (sessionRecovery.isRecoverableError(error)) {
+          const recovered = await sessionRecovery.handleSessionRecovery({
+            id: messageID,
+            role: "assistant" as const,
+            sessionID,
+            error,
+          })
+
+          if (recovered && sessionID && nativeConfig.auto_resume) {
+            await ctx.session.prompt({ sessionID, text: nativeConfig.resume_text }).catch(() => {})
+
+            const successToast = getRecoverySuccessToast()
+            bridgeLog.debug("recovery-toast", { ...successToast })
+            if (!nativeConfig.quiet_mode && !(nativeConfig.toast_scope === "root_only" && childSessions.isChildSession(sessionID))) {
+              await bridgeClient.tui.showToast({
+                body: {
+                  title: successToast.title,
+                  message: successToast.message,
+                  variant: "success",
+                },
+              }).catch(() => {})
+            }
+          }
+        }
+      }
+    }
+
     bridgeLog.info("V2 plugin setup", {
       directory: ctx.location.directory,
       version: ctx.app?.version,
@@ -82,7 +209,6 @@ export default Plugin.define({
       }
     }
 
-    let initializedFetch: Promise<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>> | undefined
     const requireOAuthAuth = async () => {
       const auth = await getAuth()
       if (!isOAuthAuth(auth)) {
@@ -90,15 +216,26 @@ export default Plugin.define({
       }
       return auth
     }
-    const loadRoutedFetch = async () => {
-      const result = await legacyPlugin.auth.loader(
-        requireOAuthAuth,
-        { models: {} } as Provider,
-      )
-      if (typeof result.fetch !== "function") {
-        throw new Error("Antigravity request routing did not initialize; refusing to send OAuth models to Google's API-key endpoint.")
+    let nativeManager: AccountManager | null = null
+    let refreshQueue: ProactiveRefreshQueue | null = null
+    const resetNativeManager = () => {
+      refreshQueue?.stop()
+      refreshQueue = null
+      nativeManager = null
+    }
+    const loadNativeManager = async () => {
+      const auth = await requireOAuthAuth()
+      nativeManager ??= await AccountManager.loadFromDisk(auth)
+      if (nativeConfig.proactive_token_refresh && !refreshQueue && nativeManager.getAccountCount() > 0) {
+        refreshQueue = createProactiveRefreshQueue(bridgeClient, ANTIGRAVITY_PROVIDER_ID, {
+          enabled: nativeConfig.proactive_token_refresh,
+          bufferSeconds: nativeConfig.proactive_refresh_buffer_seconds,
+          checkIntervalSeconds: nativeConfig.proactive_refresh_check_interval_seconds,
+        })
+        refreshQueue.setAccountManager(nativeManager)
+        refreshQueue.start()
       }
-      return result.fetch as unknown as (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+      return nativeManager
     }
     const antigravityFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       await requireOAuthAuth()
@@ -116,17 +253,22 @@ export default Plugin.define({
         return fetch(normalizedExternal.input, { ...normalizedExternal.init, headers: externalHeaders })
       }
 
-      initializedFetch ??= loadRoutedFetch().catch((error: unknown) => {
-        initializedFetch = undefined
-        throw error
-      })
-      const routedFetch = await initializedFetch
       const normalized = await normalizeFetchBody(input, init)
       bridgeLog.debug("Dispatching Antigravity model request", {
         destination: destination.hostname,
         path: destination.pathname,
       })
-      return routedFetch(normalized.input, normalized.init)
+
+      // Native engine: multi-account rotation, backoff, warmup, and signature
+      // handling live in src/plugin/engine.ts (no V1 harness involved).
+      const accountManager = await loadNativeManager()
+      return executeAntigravityRequest(normalized.input, normalized.init, {
+        client: bridgeClient,
+        providerId: ANTIGRAVITY_PROVIDER_ID,
+        config: nativeConfig,
+        accountManager,
+        isChildSession: childSessions.isChildSession(),
+      })
     }
 
     let accountSummary = (await loadAccounts())?.accounts ?? []
@@ -181,7 +323,7 @@ export default Plugin.define({
                 access: result.access,
                 expires: result.expires,
               }
-              initializedFetch = undefined
+              resetNativeManager()
               return {
                 type: "oauth" as const,
                 access: result.access,
@@ -193,7 +335,7 @@ export default Plugin.define({
             },
           }
         },
-        refresh: async (credential) => refreshOAuthCredential(credential),
+        refresh: async (credential) => refreshOAuthCredential(credential, bridgeClient),
         label: (credential) => {
           const email = credential.metadata?.email
           return typeof email === "string" ? email : accountSummary.find(
@@ -267,7 +409,7 @@ export default Plugin.define({
       }
       event.options.fetch = antigravityFetch
       // The Google SDK requires an API key even though this fetch bridge uses OAuth.
-      // Its generated x-goog-api-key header is removed by the legacy request adapter.
+      // Its generated x-goog-api-key header is removed by the request adapter.
       event.options.apiKey = "antigravity-oauth"
       bridgeLog.info("Routed Google SDK model through OAuth bridge", {
         model: event.model.id,
@@ -277,45 +419,6 @@ export default Plugin.define({
     }, { providerID: GOOGLE_PROVIDER_ID })
 
     await ctx.tool.transform((editor) => {
-      editor.add({
-        name: "google_search",
-        description: "Search the web with Google Search grounding and analyze URLs.",
-        input: {
-          type: "object",
-          properties: {
-            query: { type: "string", description: "Search query" },
-            urls: { type: "array", items: { type: "string" }, description: "URLs to analyze" },
-            thinking: { type: "boolean", description: "Enable deeper analysis" },
-          },
-          required: ["query"],
-          additionalProperties: false,
-        },
-        execute: async (input, { signal }) => {
-          let auth = await getAuth()
-          if (!isOAuthAuth(auth)) {
-            return { content: "Error: Not authenticated with Antigravity. Please connect Google Antigravity in OpenCode integrations." }
-          }
-          let accessToken = auth.access
-          if (!accessToken || accessTokenExpired(auth)) {
-            try {
-              const refreshed = await refreshAccessToken(auth, legacyClient, ANTIGRAVITY_PROVIDER_ID)
-              accessToken = refreshed?.access
-              if (refreshed) currentAuth = refreshed
-            } catch (error) {
-              return { content: `Error: Failed to refresh access token: ${error instanceof Error ? error.message : String(error)}` }
-            }
-          }
-          if (!accessToken) {
-            return { content: "Error: No valid access token available. Please connect Google Antigravity again." }
-          }
-          const args = input as { query: string; urls?: string[]; thinking?: boolean }
-          const parts = parseRefreshParts(auth.refresh)
-          const projectId = parts.managedProjectId || parts.projectId || "unknown"
-          const result = await executeSearch(args, accessToken, projectId, signal)
-          return { content: result }
-        },
-      })
-
       editor.add({
         name: "antigravity_accounts",
         description: "Manage Antigravity Google accounts and inspect their quota status.",
@@ -332,10 +435,11 @@ export default Plugin.define({
           required: ["action"],
           additionalProperties: false,
         },
-        execute: async (input) => manageAccounts(input as { action: string; index?: number }, legacyClient, () => {
-          initializedFetch = undefined
+        execute: async (input) => manageAccounts(input as { action: string; index?: number }, bridgeClient, () => {
+          resetNativeManager()
         }, (auth) => {
           currentAuth = auth
+          resetNativeManager()
         }),
       })
     })
@@ -343,7 +447,7 @@ export default Plugin.define({
     await ctx.session.hook("retry", async (event) => {
       if (event.decision.retry) return
       const v1Error = { name: event.error.type, message: event.error.message, status: event.error.status }
-      await legacyPlugin.event?.({
+      await handlePluginEvent({
         event: {
           type: "session.error",
           properties: { sessionID: event.sessionID, error: v1Error },
@@ -354,10 +458,11 @@ export default Plugin.define({
     const controller = new AbortController()
     void (async () => {
       for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
+        const data = event.data as { parentID?: string; sessionID?: string; id?: string }
         const properties = event.type === "session.created"
-          ? { info: { parentID: event.data.parentID } }
+          ? { info: { parentID: data.parentID }, sessionID: data.sessionID ?? data.id }
           : event.data
-        await legacyPlugin.event?.({
+        await handlePluginEvent({
           event: {
             type: event.type,
             properties,
@@ -370,13 +475,15 @@ export default Plugin.define({
 
     return async () => {
       controller.abort()
+      refreshQueue?.stop()
+      refreshQueue = null
       await disposeAntigravityRuntimeResources()
     }
 
   },
 })
 
-function makeLegacyClient(ctx: Parameters<Parameters<typeof Plugin.define>[0]["setup"]>[0], setAuth: (auth: OAuthAuthDetails) => void): PluginClient {
+function makeBridgeClient(ctx: Parameters<Parameters<typeof Plugin.define>[0]["setup"]>[0], setAuth: (auth: OAuthAuthDetails) => void): PluginClient {
   const client = {
     app: {
       log: async (input: unknown) => {
@@ -517,36 +624,24 @@ export function parseOAuthCallbackInput(value: string, expectedState: string): {
   return { code, state }
 }
 
-async function refreshOAuthCredential<T extends OAuthValue & { methodID: string }>(credential: T): Promise<T> {
-  const [refreshToken = "", projectId = "", managedProjectId = ""] = credential.refresh.split("|")
-  const response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-      client_id: ANTIGRAVITY_CLIENT_ID,
-      client_secret: ANTIGRAVITY_CLIENT_SECRET,
-    }),
-  })
-  if (!response.ok) throw new Error(`Google token refresh failed (${response.status})`)
-  const token = await response.json() as { access_token: string; expires_in: number; refresh_token?: string }
-  const rotatedRefreshToken = token.refresh_token ?? refreshToken
-  if (rotatedRefreshToken !== refreshToken) {
+export async function refreshOAuthCredential<T extends OAuthValue & { methodID: string }>(
+  credential: T,
+  client: PluginClient,
+): Promise<T> {
+  // Single refresh path (D-REFRESH-DUAL): delegate to src/plugin/token.ts.
+  const refreshed = await refreshOAuthCredentialUnified(credential, client, ANTIGRAVITY_PROVIDER_ID)
+  const previousRefreshToken = parseRefreshParts(credential.refresh).refreshToken
+  const [rotatedRefreshToken = ""] = refreshed.refresh.split("|")
+  if (rotatedRefreshToken && rotatedRefreshToken !== previousRefreshToken) {
     const stored = await loadAccounts()
     if (stored) {
-      const accounts = stored.accounts.map((account) => account.refreshToken === refreshToken
+      const accounts = stored.accounts.map((account) => account.refreshToken === previousRefreshToken
         ? { ...account, refreshToken: rotatedRefreshToken }
         : account)
       await saveAccountsReplace({ ...stored, accounts })
     }
   }
-  return {
-    ...credential,
-    access: token.access_token,
-    expires: Date.now() + token.expires_in * 1000,
-    refresh: `${rotatedRefreshToken}|${projectId}${managedProjectId ? `|${managedProjectId}` : ""}`,
-  }
+  return refreshed
 }
 
 async function persistOAuthAccount(

@@ -566,7 +566,7 @@ export function wrapToolsAsFunctionDeclarations(payload: RequestPayload): WrapTo
     // Log warning: web search requested but can't be used with functions
     console.warn(
       "[gemini] web_search tool detected but cannot be combined with function declarations. " +
-      "Use the explicit google_search() tool call instead."
+      "web_search will be skipped for this request."
     );
   }
 

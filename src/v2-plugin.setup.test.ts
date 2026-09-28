@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { legacyLoader, routedFetch, legacyEvent, authorizeAntigravity, exchangeAntigravity, loadAccounts, saveAccountsReplace, verifyAccountAccess } = vi.hoisted(() => ({
-  legacyLoader: vi.fn(),
-  routedFetch: vi.fn(),
-  legacyEvent: vi.fn(),
+const { authorizeAntigravity, exchangeAntigravity, loadAccounts, saveAccountsReplace, verifyAccountAccess, mockNativeFetch, mockLoadManager, mockUnifiedRefresh, mockRefreshQueue, mockDisposeResources } = vi.hoisted(() => ({
   authorizeAntigravity: vi.fn(async () => ({
     url: "https://accounts.google.com/auth?state=encoded-state",
     verifier: "verifier",
@@ -20,21 +17,40 @@ const { legacyLoader, routedFetch, legacyEvent, authorizeAntigravity, exchangeAn
   loadAccounts: vi.fn(),
   saveAccountsReplace: vi.fn(async () => undefined),
   verifyAccountAccess: vi.fn(async () => ({ status: "ok" as const, message: "verified" })),
+  mockNativeFetch: vi.fn(),
+  mockLoadManager: vi.fn(),
+  mockUnifiedRefresh: vi.fn(async (credential: unknown) => credential),
+  mockRefreshQueue: {
+    setAccountManager: vi.fn(),
+    start: vi.fn(),
+    stop: vi.fn(),
+  },
+  mockDisposeResources: vi.fn(async () => undefined),
 }))
 
-vi.mock("./plugin.js", () => ({
-  createAntigravityPlugin: () => async () => ({
-    auth: { loader: legacyLoader },
-    event: legacyEvent,
-  }),
-  disposeAntigravityRuntimeResources: vi.fn(async () => undefined),
+vi.mock("./plugin/verify.js", () => ({
   verifyAccountAccess,
+}))
+
+vi.mock("./plugin/version.js", () => ({
+  initAntigravityVersion: vi.fn(async () => undefined),
 }))
 
 vi.mock("./antigravity/oauth.js", () => ({ authorizeAntigravity, exchangeAntigravity }))
 vi.mock("./plugin/storage.js", () => ({ loadAccounts, saveAccountsReplace }))
+vi.mock("./plugin/engine.js", () => ({
+  executeAntigravityRequest: mockNativeFetch,
+  disposeAntigravityRuntimeResources: mockDisposeResources,
+  refreshOAuthCredentialUnified: mockUnifiedRefresh,
+}))
+vi.mock("./plugin/accounts.js", () => ({
+  AccountManager: { loadFromDisk: mockLoadManager },
+}))
+vi.mock("./plugin/refresh-queue.js", () => ({
+  createProactiveRefreshQueue: vi.fn(() => mockRefreshQueue),
+}))
 
-import plugin from "./v2-plugin.js"
+import plugin, { createChildSessionTracker, refreshOAuthCredential } from "./v2-plugin.js"
 const sdkPackage = new URL("./google-sdk.js", import.meta.url).href
 
 describe("V2 Antigravity runtime bridge", () => {
@@ -45,11 +61,11 @@ describe("V2 Antigravity runtime bridge", () => {
       accounts: [{ email: "old@example.com", refreshToken: "old-refresh-token", projectId: "old-project", addedAt: 1, lastUsed: 2 }],
       activeIndex: 0,
     })
-    routedFetch.mockResolvedValue(new Response("ok"))
-    legacyLoader.mockResolvedValue({ fetch: routedFetch })
+    mockLoadManager.mockResolvedValue({ index: "native-manager", getAccountCount: () => 1 })
+    mockNativeFetch.mockImplementation(async () => new Response("native-ok"))
   })
 
-  it("registers Antigravity models on Google and routes SDK JSON through the legacy engine", async () => {
+  it("registers Antigravity models on Google and routes SDK JSON through the native engine", async () => {
     let modelDefinitions: Array<Record<string, unknown>> = []
     let integrationMethod: Record<string, unknown> | undefined
     const googleProviderInfo: { activation?: string; package?: string } = { activation: "auto", package: "@opencode/ai/providers/google" }
@@ -145,6 +161,7 @@ describe("V2 Antigravity runtime bridge", () => {
     await sdkHook?.(unnormalizedSdkEvent)
     expect(unnormalizedSdkEvent.sdk).toBeUndefined()
 
+    // API-key passthrough is preserved: ordinary Gemini models keep their own route.
     credential = { type: "api", key: "google-api-key" }
     loadAccounts.mockResolvedValue({
       version: 4,
@@ -219,17 +236,95 @@ describe("V2 Antigravity runtime bridge", () => {
       headers: { "content-type": "application/json" },
       body: new TextEncoder().encode(payload),
     }
-    legacyLoader.mockResolvedValueOnce({})
-    await expect(fetchModel.fetch(requestUrl, requestInit)).rejects.toThrow("did not initialize")
-    legacyLoader.mockRejectedValueOnce(new Error("temporary loader failure"))
-    await expect(fetchModel.fetch(requestUrl, requestInit)).rejects.toThrow("temporary loader failure")
-    const response = await fetchModel.fetch(requestUrl, requestInit)
 
-    expect(await response.text()).toBe("ok")
-    expect(legacyLoader).toHaveBeenCalledTimes(3)
-    expect(routedFetch).toHaveBeenCalledOnce()
-    expect(routedFetch.mock.calls[0]?.[1]?.body).toBe(payload)
+    // Native engine path: SDK JSON bytes are decoded and dispatched natively
+    // with zero V1 harness involvement.
+    const nativeResponse = await fetchModel.fetch(requestUrl, requestInit)
+    expect(await nativeResponse.text()).toBe("native-ok")
+    expect(mockNativeFetch).toHaveBeenCalledOnce()
+    expect(mockNativeFetch.mock.calls[0]?.[0]).toBe(requestUrl)
+    expect(mockNativeFetch.mock.calls[0]?.[1]?.body).toBe(payload)
+    expect(mockNativeFetch.mock.calls[0]?.[2]).toMatchObject({ providerId: "google" })
+    expect(mockRefreshQueue.setAccountManager).toHaveBeenCalledOnce()
+    expect(mockRefreshQueue.start).toHaveBeenCalledOnce()
+
     expect(cleanup).toEqual(expect.any(Function))
     cleanup?.()
+    expect(mockRefreshQueue.stop).toHaveBeenCalledOnce()
+    expect(mockDisposeResources).toHaveBeenCalledOnce()
+  })
+
+  it("refreshes OAuth credentials through the unified token path", async () => {
+    const credential = {
+      type: "oauth" as const,
+      access: "old-access",
+      refresh: "old-refresh|old-project",
+      expires: 1,
+      methodID: "google-oauth",
+    }
+    mockUnifiedRefresh.mockResolvedValueOnce({ ...credential, access: "new-access" })
+    const refreshed = await refreshOAuthCredential(credential, {} as never)
+    expect(mockUnifiedRefresh).toHaveBeenCalledOnce()
+    expect(refreshed.access).toBe("new-access")
+  })
+})
+
+describe("createChildSessionTracker", () => {
+  it("classifies unknown sessions as root so toasts stay on", () => {
+    const tracker = createChildSessionTracker()
+
+    expect(tracker.isChildSession()).toBe(false)
+    expect(tracker.isChildSession("never-seen")).toBe(false)
+
+    tracker.remember("child-1", true)
+    expect(tracker.isChildSession()).toBe(false)
+    expect(tracker.isChildSession("never-seen")).toBe(false)
+    expect(tracker.isChildSession("child-1")).toBe(true)
+  })
+
+  it("classifies each tracked id independently across interleaved root/child events", () => {
+    const tracker = createChildSessionTracker()
+
+    tracker.remember("child-1", true)
+    tracker.remember("root-1", false)
+    tracker.remember("child-2", true)
+    tracker.remember("root-2", false)
+
+    expect(tracker.isChildSession("child-1")).toBe(true)
+    expect(tracker.isChildSession("child-2")).toBe(true)
+    expect(tracker.isChildSession("root-1")).toBe(false)
+    expect(tracker.isChildSession("root-2")).toBe(false)
+    expect(tracker.isChildSession()).toBe(false)
+  })
+
+  it("forgets a child session once it is recorded as root", () => {
+    const tracker = createChildSessionTracker()
+
+    tracker.remember("session-1", true)
+    expect(tracker.isChildSession("session-1")).toBe(true)
+
+    tracker.remember("session-1", false)
+    expect(tracker.isChildSession("session-1")).toBe(false)
+    expect(tracker.isChildSession()).toBe(false)
+  })
+
+  it("bounds tracked child sessions", () => {
+    const tracker = createChildSessionTracker(2)
+
+    tracker.remember("child-1", true)
+    tracker.remember("child-2", true)
+    tracker.remember("child-3", true)
+
+    expect(tracker.trackedChildCount()).toBe(2)
+    expect(tracker.isChildSession("child-1")).toBe(false)
+    expect(tracker.isChildSession("child-3")).toBe(true)
+  })
+
+  it("ignores events without a session id", () => {
+    const tracker = createChildSessionTracker()
+
+    tracker.remember(undefined, true)
+    expect(tracker.isChildSession()).toBe(false)
+    expect(tracker.trackedChildCount()).toBe(0)
   })
 })

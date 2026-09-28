@@ -1,6 +1,3 @@
-import type { PluginInput } from "@opencode-ai/plugin";
-import type { AntigravityTokenExchangeResult } from "../antigravity/oauth";
-
 export interface OAuthAuthDetails {
   type: "oauth";
   refresh: string;
@@ -20,8 +17,6 @@ export interface NonOAuthAuthDetails {
 
 export type AuthDetails = OAuthAuthDetails | ApiKeyAuthDetails | NonOAuthAuthDetails;
 
-export type GetAuth = () => Promise<AuthDetails>;
-
 export interface ProviderModel {
   cost?: {
     input: number;
@@ -34,69 +29,27 @@ export interface Provider {
   models?: Record<string, ProviderModel>;
 }
 
-export interface LoaderResult {
-  apiKey: string;
-  fetch(input: RequestInfo, init?: RequestInit): Promise<Response>;
-}
-
-export type PluginClient = PluginInput["client"];
-
-export interface PluginContext {
-  client: PluginClient;
-  directory: string;
-}
-
-export type AuthPrompt =
-  | {
-      type: "text";
-      key: string;
-      message: string;
-      placeholder?: string;
-      validate?: (value: string) => string | undefined;
-      condition?: (inputs: Record<string, string>) => boolean;
-    }
-  | {
-      type: "select";
-      key: string;
-      message: string;
-      options: Array<{ label: string; value: string; hint?: string }>;
-      condition?: (inputs: Record<string, string>) => boolean;
-    };
-
-export type OAuthAuthorizationResult = { url: string; instructions: string } & (
-  | {
-      method: "auto";
-      callback: () => Promise<AntigravityTokenExchangeResult>;
-    }
-  | {
-      method: "code";
-      callback: (code: string) => Promise<AntigravityTokenExchangeResult>;
-    }
-);
-
-export interface AuthMethod {
-  provider?: string;
-  label: string;
-  type: "oauth" | "api";
-  prompts?: AuthPrompt[];
-  authorize?: (inputs?: Record<string, string>) => Promise<OAuthAuthorizationResult>;
-}
-
-export interface PluginEventPayload {
-  event: {
-    type: string;
-    properties?: unknown;
+/**
+ * Minimal client surface used by the shared engine modules.
+ *
+ * Structural (not bound to any OpenCode plugin SDK) so both the V2 bridge
+ * and unit tests can provide it without the V1 `@opencode-ai/plugin` types.
+ */
+export interface PluginClient {
+  app: {
+    log: (input: unknown) => Promise<unknown>;
   };
-}
-
-export interface PluginResult {
   auth: {
-    provider: string;
-    loader: (getAuth: GetAuth, provider: Provider) => Promise<LoaderResult | Record<string, unknown>>;
-    methods: AuthMethod[];
+    set: (input: unknown) => Promise<unknown>;
   };
-  event?: (payload: PluginEventPayload) => void;
-  tool?: Record<string, unknown>;
+  session: {
+    prompt: (input: unknown) => Promise<unknown>;
+    abort: (input: unknown) => Promise<unknown>;
+    messages: (input: unknown) => Promise<unknown>;
+  };
+  tui: {
+    showToast: (input: unknown) => Promise<unknown>;
+  };
 }
 
 export interface RefreshParts {
@@ -109,4 +62,3 @@ export interface ProjectContextResult {
   auth: OAuthAuthDetails;
   effectiveProjectId: string;
 }
-

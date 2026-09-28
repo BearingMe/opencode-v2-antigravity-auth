@@ -11,9 +11,7 @@ const { loadAccounts, saveAccountsReplace, verifyAccountAccess } = vi.hoisted(()
 }))
 
 vi.mock("./plugin/storage.js", () => ({ loadAccounts, saveAccountsReplace }))
-vi.mock("./plugin.js", () => ({
-  createAntigravityPlugin: vi.fn(),
-  disposeAntigravityRuntimeResources: vi.fn(),
+vi.mock("./plugin/verify.js", () => ({
   verifyAccountAccess,
 }))
 
