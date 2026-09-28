@@ -320,6 +320,18 @@ describe("createChildSessionTracker", () => {
     expect(tracker.isChildSession("child-3")).toBe(true)
   })
 
+  it("keeps all tracked ids on duplicate registration at capacity", () => {
+    const tracker = createChildSessionTracker(2)
+
+    tracker.remember("child-1", true)
+    tracker.remember("child-2", true)
+    tracker.remember("child-1", true)
+
+    expect(tracker.trackedChildCount()).toBe(2)
+    expect(tracker.isChildSession("child-1")).toBe(true)
+    expect(tracker.isChildSession("child-2")).toBe(true)
+  })
+
   it("ignores events without a session id", () => {
     const tracker = createChildSessionTracker()
 

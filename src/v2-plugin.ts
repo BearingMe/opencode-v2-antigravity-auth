@@ -68,6 +68,7 @@ export function createChildSessionTracker(maxTrackedSessions = 1000) {
     remember: (sessionId: string | undefined, isChild: boolean | undefined) => {
       if (!sessionId) return
       if (isChild === true) {
+        if (childSessionIds.has(sessionId)) return
         evictOldestIfNeeded()
         childSessionIds.add(sessionId)
       } else if (isChild === false) {
