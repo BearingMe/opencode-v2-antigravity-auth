@@ -4,12 +4,19 @@
 
 1. Thought signatures (Google). Responses MAY carry `thoughtSignature` in
    content parts; clients SHOULD echo them back exactly. Gemini 3 ENFORCES
-   validation during function calling — missing signatures yield 4xx,
-   including at `minimal` thinking level. `skip_thought_signature_validator`
-   in the signature field is an officially supported bypass. Non-functionCall
-   parts are recommended-but-unenforced (degraded quality if omitted).
+   validation during function calling — missing signatures yield 400,
+   including at `minimal` thinking level. Parallel calls carry the
+   signature on the FIRST `functionCall` only, and the reply MUST order
+   all calls before all responses (`FC1+sig, FC2, FR1, FR2` — interleaving
+   is a 400). `skip_thought_signature_validator` in the signature field
+   is an officially supported LAST-RESORT bypass (degrades model
+   performance). Non-functionCall parts are recommended-but-unenforced
+   (degraded quality if omitted). Gemini 3 Pro Image is lenient (no 400)
+   yet still needs round-tripping for context.
    The plugin's cache → re-inject → sanitize → warmup → sentinel-escalation
-   design directly implements this contract.
+   design directly implements this contract (R-SIG-PRESERVE /
+   R-SIG-CLAUDE-STRIP / R-SIG-SENTINEL-LAST-RESORT; first-call-keeps,
+   parallels-stripped).
    - `Thought signatures - generateContent API` (Google AI for Developers,
      https://ai.google.dev/gemini-api/docs/generate-content/thought-signatures)
    - `Thought signatures | Gemini Enterprise Agent Platform`
@@ -83,8 +90,9 @@
 - `hooks/auto-update-checker`: `checker.test.ts` (config/JSONC/entry
   forms), `index.test.ts` (prerelease skip, toast-only mode,
   once-per-instance, child ignore, local-dev warning; fake timers).
-- Gaps: NO tests in `src/antigravity/`; NO dedicated `src/plugin.ts`
-  unit tests (only indirect coverage).
+- Gaps: NO tests in `src/antigravity/`; NO dedicated V1-unit (deleted);
+  `script/` E2E is excluded from typecheck and live-endpoint E2E has never
+  run (needs real quota).
 
 ## Compatibility
 
@@ -129,6 +137,17 @@
 6. Deprecated `ANTIGRAVITY_HEADERS / ANTIGRAVITY_VERSION / quota_fallback /
    invalidateCache` remain exported. New code MUST use
    `getAntigravityHeaders() / getAntigravityVersion() / invalidatePackage()`.
+7. D-RETRY-GLOBAL (observed limitation): `ctx.session.hook("retry")` in
+   `src/v2-plugin.ts` is provider-agnostic — any session whose error
+   matches `detectErrorType` patterns (tool_result_missing / thinking
+   errors) triggers abort + synthetic prompt + toast, including non-Google
+   sessions (e.g. Codex). Auth and fetch paths are Google-scoped; only the
+   recovery hook crosses that boundary. Do not assume recovery is
+   Google-only; narrowing it needs product decision.
+8. D-SECRET-COMMITTED (accepted risk): the Antigravity OAuth `client_secret`
+   is committed in `src/constants.ts` (CLI-spoof requirement) and duplicated
+   in `scripts/check-quota.mjs`. Rotation means changing both; scripts
+   SHOULD import from a single source rather than re-hardcoding.
 
 ## Unresolved questions (Oracle MUST NOT invent answers)
 
@@ -172,20 +191,29 @@
 - F-UP-6 (FIXED 2026-09-28, coordinator): recovery-success toast in
   `src/v2-plugin.ts :: handlePluginEvent` now honors `quiet_mode`,
   matching the engine-wide toast gate (`engine.ts :: showToast`).
+- F-UP-7 (CLOSED 2026-09-28, coordinator, final-review follow-up):
+  `createChildSessionTracker :: remember` skips eviction when the id is
+  already tracked, so a duplicate `session.created` at capacity no longer
+  forgets a different child; regression test
+  (`v2-plugin.setup.test.ts` :: duplicate-at-capacity) added;
+  `docs/ARCHITECTURE.md` legacy module map refreshed (V2 entry, current
+  modules, daily→prod fallback, fail-open note).
 
 ## References (repository evidence)
 
-- Entries: `src/plugin.ts`, `src/v2-plugin.ts`, `src/constants.ts`,
-  `src/google-sdk.ts`, `src/shims.d.ts`
+- Entries: `src/v2-plugin.ts`, `src/constants.ts`,
+  `src/google-sdk.ts`, `src/shims.d.ts` (historical: `src/plugin.ts`,
+  `cli.ts`, `server.ts`, `ui/` deleted Task 2)
 - OAuth: `src/antigravity/oauth.ts`
 - Update: `src/hooks/auto-update-checker/{index,checker,cache,constants,
   types,logging}.ts` + `checker.test.ts`, `index.test.ts`
 - Core: `src/plugin/{auth,token,cache,request,request-helpers,accounts,
   rotation,quota,storage,fingerprint,project,refresh-queue,recovery,
-  thinking-recovery,errors,debug,logger,logging-utils,server,search,cli,
-  version,image-saver,types}.ts`
-- Subdirs: `src/plugin/{cache,config/core:streaming,recovery,stores,
-  transform,ui}/*`
+  thinking-recovery,errors,debug,logger,logging-utils,verify,verification,
+  version,image-saver,types}.ts` (historical: `search.ts`, `cli.ts`,
+  `server.ts` deleted Tasks 2–3)
+- Subdirs: `src/plugin/{cache,config,core:streaming,recovery,stores,
+  transform}/*`
 - Tests: `src/constants.test.ts`, `src/v2-plugin.test.ts`,
   `src/v2-plugin.accounts.test.ts`, `src/v2-plugin.setup.test.ts` + 20+
   colocated `src/plugin/**/*.test.ts`

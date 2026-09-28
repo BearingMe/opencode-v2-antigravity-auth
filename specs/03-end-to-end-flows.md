@@ -2,16 +2,18 @@
 
 ## F1 — First login (OAuth)
 
-Trigger: `opencode auth login` (V1) or integrations authorize (V2).
-Participants: `cli.ts` / V2 form → `antigravity/oauth.ts` →
-`server.ts` → `storage.ts` → `project.ts` → `quota.ts`.
+Trigger: `opencode auth login` or integrations authorize (V2).
+Participants: V2 form → `antigravity/oauth.ts` →
+`storage.ts` → `project.ts` → `quota.ts`.
+(Historical V1: `cli.ts` → `server.ts` localhost listener → same tail.)
 
 1. Prompt login mode / account action (`add` vs `replace`) + optional
    project override.
 2. `authorizeAntigravity(projectId)` → open consent URL (PKCE S256,
    `state=base64url({verifier,projectId})`).
-3. Localhost listener on port 51121 OR manual code/URL paste (WSL, remote,
-   `shouldSkipLocalServer`).
+3. Manual code/redirect-URL paste via the authorize `callback`
+   (V2; validates state equality). (Historical V1: localhost listener on
+   port 51121 unless WSL/remote/`shouldSkipLocalServer`.)
 4. `exchangeAntigravity(code, state)` → validate state → token POST →
    userinfo GET → `loadCodeAssist` project discovery → packed
    `refresh|project`.

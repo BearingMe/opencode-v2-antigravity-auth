@@ -45,8 +45,9 @@ Inferred (likely intent). Details live in the referenced sections.
 - R-SIG-SENTINEL-LAST-RESORT (Strong): `skip_thought_signature_validator`
   MAY be used only on cache-miss/session-mismatch restart paths, never as
   the default signature.
-- First functionCall keeps the signature; parallel-call extras stripped
-  (Strong).
+- First functionCall keeps the signature; parallel-call extras stripped;
+  replies MUST order all calls before all responses (`FC1+sig, FC2, FR1,
+  FR2` — interleaving is a 400) (Strong + External).
 
 ## Recovery and resilience
 
@@ -57,6 +58,11 @@ Inferred (likely intent). Details live in the referenced sections.
 - Session recovery gated by `session_recovery`; dedup in-flight errors;
   toasts never throw; recovery-success toast honors `quiet_mode` and
   `toast_scope=root_only` with explicit session ID (Explicit, Task 4).
+  The `session.retry` hook is provider-agnostic: recoverable-pattern
+  errors in NON-Google sessions also trigger recovery (D-RETRY-GLOBAL) —
+  do not assume Google-only.
+- Child tracker is duplicate-safe: re-remembering a tracked id at
+  capacity MUST NOT evict a different child (Explicit, F-UP-7).
 - Fetch-path toasts are fail-open: unknown sessions classify as ROOT
   (session ID unavailable at the fetch call site, Oracle-verified), so
   `toast_scope=root_only` suppression applies to update checks and

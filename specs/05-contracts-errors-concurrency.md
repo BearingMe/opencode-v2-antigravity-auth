@@ -2,14 +2,16 @@
 
 ## Public contracts
 
-- Plugin entrypoints: `createAntigravityPlugin`,
-  `AntigravityCLIOAuthPlugin`, `GoogleOAuthPlugin`,
-  `disposeAntigravityRuntimeResources`, `verifyAccountAccess`,
-  `__testExports{getHeaderStyleFromUrl, resolveHeaderRoutingDecision,
-  resolveQuotaFallbackHeaderStyle}` (`src/plugin.ts`); V2 default plugin +
+- Plugin entrypoints: V2 default plugin +
   `normalizeFetchBody`, `getFetchDestination`,
   `isGenerativeLanguageModelPath`, `parseOAuthCallbackInput`,
-  `manageAccounts` (`src/v2-plugin.ts`).
+  `manageAccounts` (`src/v2-plugin.ts`); `executeAntigravityRequest`,
+  `refreshOAuthCredentialUnified`, `disposeAntigravityRuntimeResources`
+  (`src/plugin/engine.ts`); `verifyAccountAccess` (`src/plugin/verify.ts`).
+  (Historical V1, deleted Task 2: `createAntigravityPlugin`,
+  `AntigravityCLIOAuthPlugin`, `GoogleOAuthPlugin`, and the
+  `__testExports` in `src/plugin.ts`; routing test-helpers now live in
+  `src/plugin/engine.ts`.)
 - Fetch scope rule (R-FETCH-SCOPE): the interceptor MUST only route
   absolute http(s) URLs on `generativelanguage.googleapis.com` matching
   `^/v1(beta)?/models/[^/]+:(generateContent|streamGenerateContent|

@@ -208,15 +208,21 @@ non-streaming variant.
   request{sessionId}}` POST `.../v1internal:generateContent`; grounding +
   urlContext → markdown Sources/URLs/Queries; failures → `"Search Error"`
   markdown. Budgets deep 16384 / fast 4096, 60 s timeout.
-- `cli.ts`: `promptProjectId / promptAddAnotherAccount` (readline),
+- (REMOVED 2026-09-28, Task 2 — historical) `cli.ts`:
+  `promptProjectId / promptAddAnotherAccount` (readline),
   `promptLoginMode` (TTY → `ui/auth-menu` loop incl. configure-models; else
-  a/f/c/v/va fallback).
-- `ui/`: `ansi`, `select`, `confirm`, `auth-menu.ts :: showAuthMenu /
-  showAccountDetails` (`[current][active|rate-limited|expired|needs
+  a/f/c/v/va fallback). V2 replacement: the `google-oauth` integration
+  form + `antigravity_accounts` tool.
+- (REMOVED 2026-09-28, Task 2 — historical) `ui/`: `ansi`, `select`,
+  `confirm`, `auth-menu.ts :: showAuthMenu / showAccountDetails`
+  (`[current][active|rate-limited|expired|needs
   verification][disabled]`, delete-all confirm).
-- `server.ts :: startOAuthListener` (port from redirect URI; bind
+- (REMOVED 2026-09-28, Task 2 — historical) `server.ts ::
+  startOAuthListener` (port from redirect URI; bind
   `OPENCODE_ANTIGRAVITY_OAUTH_BIND || OrbStack-127.0.0.1 || WSL/SSH-0.0.0.0
-  || 127.0.0.1`; 5 m timeout; success card; EADDRINUSE hint).
+  || 127.0.0.1`; 5 m timeout; success card; EADDRINUSE hint). V2
+  replacement: manual code/redirect-URL paste via the authorize `callback`
+  (no localhost listener).
 - `image-saver.ts`: `saveImageToDisk`
   (`~/.opencode/generated-images/image-{ts}-{rand}.{ext}`, `""` on fail) →
   markdown `![...](path)` else data URL.
