@@ -180,6 +180,13 @@ export interface AccountStorage {
 export type CooldownReason = "auth-failure" | "network-error" | "project-error" | "validation-required";
 
 export interface AccountMetadataV3 {
+  /**
+   * Durable opaque account id (e.g. a UUID) assigned by the account service.
+   * Additive and optional for backward compatibility: legacy stores predate
+   * it and are backfilled on service write paths. Never derived from token
+   * material so it survives refresh-token rotation.
+   */
+  id?: string;
   email?: string;
   refreshToken: string;
   projectId?: string;
