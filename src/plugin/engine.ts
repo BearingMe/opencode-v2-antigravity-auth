@@ -2,8 +2,8 @@ import {
   ANTIGRAVITY_ENDPOINT_FALLBACKS,
   ANTIGRAVITY_ENDPOINT_PROD,
   type HeaderStyle,
-} from "../constants.ts"
-import { accessTokenExpired } from "./auth.ts"
+} from "../constants.js"
+import { accessTokenExpired } from "./auth.js"
 import {
   AccountManager,
   calculateBackoffMs,
@@ -11,18 +11,18 @@ import {
   parseRateLimitReason,
   type ManagedAccount,
   type ModelFamily,
-} from "./accounts.ts"
-import { createSyntheticErrorResponse, isEmptyResponseBody } from "./request-helpers.ts"
-import { EmptyResponseError } from "./errors.ts"
+} from "./accounts.js"
+import { createSyntheticErrorResponse, isEmptyResponseBody } from "./request-helpers.js"
+import { EmptyResponseError } from "./errors.js"
 import {
   buildThinkingWarmupBody,
   prepareAntigravityRequest,
   transformAntigravityResponse,
-} from "./request.ts"
-import { AntigravityTokenRefreshError, refreshAccessToken } from "./token.ts"
-import { ensureProjectContext } from "./project.ts"
-import { resolveModelWithTier } from "./transform/model-resolver.ts"
-import { getHealthTracker, getTokenTracker } from "./rotation.ts"
+} from "./request.js"
+import { AntigravityTokenRefreshError, refreshAccessToken } from "./token.js"
+import { ensureProjectContext } from "./project.js"
+import { resolveModelWithTier } from "./transform/model-resolver.js"
+import { getHealthTracker, getTokenTracker } from "./rotation.js"
 import {
   isDebugEnabled,
   logAccountContext,
@@ -32,12 +32,12 @@ import {
   logResponseBody,
   logModelFamily,
   startAntigravityDebugRequest,
-} from "./debug.ts"
-import { createLogger } from "./logger.ts"
-import { disposeDiskSignatureCache } from "./cache.ts"
-import { extractVerificationErrorDetails } from "./verification.ts"
-import type { AntigravityConfig } from "./config/index.ts"
-import type { OAuthAuthDetails, PluginClient, ProjectContextResult } from "./types.ts"
+} from "./debug.js"
+import { createLogger } from "./logger.js"
+import { disposeDiskSignatureCache } from "./cache.js"
+import { extractVerificationErrorDetails } from "./verification.js"
+import type { AntigravityConfig } from "./config/index.js"
+import type { OAuthAuthDetails, PluginClient, ProjectContextResult } from "./types.js"
 
 const log = createLogger("engine")
 

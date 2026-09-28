@@ -83,6 +83,10 @@ Inferred (likely intent). Details live in the referenced sections.
 - New code MUST use `getAntigravityHeaders()/getAntigravityVersion()/
   invalidatePackage()` over deprecated exports (Explicit).
 - Fire-and-forget work MUST NOT reject into session creation (Strong).
+- Runtime (non-test) source imports MUST resolve under BOTH
+  `tsconfig.json` and `tsconfig.build.json`: use `.js`-suffixed or
+  extensionless relative imports — `.ts`-suffixed imports pass `typecheck`
+  but fail `bun run build` with TS5097 (Explicit).
 
 ## What the Oracle MUST leave unresolved
 

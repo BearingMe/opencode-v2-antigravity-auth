@@ -40,6 +40,10 @@ No linter or formatter is configured. Style is enforced by convention (see below
 - Named imports only — no default imports in src/
 - Relative paths with `.ts` extensions: `import { foo } from "./bar.ts"`
 - Order: node builtins > external packages > local modules
+- Exception: `tsconfig.build.json` sets `allowImportingTsExtensions: false`
+  (TS5097 under emit), so NON-TEST runtime sources MUST use emit-compatible
+  imports (`.js`-suffixed or extensionless, e.g. `./bar.js`); `.ts`-suffixed
+  imports break `bun run build` even though `typecheck` accepts them
 
 ### Exports
 - Named exports only in src/ — no default exports (sole exception:

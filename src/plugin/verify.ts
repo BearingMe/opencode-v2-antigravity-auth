@@ -1,9 +1,9 @@
-import { formatRefreshParts, parseRefreshParts } from "./auth.ts"
-import { ensureProjectContext } from "./project.ts"
-import { prepareAntigravityRequest } from "./request.ts"
-import { AntigravityTokenRefreshError, refreshAccessToken } from "./token.ts"
-import { extractVerificationErrorDetails } from "./verification.ts"
-import type { PluginClient } from "./types.ts"
+import { formatRefreshParts, parseRefreshParts } from "./auth.js"
+import { ensureProjectContext } from "./project.js"
+import { prepareAntigravityRequest } from "./request.js"
+import { AntigravityTokenRefreshError, refreshAccessToken } from "./token.js"
+import { extractVerificationErrorDetails } from "./verification.js"
+import type { PluginClient } from "./types.js"
 
 export type VerificationProbeResult = {
   status: "ok" | "blocked" | "error"
