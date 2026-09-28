@@ -323,6 +323,10 @@ export function resolveModelForHeaderStyle(
       .replace(/-preview-customtools$/i, "")
       .replace(/-preview$/i, "")
       .replace(/^antigravity-/i, "");
+    // Antigravity's inventory exposes Gemini 3.8 Flash under its tiered ID.
+    if (transformedModel === "gemini-3.8-flash") {
+      transformedModel = "gemini-3.8-flash-tiered";
+    }
     
     const isGemini3Pro = isGemini3ProModel(transformedModel);
     const hasTierSuffix = /-(low|medium|high)$/i.test(transformedModel);

@@ -267,6 +267,14 @@ export class SignatureCache {
     return this.saveToDisk();
   }
 
+  async dispose(): Promise<boolean> {
+    if (this.writeTimer) clearInterval(this.writeTimer)
+    if (this.cleanupTimer) clearInterval(this.cleanupTimer)
+    this.writeTimer = null
+    this.cleanupTimer = null
+    return this.flush()
+  }
+
   /**
    * Graceful shutdown: stop timers and flush to disk.
    */

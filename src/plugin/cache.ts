@@ -97,6 +97,7 @@ let diskCache: SignatureCache | null = null;
  * Call this from plugin initialization when keep_thinking is enabled.
  */
 export function initDiskSignatureCache(config: SignatureCacheConfig | undefined): SignatureCache | null {
+  if (diskCache) void diskCache.dispose()
   diskCache = createSignatureCache(config);
   return diskCache;
 }
@@ -106,6 +107,12 @@ export function initDiskSignatureCache(config: SignatureCacheConfig | undefined)
  */
 export function getDiskSignatureCache(): SignatureCache | null {
   return diskCache;
+}
+
+export async function disposeDiskSignatureCache(): Promise<void> {
+  const cache = diskCache
+  diskCache = null
+  await cache?.dispose()
 }
 
 /**

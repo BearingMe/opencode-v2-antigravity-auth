@@ -1,5 +1,4 @@
 import { exec } from "node:child_process";
-import { tool } from "@opencode-ai/plugin";
 import {
   ANTIGRAVITY_DEFAULT_PROJECT_ID,
   ANTIGRAVITY_ENDPOINT_FALLBACKS,
@@ -45,12 +44,11 @@ import { createAutoUpdateCheckerHook } from "./hooks/auto-update-checker";
 import { loadConfig, initRuntimeConfig, type AntigravityConfig } from "./plugin/config";
 import { createSessionRecoveryHook, getRecoverySuccessToast } from "./plugin/recovery";
 import { checkAccountsQuota } from "./plugin/quota";
-import { initDiskSignatureCache } from "./plugin/cache";
+import { disposeDiskSignatureCache, initDiskSignatureCache } from "./plugin/cache";
 import { createProactiveRefreshQueue, type ProactiveRefreshQueue } from "./plugin/refresh-queue";
 import { initLogger, createLogger } from "./plugin/logger";
 import { initHealthTracker, getHealthTracker, initTokenTracker, getTokenTracker } from "./plugin/rotation";
 import { initAntigravityVersion } from "./plugin/version";
-import { executeSearch } from "./plugin/search";
 import type {
   GetAuth,
   LoaderResult,
@@ -91,6 +89,13 @@ let rateLimitToastShown = false;
 
 // Module-level reference to AccountManager for access from auth.login
 let activeAccountManager: import("./plugin/accounts").AccountManager | null = null;
+let activeRefreshQueue: ProactiveRefreshQueue | null = null;
+
+export async function disposeAntigravityRuntimeResources(): Promise<void> {
+  activeRefreshQueue?.stop();
+  activeRefreshQueue = null;
+  await disposeDiskSignatureCache();
+}
 
 function cleanupToastCooldowns(): void {
   if (rateLimitToastCooldowns.size > MAX_TOAST_COOLDOWN_ENTRIES) {
@@ -435,7 +440,7 @@ function extractVerificationErrorDetails(bodyText: string): {
   };
 }
 
-async function verifyAccountAccess(
+export async function verifyAccountAccess(
   account: {
     refreshToken: string;
     email?: string;
@@ -475,42 +480,27 @@ async function verifyAccountAccess(
     return { status: "error", message: "Could not refresh access token for this account." };
   }
 
-  const projectId =
-    parsed.managedProjectId ??
-    parsed.projectId ??
-    account.managedProjectId ??
-    account.projectId ??
-    ANTIGRAVITY_DEFAULT_PROJECT_ID;
-
-  const headers: Record<string, string> = {
-    ...getAntigravityHeaders(),
-    Authorization: `Bearer ${refreshedAuth.access}`,
-    "Content-Type": "application/json",
-  };
-  if (projectId) {
-    headers["x-goog-user-project"] = projectId;
-  }
-
-  const requestBody = {
-    model: "gemini-3-flash",
-    request: {
-      model: "gemini-3-flash",
-      contents: [{ role: "user", parts: [{ text: "ping" }] }],
-      generationConfig: { maxOutputTokens: 1, temperature: 0 },
-    },
-  };
-
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 20000);
 
   let response: Response;
   try {
-    response = await fetch(`${ANTIGRAVITY_ENDPOINT_PROD}/v1internal:streamGenerateContent?alt=sse`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(requestBody),
-      signal: controller.signal,
-    });
+    const project = await ensureProjectContext(refreshedAuth);
+    const prepared = prepareAntigravityRequest(
+      "https://generativelanguage.googleapis.com/v1beta/models/antigravity-gemini-3.1-pro:generateContent",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: "Reply OK" }] }],
+          generationConfig: { maxOutputTokens: 16, temperature: 0 },
+        }),
+        signal: controller.signal,
+      },
+      refreshedAuth.access,
+      project.effectiveProjectId,
+    );
+    response = await fetch(prepared.request, prepared.init);
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       return { status: "error", message: "Verification check timed out." };
@@ -1217,9 +1207,6 @@ export const createAntigravityPlugin = (providerId: string) => async (
   const config = loadConfig(directory);
   initRuntimeConfig(config);
 
-  // Cached getAuth function for tool access
-  let cachedGetAuth: GetAuth | null = null;
-  
   // Initialize debug with config
   initializeDebug(config);
   
@@ -1331,66 +1318,11 @@ export const createAntigravityPlugin = (providerId: string) => async (
     }
   };
 
-  // Create google_search tool with access to auth context
-  const googleSearchTool = tool({
-    description: "Search the web using Google Search and analyze URLs. Returns real-time information from the internet with source citations. Use this when you need up-to-date information about current events, recent developments, or any topic that may have changed. You can also provide specific URLs to analyze. IMPORTANT: If the user mentions or provides any URLs in their query, you MUST extract those URLs and pass them in the 'urls' parameter for direct analysis.",
-    args: {
-      query: tool.schema.string().describe("The search query or question to answer using web search"),
-      urls: tool.schema.array(tool.schema.string()).optional().describe("List of specific URLs to fetch and analyze. IMPORTANT: Always extract and include any URLs mentioned by the user in their query here."),
-      thinking: tool.schema.boolean().optional().default(true).describe("Enable deep thinking for more thorough analysis (default: true)"),
-    },
-    async execute(args, ctx) {
-      log.debug("Google Search tool called", { query: args.query, urlCount: args.urls?.length ?? 0 });
-
-      // Get current auth context
-      const auth = cachedGetAuth ? await cachedGetAuth() : null;
-      if (!auth || !isOAuthAuth(auth)) {
-        return "Error: Not authenticated with Antigravity. Please run `opencode auth login` to authenticate.";
-      }
-
-      // Get access token and project ID
-      const parts = parseRefreshParts(auth.refresh);
-      const projectId = parts.managedProjectId || parts.projectId || "unknown";
-
-      // Ensure we have a valid access token
-      let accessToken = auth.access;
-      if (!accessToken || accessTokenExpired(auth)) {
-        try {
-          const refreshed = await refreshAccessToken(auth, client, providerId);
-          accessToken = refreshed?.access;
-        } catch (error) {
-          return `Error: Failed to refresh access token: ${error instanceof Error ? error.message : String(error)}`;
-        }
-      }
-
-      if (!accessToken) {
-        return "Error: No valid access token available. Please run `opencode auth login` to re-authenticate.";
-      }
-
-      return executeSearch(
-        {
-          query: args.query,
-          urls: args.urls,
-          thinking: args.thinking,
-        },
-        accessToken,
-        projectId,
-        ctx.abort,
-      );
-    },
-  });
-
   return {
     event: eventHandler,
-    tool: {
-      google_search: googleSearchTool,
-    },
     auth: {
     provider: providerId,
     loader: async (getAuth: GetAuth, provider: Provider): Promise<LoaderResult | Record<string, unknown>> => {
-      // Cache getAuth for tool access
-      cachedGetAuth = getAuth;
-
       const auth = await getAuth();
       
       // If OpenCode has no valid OAuth auth, clear any stale account storage
@@ -1417,15 +1349,16 @@ export const createAntigravityPlugin = (providerId: string) => async (
       }
 
       // Initialize proactive token refresh queue (ported from LLM-API-Key-Proxy)
-      let refreshQueue: ProactiveRefreshQueue | null = null;
+      activeRefreshQueue?.stop();
+      activeRefreshQueue = null;
       if (config.proactive_token_refresh && accountManager.getAccountCount() > 0) {
-        refreshQueue = createProactiveRefreshQueue(client, providerId, {
+        activeRefreshQueue = createProactiveRefreshQueue(client, providerId, {
           enabled: config.proactive_token_refresh,
           bufferSeconds: config.proactive_refresh_buffer_seconds,
           checkIntervalSeconds: config.proactive_refresh_check_interval_seconds,
         });
-        refreshQueue.setAccountManager(accountManager);
-        refreshQueue.start();
+        activeRefreshQueue.setAccountManager(accountManager);
+        activeRefreshQueue.start();
       }
 
       if (isDebugEnabled()) {
@@ -1452,13 +1385,35 @@ export const createAntigravityPlugin = (providerId: string) => async (
       return {
         apiKey: "",
         async fetch(input, init) {
-          if (!isGenerativeLanguageRequest(input)) {
+          const originalInput = input;
+          const originalInit = init;
+          const requestInput = input instanceof Request ? new Request(input.clone(), init) : undefined;
+          const requestUrl = requestInput?.url ?? (input instanceof URL ? input.toString() : typeof input === "string" ? input : input.url);
+          if (!isGenerativeLanguageRequest(requestUrl)) {
             return fetch(input, init);
+          }
+
+          if (requestInput) {
+            const headers = new Headers(requestInput.headers);
+            const requestBody = requestInput.body ? await requestInput.clone().arrayBuffer() : undefined;
+            const body = requestBody && headers.get("content-type")?.toLowerCase().includes("json")
+              ? new TextDecoder().decode(requestBody)
+              : requestBody;
+            input = requestUrl;
+            init = {
+              ...init,
+              method: requestInput.method,
+              headers,
+              body,
+              signal: requestInput.signal,
+            };
+          } else {
+            input = requestUrl;
           }
 
           const latestAuth = await getAuth();
           if (!isOAuthAuth(latestAuth)) {
-            return fetch(input, init);
+            return fetch(originalInput, originalInit);
           }
 
           if (accountManager.getAccountCount() === 0) {
@@ -2022,6 +1977,11 @@ export const createAntigravityPlugin = (providerId: string) => async (
                   tokenConsumed = getTokenTracker().consume(account.index);
                 }
 
+                log.info("dispatching Antigravity request", {
+                  destination: new URL(toUrlString(prepared.request)).hostname,
+                  model: prepared.effectiveModel ?? prepared.requestedModel,
+                  headerStyle,
+                });
                 const response = await fetch(prepared.request, prepared.init);
                 pushDebug(`status=${response.status} ${response.statusText}`);
 
