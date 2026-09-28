@@ -1,53 +1,19 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { HeaderStyle, ModelFamily } from "./accounts";
+import { DEFAULT_CONFIG } from "./config/schema";
+import {
+  getHeaderStyleFromUrl,
+  resolveHeaderRoutingDecision,
+  resolveQuotaFallbackHeaderStyle,
+} from "./engine";
 
-type ResolveQuotaFallbackHeaderStyle = (input: {
-  family: ModelFamily;
-  headerStyle: HeaderStyle;
-  alternateStyle: HeaderStyle | null;
-}) => HeaderStyle | null;
-
-type GetHeaderStyleFromUrl = (
-  urlString: string,
-  family: ModelFamily,
-  cliFirst?: boolean,
-) => HeaderStyle;
-
-type ResolveHeaderRoutingDecision = (
-  urlString: string,
-  family: ModelFamily,
-  config: unknown,
-) => {
-  cliFirst: boolean;
-  preferredHeaderStyle: HeaderStyle;
-  explicitQuota: boolean;
-  allowQuotaFallback: boolean;
-};
-
-let resolveQuotaFallbackHeaderStyle: ResolveQuotaFallbackHeaderStyle | undefined;
-let getHeaderStyleFromUrl: GetHeaderStyleFromUrl | undefined;
-let resolveHeaderRoutingDecision: ResolveHeaderRoutingDecision | undefined;
-
-beforeAll(async () => {
-  vi.mock("@opencode-ai/plugin", () => ({
-    tool: vi.fn(),
-  }));
-
-  const { __testExports } = await import("../plugin");
-  resolveQuotaFallbackHeaderStyle = (__testExports as {
-    resolveQuotaFallbackHeaderStyle?: ResolveQuotaFallbackHeaderStyle;
-  }).resolveQuotaFallbackHeaderStyle;
-  getHeaderStyleFromUrl = (__testExports as {
-    getHeaderStyleFromUrl?: GetHeaderStyleFromUrl;
-  }).getHeaderStyleFromUrl;
-  resolveHeaderRoutingDecision = (__testExports as {
-    resolveHeaderRoutingDecision?: ResolveHeaderRoutingDecision;
-  }).resolveHeaderRoutingDecision;
-});
+function decisionConfig(overrides: Record<string, unknown> = {}) {
+  return { ...DEFAULT_CONFIG, ...overrides };
+}
 
 describe("quota fallback direction", () => {
   it("falls back from gemini-cli to antigravity when alternate quota is available", () => {
-    const result = resolveQuotaFallbackHeaderStyle?.({
+    const result = resolveQuotaFallbackHeaderStyle({
       family: "gemini",
       headerStyle: "gemini-cli",
       alternateStyle: "antigravity",
@@ -57,7 +23,7 @@ describe("quota fallback direction", () => {
   });
 
   it("falls back from antigravity to gemini-cli when alternate quota is available", () => {
-    const result = resolveQuotaFallbackHeaderStyle?.({
+    const result = resolveQuotaFallbackHeaderStyle({
       family: "gemini",
       headerStyle: "antigravity",
       alternateStyle: "gemini-cli",
@@ -67,7 +33,7 @@ describe("quota fallback direction", () => {
   });
 
   it("returns null when no alternate quota is available", () => {
-    const result = resolveQuotaFallbackHeaderStyle?.({
+    const result = resolveQuotaFallbackHeaderStyle({
       family: "gemini",
       headerStyle: "antigravity",
       alternateStyle: null,
@@ -79,7 +45,7 @@ describe("quota fallback direction", () => {
 
 describe("header style resolution", () => {
   it("uses gemini-cli for unsuffixed Gemini models when cli_first is enabled", () => {
-    const headerStyle = getHeaderStyleFromUrl?.(
+    const headerStyle = getHeaderStyleFromUrl(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:streamGenerateContent",
       "gemini",
       true,
@@ -89,7 +55,7 @@ describe("header style resolution", () => {
   });
 
   it("keeps antigravity for unsuffixed Gemini models when cli_first is disabled", () => {
-    const headerStyle = getHeaderStyleFromUrl?.(
+    const headerStyle = getHeaderStyleFromUrl(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:streamGenerateContent",
       "gemini",
       false,
@@ -99,7 +65,7 @@ describe("header style resolution", () => {
   });
 
   it("keeps antigravity for explicit antigravity prefix when cli_first is enabled", () => {
-    const headerStyle = getHeaderStyleFromUrl?.(
+    const headerStyle = getHeaderStyleFromUrl(
       "https://generativelanguage.googleapis.com/v1beta/models/antigravity-gemini-3-flash:streamGenerateContent",
       "gemini",
       true,
@@ -109,7 +75,7 @@ describe("header style resolution", () => {
   });
 
   it("keeps antigravity for Claude when cli_first is enabled", () => {
-    const headerStyle = getHeaderStyleFromUrl?.(
+    const headerStyle = getHeaderStyleFromUrl(
       "https://generativelanguage.googleapis.com/v1beta/models/claude-opus-4-6-thinking:streamGenerateContent",
       "claude",
       true,
@@ -121,12 +87,12 @@ describe("header style resolution", () => {
 
 describe("header routing decision", () => {
   it("defaults to antigravity-first for unsuffixed Gemini when cli_first is disabled", () => {
-    const decision = resolveHeaderRoutingDecision?.(
+    const decision = resolveHeaderRoutingDecision(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:streamGenerateContent",
       "gemini",
-      {
+      decisionConfig({
         cli_first: false,
-      },
+      }),
     );
 
     expect(decision).toMatchObject({
@@ -138,12 +104,12 @@ describe("header routing decision", () => {
   });
 
   it("uses gemini-cli-first for unsuffixed Gemini when cli_first is enabled", () => {
-    const decision = resolveHeaderRoutingDecision?.(
+    const decision = resolveHeaderRoutingDecision(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:streamGenerateContent",
       "gemini",
-      {
+      decisionConfig({
         cli_first: true,
-      },
+      }),
     );
 
     expect(decision).toMatchObject({
@@ -155,12 +121,12 @@ describe("header routing decision", () => {
   });
 
   it("keeps explicit antigravity prefix as primary route while fallback remains available", () => {
-    const decision = resolveHeaderRoutingDecision?.(
+    const decision = resolveHeaderRoutingDecision(
       "https://generativelanguage.googleapis.com/v1beta/models/antigravity-gemini-3-flash:streamGenerateContent",
       "gemini",
-      {
+      decisionConfig({
         cli_first: true,
-      },
+      }),
     );
 
     expect(decision).toMatchObject({
@@ -172,13 +138,13 @@ describe("header routing decision", () => {
   });
 
   it("ignores legacy quota_fallback when deciding Gemini fallback availability", () => {
-    const decision = resolveHeaderRoutingDecision?.(
+    const decision = resolveHeaderRoutingDecision(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:streamGenerateContent",
       "gemini",
-      {
+      decisionConfig({
         cli_first: false,
         quota_fallback: false,
-      },
+      }),
     );
 
     expect(decision).toMatchObject({

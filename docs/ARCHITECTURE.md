@@ -1,6 +1,6 @@
 # Architecture Guide
 
-**Last Updated:** April 2026
+**Last Updated:** September 2026 (V2 native engine; V1 harness and `google_search` tool removed)
 
 This document explains how the Antigravity plugin works: request/response flow, Claude-specific handling, and session recovery.
 
@@ -27,13 +27,17 @@ The plugin intercepts requests to `generativelanguage.googleapis.com`, transform
 
 ```
 src/
-├── index.ts                 # Plugin exports
-├── plugin.ts                # Main entry, fetch interceptor
+├── v2-plugin.ts               # V2 plugin entry, SDK hook + fetch bridge
+├── google-sdk.ts              # Distinct AISDK module so the SDK hook applies
 ├── constants.ts             # Endpoints, headers, config
 ├── antigravity/
 │   └── oauth.ts             # OAuth token exchange
 └── plugin/
+    ├── engine.ts            # Native request/rotation engine (sole router)
+    ├── verify.ts            # Account access verification
+    ├── verification.ts      # Shared verification-error helpers
     ├── auth.ts              # Token validation & refresh
+    ├── token.ts             # Unified OAuth refresh path
     ├── request.ts           # Request transformation (main logic)
     ├── request-helpers.ts   # Schema cleaning, thinking filters
     ├── thinking-recovery.ts # Turn boundary detection, crash recovery
@@ -46,23 +50,33 @@ src/
     │   ├── schema.ts        # Zod config schema
     │   └── loader.ts        # Config file loading
     ├── accounts.ts          # Multi-account management
-    ├── server.ts            # OAuth callback server
+    ├── refresh-queue.ts     # Proactive token refresh
+    ├── rotation.ts          # Health/token-bucket rotation scoring
     └── debug.ts             # Debug logging
 ```
+
+> Historical: V1 `src/plugin.ts` (fetch interceptor), `cli.ts`, `server.ts`
+> (OAuth callback server), `ui/`, and `plugin/search.ts` (`google_search`
+> tool) were removed. The D-SEARCH-MUTEX guard for model-declared web
+> search stays in the request pipeline.
 
 ---
 
 ## Request Flow
 
-### 1. Interception (`plugin.ts`)
+### 1. Interception (`v2-plugin.ts` + `plugin/engine.ts`)
 
 ```typescript
-fetch() intercepted → isGenerativeLanguageRequest() → prepareAntigravityRequest()
+aisdk.sdk hook (antigravity-/gemini- models) → antigravityFetch → executeAntigravityRequest()
+fetch() bridge → getFetchDestination()/isGenerativeLanguageModelPath() → prepareAntigravityRequest()
 ```
 
-- Account selection (round-robin, rate-limit aware)
-- Token refresh if expired
-- Endpoint fallback (daily → autopush → prod)
+- Account selection (sticky/hybrid/round-robin, rate-limit aware)
+- Token refresh if expired (unified path via `token.ts`)
+- Endpoint fallback (daily → prod; AUTOPUSH removed)
+- Fetch-path toasts are fail-open: the fetch call site carries no session
+  ID, so unknown sessions classify as ROOT; the recovery path passes its
+  explicit session ID and honors `quiet_mode` + `toast_scope=root_only`
 
 ### 2. Request Transformation (`request.ts`)
 

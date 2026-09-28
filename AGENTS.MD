@@ -8,17 +8,19 @@ OpenCode plugin for Google Antigravity OAuth. Intercepts `fetch()` calls to `gen
 
 ## Build & Test Commands
 
+Package and workflow scripts use Bun (`npx --yes bun@1.4.2` if bun is not directly in PATH):
+
 ```bash
-npm install                          # Install dependencies
-npm run build                        # Compile (tsc -p tsconfig.build.json)
-npm run typecheck                    # Type-check only (tsc --noEmit)
-npm test                             # Run all tests (vitest run)
-npx vitest run src/plugin/auth.test.ts          # Single test file
-npx vitest run -t "test name here"              # Single test by name
-npx vitest --watch src/plugin/auth.test.ts      # Watch mode, single file
-npm run test:coverage                # Coverage report
-npm run test:e2e:models              # E2E: model availability check
-npm run test:e2e:regression          # E2E: regression suite
+bun install                          # Install dependencies (or: npx --yes bun@1.4.2 install)
+bun run build                        # Compile (tsc -p tsconfig.build.json)
+bun run typecheck                    # Type-check only (tsc --noEmit)
+bun run test                         # Run all tests (vitest run)
+bunx vitest run src/plugin/auth.test.ts          # Single test file (or: npx --yes bun@1.4.2 x vitest ...)
+bunx vitest run -t "test name here"              # Single test by name
+bunx vitest --watch src/plugin/auth.test.ts      # Watch mode, single file
+bun run test:coverage                # Coverage report
+bun run test:e2e:models              # E2E: model availability check
+bun run test:e2e:regression          # E2E: regression suite
 ```
 
 No linter or formatter is configured. Style is enforced by convention (see below).
@@ -38,9 +40,15 @@ No linter or formatter is configured. Style is enforced by convention (see below
 - Named imports only — no default imports in src/
 - Relative paths with `.ts` extensions: `import { foo } from "./bar.ts"`
 - Order: node builtins > external packages > local modules
+- Exception: `tsconfig.build.json` sets `allowImportingTsExtensions: false`
+  (TS5097 under emit), so NON-TEST runtime sources MUST use emit-compatible
+  imports (`.js`-suffixed or extensionless, e.g. `./bar.js`); `.ts`-suffixed
+  imports break `bun run build` even though `typecheck` accepts them
 
 ### Exports
-- Named exports only in src/ — no default exports
+- Named exports only in src/ — no default exports (sole exception:
+  `src/v2-plugin.ts` default-exports `Plugin.define`, as required by the
+  OpenCode V2 plugin contract)
 - Barrel files (index.ts) for module surfaces
 
 ### Naming
@@ -82,11 +90,16 @@ No linter or formatter is configured. Style is enforced by convention (see below
 
 ```
 src/
-├── plugin.ts                # Main entry, fetch interceptor
+├── v2-plugin.ts               # V2 entry, SDK hook + fetch bridge
+├── google-sdk.ts              # Isolated AISDK module (hook routing key)
 ├── constants.ts             # Endpoints, headers, API config, system prompts
 ├── antigravity/oauth.ts     # OAuth token exchange
 └── plugin/
+    ├── engine.ts            # Native request/rotation engine (sole router)
+    ├── verify.ts            # Account access verification
+    ├── verification.ts      # Shared verification-error helpers
     ├── auth.ts              # Token validation & refresh
+    ├── token.ts             # Unified OAuth refresh path
     ├── request.ts           # Request transformation (core logic)
     ├── request-helpers.ts   # Schema cleaning, thinking filters
     ├── thinking-recovery.ts # Turn boundary detection
@@ -97,8 +110,14 @@ src/
     ├── storage.ts           # Persistent storage schemas (Zod)
     ├── fingerprint.ts       # Device fingerprint generation & headers
     ├── project.ts           # Managed project context resolution
+    ├── refresh-queue.ts     # Proactive token refresh
+    ├── rotation.ts          # Health/token-bucket rotation scoring
     └── debug.ts             # Debug logging utilities
 ```
+
+> Historical: V1 `src/plugin.ts`, `cli.ts`, `server.ts`, `ui/`, and
+> `plugin/search.ts` (`google_search` tool) were removed; the D-SEARCH-MUTEX
+> guard for model-declared web search stays in the request pipeline.
 
 ## Key Design Patterns
 
@@ -135,6 +154,62 @@ Per-account device fingerprints stored in `antigravity-accounts.json`. Each fing
 - Tests colocated: `src/plugin/foo.test.ts` next to `src/plugin/foo.ts`
 - Use `describe`/`it`/`expect` — standard Vitest API
 - Mock with `vi.fn()`, `vi.spyOn()`, `vi.mock()`
+
+## Oracle
+
+Oracle is a high-confidence technical advisor for difficult reasoning, consequential decisions, and resolving uncertainty. It complements repository exploration and documentation retrieval rather than replacing them.
+
+### When to use Oracle
+
+Consult Oracle when the task involves:
+
+- consequential architectural or design decisions
+- ambiguity that remains after reasonable exploration
+- reasoning across multiple subsystems or sources of evidence
+- conflicting code, documentation, requirements, or assumptions
+- subtle correctness, concurrency, security, migration, or data-integrity concerns
+- unfamiliar systems where choosing the wrong approach would be expensive
+- debugging where evidence has been gathered but the underlying cause remains unclear
+- validating an important assumption before committing to it
+- challenging a proposed approach when an independent technical assessment would materially reduce risk
+
+Do not use Oracle for routine retrieval or mechanical work. Finding files, symbols, implementations, usages, documentation, or straightforward facts should normally be handled through repository exploration or documentation tools.
+
+A useful distinction:
+
+- **Explore** answers: *What exists? Where is it? How is it currently implemented?*
+- **Documentation tools** answer: *What does the external API/library officially support?*
+- **Oracle** answers: *Given the evidence and constraints, what is actually going on, what assumptions are safe, and what approach should we take?*
+
+### How to use Oracle
+
+Do the cheap investigation first. Gather the relevant code, documentation, errors, constraints, attempted approaches, and competing hypotheses before consulting Oracle.
+
+Ask focused, decision-oriented questions with enough context for Oracle to reason about the problem. Prefer:
+
+> "The plan assumes `SessionStore` supports concurrent writes, but its implementation performs an unlocked read-modify-write and these call sites invoke it concurrently. Is that assumption valid? What invariant should the implementation preserve?"
+
+over:
+
+> "Look at the session system."
+
+Treat Oracle's output as expert advice, not authority. Verify its claims against available evidence when practical, and do not follow recommendations that conflict with stronger repository or authoritative documentation evidence.
+
+### Planning
+
+During planning, use Oracle to resolve uncertainties that materially affect the architecture or implementation strategy. Incorporate useful conclusions, assumptions, constraints, and caveats into the plan so downstream workers do not need to rediscover them.
+
+### Implementation
+
+During implementation, follow the plan and repository evidence by default. Consult Oracle when new evidence invalidates an important assumption, exposes a consequential ambiguity, or forces a significant design choice not addressed by the plan.
+
+If Oracle's conclusion would substantially change the approved plan, escalate the issue rather than silently redesigning the system.
+
+### Principle
+
+Use Oracle for **reasoning, not retrieval**.
+
+Explore first, retrieve authoritative documentation when needed, then use Oracle where judgment remains valuable. Oracle should reduce uncertainty on decisions that matter, not become an expensive substitute for ordinary investigation.
 
 ## Documentation
 

@@ -724,8 +724,13 @@ const STREAM_ACTION = "streamGenerateContent";
 /**
  * Detects requests headed to the Google Generative Language API so we can intercept them.
  */
-export function isGenerativeLanguageRequest(input: RequestInfo): input is string {
-  return typeof input === "string" && input.includes("generativelanguage.googleapis.com");
+export function isGenerativeLanguageRequest(input: RequestInfo): boolean {
+  const value = typeof input === "string" ? input : input.url;
+  try {
+    return new URL(value).hostname === "generativelanguage.googleapis.com";
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -787,13 +792,16 @@ export function prepareAntigravityRequest(
   }
 
   headers.set("Authorization", `Bearer ${accessToken}`);
+  // OAuth requests must not carry the Google SDK's API-key credential.
+  headers.delete("x-goog-api-key");
   headers.delete("x-api-key");
   // Strip x-goog-user-project header to prevent 403 auth/license conflicts.
   // This header is added by OpenCode/AI SDK and can force project-level checks
   // that are not required for Antigravity/Gemini CLI OAuth requests.
   headers.delete("x-goog-user-project");
 
-  const match = input.match(/\/models\/([^:]+):(\w+)/);
+  const requestUrl = typeof input === "string" ? input : input.url;
+  const match = requestUrl.match(/\/models\/([^:]+):(\w+)/);
   if (!match) {
     return {
       request: input,

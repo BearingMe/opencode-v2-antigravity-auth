@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AccountManager, type ModelFamily, type HeaderStyle, parseRateLimitReason, calculateBackoffMs, type RateLimitReason, resolveQuotaGroup } from "./accounts";
+import { saveAccounts } from "./storage";
 import type { AccountStorageV4 } from "./storage";
 import type { OAuthAuthDetails } from "./types";
 
@@ -18,6 +19,34 @@ describe("AccountManager", () => {
   beforeEach(() => {
     vi.useRealTimers();
     vi.stubGlobal("process", { ...process, pid: 0 });
+  });
+
+  it("preserves verification result metadata across account-manager persistence", async () => {
+    const stored: AccountStorageV4 = {
+      version: 4,
+      accounts: [{
+        refreshToken: "verified-refresh",
+        addedAt: 1,
+        lastUsed: 2,
+        lastVerificationAt: 1234,
+        lastVerificationStatus: "ok",
+      }],
+      activeIndex: 0,
+    };
+    const manager = new AccountManager(undefined, stored);
+
+    expect(manager.getAccounts()[0]).toMatchObject({
+      lastVerificationAt: 1234,
+      lastVerificationStatus: "ok",
+    });
+    await manager.saveToDisk();
+
+    expect(saveAccounts).toHaveBeenCalledWith(expect.objectContaining({
+      accounts: [expect.objectContaining({
+        lastVerificationAt: 1234,
+        lastVerificationStatus: "ok",
+      })],
+    }));
   });
 
   it("treats on-disk storage as source of truth, even when empty", () => {

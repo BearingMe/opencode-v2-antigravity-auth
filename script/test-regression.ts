@@ -1,4 +1,4 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env bun
 import { spawn } from "child_process";
 
 type Category = "thinking-order" | "tool-pairing" | "multi-tool" | "multi-provider" | "error-handling" | "stress" | "concurrency";
@@ -535,7 +535,8 @@ Tests:
     - stress-50-turn-endurance (51 turns, endurance test)
 
 Usage:
-  npx tsx script/test-regression.ts [options]
+  bun run script/test-regression.ts [options]
+  (or: npx tsx script/test-regression.ts [options])
 
 Options:
   --sanity              Run sanity tests only (quick)
@@ -546,9 +547,9 @@ Options:
   --help, -h            Show this help
 
 Examples:
-  npx tsx script/test-regression.ts --sanity
-  npx tsx script/test-regression.ts --heavy
-  npx tsx script/test-regression.ts --test stress-20-turn-recovery
+  bun run script/test-regression.ts --sanity
+  bun run script/test-regression.ts --heavy
+  bun run script/test-regression.ts --test stress-20-turn-recovery
 `);
 }
 

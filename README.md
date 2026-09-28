@@ -8,13 +8,15 @@
 
 Enable Opencode to authenticate against **Antigravity** (Google's IDE) via OAuth so you can use Antigravity rate limits and access models like `gemini-3.1-pro` and `claude-opus-4-6-thinking` with your Google credentials.
 
+> **V2 migration status:** model requests reuse the existing Antigravity transformation, streaming, quota, rotation, and recovery engine through OpenCode V2's AI SDK custom-fetch path. Existing account-pool files remain in use. V2 replaces the old interactive terminal account menu with the `antigravity_accounts` tool and Google OAuth integration form; TUI toasts are emitted as plugin logs because server plugins have no equivalent toast API. Validate against your V2 provider/model configuration before relying on it in production.
+
 ## What You Get
 
 - **Claude Opus 4.6, Sonnet 4.6** and **Gemini 3.1 Pro/Flash** via Google OAuth
 - **Multi-account support** — add multiple Google accounts, auto-rotates when rate-limited
 - **Dual quota system** — access both Antigravity and Gemini CLI quotas from one plugin
 - **Thinking models** — extended thinking for Claude and Gemini 3 with configurable budgets
-- **Google Search grounding** — enable web search for Gemini models (auto or always-on)
+- **Google Search grounding (removed)** — the dedicated `google_search` tool was deleted; model-declared web search is still sanitized by the request pipeline but no search tool is registered anymore
 - **Auto-recovery** — handles session errors and tool failures automatically
 - **Plugin compatible** — works alongside other OpenCode plugins (oh-my-opencode, dcp, etc.)
 
@@ -55,21 +57,19 @@ Install the opencode-antigravity-auth plugin and add the Antigravity model defin
 
    ```json
    {
-     "plugin": ["opencode-antigravity-auth@latest"]
+     "plugins": ["opencode-antigravity-auth@latest"]
    }
    ```
 
    > Want bleeding-edge features? Use `opencode-antigravity-auth@beta` instead.
 
-2. **Login** with your Google account:
+2. **Connect Google Antigravity** from OpenCode's integrations/authentication UI and complete the OAuth flow:
 
    ```bash
-   opencode auth login
+   Open the Google integration and choose **OAuth with Google (Antigravity)**
    ```
 
-3. **Add models** — choose one:
-   - Run `opencode auth login` → Google → OAuth with Google (Antigravity) → select **"Configure models in opencode.json"** (auto-configures all models)
-   - Or manually copy the [full configuration](#models) below
+3. **Add models** by copying the [full configuration](#models) below. V2 model definitions are configured in `opencode.json`.
 
 4. **Use it:**
 

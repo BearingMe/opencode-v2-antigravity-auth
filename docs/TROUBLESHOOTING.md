@@ -57,7 +57,7 @@ opencode auth login
 
 **Windows (PowerShell):**
 ```powershell
-Remove-Item "$env:APPDATA\opencode\antigravity-accounts.json" -Force -ErrorAction SilentlyContinue
+Remove-Item "$env:USERPROFILE\.config\opencode\antigravity-accounts.json" -Force -ErrorAction SilentlyContinue
 Remove-Item "$env:LOCALAPPDATA\opencode\Cache\node_modules\opencode-antigravity-auth" -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item "$env:USERPROFILE\.bun\install\cache\opencode-antigravity-auth*" -Recurse -Force -ErrorAction SilentlyContinue
 opencode auth login
@@ -457,9 +457,9 @@ Logs are in `~/.config/opencode/antigravity-logs/`.
 The plugin includes regression tests (consume API quota):
 
 ```bash
-npx tsx script/test-regression.ts --sanity      # 7 tests, ~5 min
-npx tsx script/test-regression.ts --heavy       # 4 tests, ~30 min
-npx tsx script/test-regression.ts --dry-run     # List tests
+bun run script/test-regression.ts --sanity      # 7 tests, ~5 min (or: npx tsx script/test-regression.ts --sanity)
+bun run script/test-regression.ts --heavy       # 4 tests, ~30 min
+bun run script/test-regression.ts --dry-run     # List tests
 ```
 
 ---

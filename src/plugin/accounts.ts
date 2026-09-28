@@ -153,6 +153,8 @@ export interface ManagedAccount {
   verificationRequiredAt?: number;
   verificationRequiredReason?: string;
   verificationUrl?: string;
+  lastVerificationAt?: number;
+  lastVerificationStatus?: "ok" | "blocked" | "error";
 }
 
 function nowMs(): number {
@@ -367,6 +369,8 @@ export class AccountManager {
             verificationRequiredAt: acc.verificationRequiredAt,
             verificationRequiredReason: acc.verificationRequiredReason,
             verificationUrl: acc.verificationUrl,
+            lastVerificationAt: acc.lastVerificationAt,
+            lastVerificationStatus: acc.lastVerificationStatus,
           };
         })
         .filter((a): a is ManagedAccount => a !== null);
@@ -1014,6 +1018,8 @@ export class AccountManager {
         verificationRequiredAt: a.verificationRequiredAt,
         verificationRequiredReason: a.verificationRequiredReason,
         verificationUrl: a.verificationUrl,
+        lastVerificationAt: a.lastVerificationAt,
+        lastVerificationStatus: a.lastVerificationStatus,
       })),
       activeIndex: claudeIndex,
       activeIndexByFamily: {
