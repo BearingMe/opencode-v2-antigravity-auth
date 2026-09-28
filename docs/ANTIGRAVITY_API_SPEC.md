@@ -67,6 +67,11 @@ X-Goog-Api-Client: google-cloud-sdk vscode_cloudshelleditor/0.1
 Client-Metadata: {"ideType":"ANTIGRAVITY","platform":"MACOS","pluginType":"GEMINI"}
 ```
 
+> Example snapshot only. Runtime values come from
+> `src/constants.ts :: getAntigravityHeaders()` /
+> `getRandomizedHeaders()` (version fallback `1.18.3`, platform-aware
+> `WINDOWS|MACOS`, dual `antigravity` / `gemini-cli` styles).
+
 For streaming requests, also include:
 ```http
 Accept: text/event-stream
@@ -316,7 +321,7 @@ The underlying API uses these tool formats:
 { "type": { "enum": ["email"] } }
 ```
 
-**Note:** The plugin automatically handles these conversions via the `schema-transform.ts` module.
+**Note:** The plugin automatically handles these conversions via `src/plugin/request-helpers.ts :: cleanJSONSchemaForAntigravity` (plus the `transform/` sanitizers).
 
 ---
 

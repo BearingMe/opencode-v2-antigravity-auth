@@ -16,7 +16,7 @@ Enable Opencode to authenticate against **Antigravity** (Google's IDE) via OAuth
 - **Multi-account support** — add multiple Google accounts, auto-rotates when rate-limited
 - **Dual quota system** — access both Antigravity and Gemini CLI quotas from one plugin
 - **Thinking models** — extended thinking for Claude and Gemini 3 with configurable budgets
-- **Google Search grounding** — enable web search for Gemini models (auto or always-on)
+- **Google Search grounding (removed)** — the dedicated `google_search` tool was deleted; model-declared web search is still sanitized by the request pipeline but no search tool is registered anymore
 - **Auto-recovery** — handles session errors and tool failures automatically
 - **Plugin compatible** — works alongside other OpenCode plugins (oh-my-opencode, dcp, etc.)
 

@@ -57,7 +57,7 @@ opencode auth login
 
 **Windows (PowerShell):**
 ```powershell
-Remove-Item "$env:APPDATA\opencode\antigravity-accounts.json" -Force -ErrorAction SilentlyContinue
+Remove-Item "$env:USERPROFILE\.config\opencode\antigravity-accounts.json" -Force -ErrorAction SilentlyContinue
 Remove-Item "$env:LOCALAPPDATA\opencode\Cache\node_modules\opencode-antigravity-auth" -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item "$env:USERPROFILE\.bun\install\cache\opencode-antigravity-auth*" -Recurse -Force -ErrorAction SilentlyContinue
 opencode auth login

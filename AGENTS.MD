@@ -42,7 +42,9 @@ No linter or formatter is configured. Style is enforced by convention (see below
 - Order: node builtins > external packages > local modules
 
 ### Exports
-- Named exports only in src/ — no default exports
+- Named exports only in src/ — no default exports (sole exception:
+  `src/v2-plugin.ts` default-exports `Plugin.define`, as required by the
+  OpenCode V2 plugin contract)
 - Barrel files (index.ts) for module surfaces
 
 ### Naming
@@ -84,11 +86,16 @@ No linter or formatter is configured. Style is enforced by convention (see below
 
 ```
 src/
-├── plugin.ts                # Main entry, fetch interceptor
+├── v2-plugin.ts               # V2 entry, SDK hook + fetch bridge
+├── google-sdk.ts              # Isolated AISDK module (hook routing key)
 ├── constants.ts             # Endpoints, headers, API config, system prompts
 ├── antigravity/oauth.ts     # OAuth token exchange
 └── plugin/
+    ├── engine.ts            # Native request/rotation engine (sole router)
+    ├── verify.ts            # Account access verification
+    ├── verification.ts      # Shared verification-error helpers
     ├── auth.ts              # Token validation & refresh
+    ├── token.ts             # Unified OAuth refresh path
     ├── request.ts           # Request transformation (core logic)
     ├── request-helpers.ts   # Schema cleaning, thinking filters
     ├── thinking-recovery.ts # Turn boundary detection
@@ -99,8 +106,14 @@ src/
     ├── storage.ts           # Persistent storage schemas (Zod)
     ├── fingerprint.ts       # Device fingerprint generation & headers
     ├── project.ts           # Managed project context resolution
+    ├── refresh-queue.ts     # Proactive token refresh
+    ├── rotation.ts          # Health/token-bucket rotation scoring
     └── debug.ts             # Debug logging utilities
 ```
+
+> Historical: V1 `src/plugin.ts`, `cli.ts`, `server.ts`, `ui/`, and
+> `plugin/search.ts` (`google_search` tool) were removed; the D-SEARCH-MUTEX
+> guard for model-declared web search stays in the request pipeline.
 
 ## Key Design Patterns
 
