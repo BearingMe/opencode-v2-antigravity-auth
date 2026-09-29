@@ -10,7 +10,7 @@
 | Auth cache (refresh→details, prefer unexpired) | `plugin/cache.ts` | Memory | `clearCachedAuth` on `invalid_grant` |
 | Thinking-signature cache | `plugin/cache.ts` + `cache/signature-cache.ts` + `stores/signature-store.ts` | Memory (1 h, 100/session, expiry-then-oldest-quarter evict) + disk (48 h, 60 s write batch, `sessionId:modelId` keys, version 1.0) | TTL; `keep_thinking=false` disables disk init |
 | Health / token-bucket trackers | `plugin/rotation.ts` singletons | Memory (time-decayed) | `initHealthTracker/initTokenTracker` on setup |
-| Rate-limit / failure maps, warmup sets, toast cooldowns, child-session flag | `plugin.ts` module level | Memory, bounded (warmup 1000 LRU, toasts 100, 5 s cooldown) | Time-based reset (dedup 2 s, state 120 s, failure 120 s) |
+| Rate-limit / failure maps, warmup sets, toast cooldowns, child-session tracker | `plugin/engine.ts` module level + `v2-plugin.ts :: createChildSessionTracker` | Memory, bounded (warmup 1000 LRU, toasts 100, 5 s cooldown, child sessions 1000 with oldest eviction, duplicate-at-capacity safe) | Time-based reset (dedup 2 s, state 120 s, failure 120 s) |
 | Proactive refresh queue | `plugin/refresh-queue.ts` | Memory timers (5 s initial + interval; buffer 1800 s default, check 300 s) | `stop()` on teardown / loader re-entry |
 | Update-check once-flag | `hooks/auto-update-checker/index.ts` closure | Memory per plugin instance | N/A (once per instance) |
 
@@ -36,8 +36,7 @@ well as the 3-segment form with `managedProjectId`.
 Sources (precedence): user `~/.config/opencode/antigravity.json` THEN
 project `.opencode/antigravity.json` (partial Zod, `signature_cache`
 deep-merged) — `plugin/config/loader.ts :: loadConfig`; runtime singleton
-`initRuntimeConfig / getKeepThinking`. V1 `auth.login` inputs object is an
-additional CLI-flow source.
+`initRuntimeConfig / getKeepThinking`.
 
 Key knobs and defaults (`config/schema.ts :: DEFAULT_CONFIG`): `quiet_mode`,
 `toast_scope root_only|all`, `debug/debug_tui/log_dir`, `keep_thinking`,
@@ -48,16 +47,20 @@ memory/disk/write}`, empty-response retries, `tool_id_recovery`,
 `cli_first`, `account_selection sticky|round-robin|hybrid` (default hybrid),
 `pid_offset`, `switch_on_first`, scheduling `cache_first|balance|
 performance_first`, `max_cache_first 60`, `failure_ttl 3600`,
-`retry_after 60`, `max_backoff 60`, jitter 0, `soft_quota 90` /
-`quota_refresh 15` / ttl-auto, health/token-bucket params, `auto_update`.
-`quota_fallback` is deprecated.
+soft quota `soft_quota 90` / `quota_refresh 15` / ttl-auto,
+health/token-bucket params, `auto_update`, `claude_prompt_auto_caching`
+(1.6.0, default off).
+`quota_fallback` is deprecated and ignored (Gemini fallback across pools is
+always on; see `quota-fallback.test.ts`).
+Header-normalization note (1.5.0): `x-goog-user-project` is stripped for all
+styles. Debug-sink split (1.6.0): `debug` = file only, `debug_tui` = TUI only.
 
 Validation: Zod partial schemas; malformed JSONC in the update checker is
 tolerated (`continue` / null, no-throw — `checker.test.ts`).
 
 ## Lifecycle
 
-Init (`createAntigravityPlugin` / V2 `setup`): load config → runtime config
+Init (V2 `setup`): load config → runtime config
 → debug → logger → `await initAntigravityVersion()` (non-blocking intent but
 awaited; falls back to `1.18.3`) → health/token trackers → disk signature
 cache (if `keep_thinking`) → recovery hook → update-checker hook →
@@ -75,8 +78,9 @@ MUST NOT initiate update checks and SHOULD have toasts suppressed when
 `toast_scope=root_only`. Detecting a child session MUST NOT consume the
 update-checker once-flag (a later root session MUST still check).
 
-**Project evidence:** `plugin.ts` eventHandler + `hooks/auto-update-checker
-/index.ts`; `index.test.ts` :: once-per-instance, child ignored.
+**Project evidence:** `src/v2-plugin.ts` event handling +
+`hooks/auto-update-checker/index.ts`; `index.test.ts` ::
+once-per-instance, child ignored.
 
 **Status:** Explicit.
 

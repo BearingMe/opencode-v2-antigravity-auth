@@ -14,16 +14,19 @@
 ## Dependency direction (normative)
 
 ```text
-v2-plugin.ts ──uses──> plugin.ts :: createAntigravityPlugin / verifyAccountAccess / dispose
-plugin.ts ──uses──> plugin/{request,accounts,token,project,quota,config,cache,
-                     recovery,refresh-queue,logger,rotation,version,server,
-                     search,cli,debug,errors,request-helpers}
-                   + antigravity/oauth + hooks/auto-update-checker
+v2-plugin.ts ──uses──> plugin/engine.ts :: executeAntigravityRequest
+                       (sole router) + plugin/{request,accounts,token,
+                       project,quota,config,cache,recovery,refresh-queue,
+                       logger,rotation,version,debug,request-helpers,
+                       verify,verification,account-service}
+                    + antigravity/oauth + hooks/auto-update-checker
 plugin/* ──uses──> constants.ts (identity/endpoints/headers)
                    + plugin/{auth,storage,logger,debug} kernels
 transform/*, request-helpers ──should stay──> pure re: I/O
                    (except cache + config reads)
 ```
+(Historical diagram referencing `plugin.ts :: createAntigravityPlugin` was
+retired with the V1 deletion 2026-09-28, Task 2.)
 
 ### Rule: R-ARCH-V2-DELEGATES-V1 (retargeted 2026-09-28, Task 2)
 
@@ -82,11 +85,16 @@ in `request.ts`, `accounts.ts`, `storage.ts`, `quota.ts`, `project.ts`.
   `hybrid`) + health/token-bucket trackers (`src/plugin/rotation.ts`).
 - `TransformContext/Result`, `StreamingCallbacks/SignatureStore`
   (`src/plugin/transform/types.ts`, `src/plugin/core/streaming/types.ts`).
-- `antigravity_accounts` tool (`src/v2-plugin.ts :: manageAccounts`).
+- `antigravity_accounts` tool (`src/v2-plugin.ts :: manageAccounts`,
+  backed by `src/plugin/account-service.ts`).
   (`google_search` tool + `src/plugin/search.ts` REMOVED 2026-09-28, Task 3;
   the D-SEARCH-MUTEX guard in `transform/gemini.ts` stays.)
-- `AuthMenuAction/AccountAction` UI actions (`src/plugin/ui/auth-menu.ts`).
-  (V1 UI/CLI deleted Task 2; retained here as historical surface reference.)
+- TUI smoke surface (`src/tui.ts :: antigravity-smoke-tui`,
+  `src/rpc.ts :: AntigravitySmoke/ping`) — smoke-test only, no product flow.
+- (Historical, REMOVED Task 2) `AuthMenuAction/AccountAction` UI actions
+  (`src/plugin/ui/auth-menu.ts`), `cli.ts` readline prompts, `server.ts`
+  localhost listener. V2 replacements: `google-oauth` integration form +
+  `antigravity_accounts` tool + manual code/URL paste callback.
 
 ## Forbidden relationships
 
