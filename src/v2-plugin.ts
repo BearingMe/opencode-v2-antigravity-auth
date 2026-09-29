@@ -6,6 +6,7 @@ import { ID as ProviderID, Info as ProviderInfo } from "@opencode/schema/provide
 import { IntegrationMethodID } from "@opencode/schema/integration-id"
 import { authorizeAntigravity, exchangeAntigravity } from "./antigravity/oauth.js"
 import { ANTIGRAVITY_PROVIDER_ID } from "./constants.js"
+import { AntigravitySmoke } from "./rpc.js"
 import { formatRefreshParts, isOAuthAuth, parseRefreshParts } from "./plugin/auth.js"
 import { loadAccounts } from "./plugin/storage.js"
 import {
@@ -106,6 +107,19 @@ export default Plugin.define({
     initRuntimeConfig(nativeConfig)
     initLogger(bridgeClient)
     await initAntigravityVersion()
+
+    // Smoke RPC lives on the production server plugin: a separate entry has
+    // no host auto-load contract (only "." and "./tui" load automatically),
+    // so registering here is what makes the TUI ping reachable.
+    let smokeRegistration: { dispose: () => Promise<void> | void } | null = null
+    try {
+      smokeRegistration = await ctx.rpc.register(AntigravitySmoke, {
+        ping: async () => "ANTIGRAVITY_RPC_SMOKE_OK",
+      })
+    } catch (error: unknown) {
+      bridgeLog.debug("smoke-rpc-unavailable", { error: error instanceof Error ? error.message : String(error) })
+      smokeRegistration = null
+    }
 
     if (nativeConfig.health_score) {
       initHealthTracker({
@@ -480,6 +494,7 @@ export default Plugin.define({
       controller.abort()
       refreshQueue?.stop()
       refreshQueue = null
+      await smokeRegistration?.dispose()
       await disposeAntigravityRuntimeResources()
     }
 

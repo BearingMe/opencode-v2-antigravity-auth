@@ -159,13 +159,28 @@ Supported building blocks (all verified in installed types):
 | TUI→server calls | TUI `Context.client: OpenCodeClient` with `rpc.call` | `plugin/dist/tui/context.d.ts:463`; `client/dist/promise/generated/client.d.ts:180-181` |
 | Dialogs/select/toast/theme | `ui.dialog.{show,select,confirm,alert}`, `ui.toast.show`, `theme` tokens | `plugin/dist/tui/context.d.ts:232-247, 311-322, 396-401` |
 
-Packaging caveats (Task 5 work, all UNVERIFIED at runtime):
-- `package.json` currently has no `exports` map and no `solid-js` /
-  `@opentui/*` dependency — both must be added (TUI `context.d.ts` imports
-  `@opentui/core`, `@opentui/solid`, `solid-js/store`, `@opencode/theme/tui`).
-  Whether the host resolves those from plugin `dependencies` vs. `peerDependencies`
-  is UNVERIFIED;ifaithful-to-host approach is to mirror a known-good V2 TUI
-  plugin's manifest, which we do not have locally.
+Packaging caveats (partially resolved 2026-09-29, live-TUI verified):
+- Local-dir plugins need a root `tui.ts` entrypoint: the host resolves
+  `index.ts`/`tui.ts` source and ignores the package `exports` map for
+  loading (the map is still kept for packagers). `tsconfig*.json` include
+  root `tui.ts`, which re-exports `./src/tui.js`.
+- Only `.` and `./tui` load automatically: a separate RPC sidecar module has
+  NO host auto-load contract. RPC handlers must be registered from the
+  production server setup (`ctx.rpc.register` in `src/v2-plugin.ts`, disposed
+  on cleanup); `src/rpc.smoke-server.ts` was deleted for this reason.
+- `keymap.layer` must run inside a component (app-slot render), never at
+  setup top level (`Keymap.Provider is missing` otherwise).
+- Custom JSX route pages crash against the host renderer (`No renderer
+  found` outside `RendererContext`): TUI interaction uses host-rendered
+  dialogs/toasts/selects only. This revises the Task 5 design: no custom
+  router page; one slash/palette entry driving dialogs.
+- SMOKE GATE PASSED on host v2.0.18 (live TUI): `/antigravity-smoke` opens a
+  host select dialog (Ping RPC / Plugin info); Ping returns
+  `ANTIGRAVITY_RPC_SMOKE_OK` via toast. `solid-js`/`@opentui/*` remain
+  peerDeps for packaging; whether the host resolves them from plugin
+  `dependencies` vs. `peerDependencies` is still UNVERIFIED (no failure
+  observed with the dialog-only smoke, which imports no Solid runtime —
+  verify again once the production UI imports Solid).
 - `tsconfig.build.json` includes `src/**/*.tsx` and emits declarations, so a
   `src/tui.tsx` (+ `src/rpc.ts` if a separate rpc entry is used) compiles; but
   hot-reload/file-watching behavior for the `tui` entry is UNVERIFIED.
@@ -270,8 +285,11 @@ Verified facts:
   TUI smoke artifact — built package loads, command registers, page
   navigates, RPC round-trips on host v2.0.18 — is a **BLOCKING prerequisite**,
   not deferrable: the Task 5 full build must not start until the smoke
-  artifact passes on the observed host. OAuth-in-TUI needs host work (see
-  (d)); host-credential removal is gated per (e).
+  artifact passes on the observed host. GATE PASSED 2026-09-29 via the
+  dialog-driven smoke (see (d)): `/antigravity-smoke` + ping round-trip live
+  on v2.0.18. Production build proceeds WITHOUT custom JSX pages (host
+  renderer rejects them) — dialogs/toasts/selects only. OAuth-in-TUI needs
+  host work (see (d)); host-credential removal is gated per (e).
 - **Task 6 (verify/package): GO** once the Task 3 entrypoint decision is
   recorded; manual CLI exercises must run against host v2.0.18 on Windows.
 
@@ -291,7 +309,7 @@ Still open:
 1. Post-success login rendering (what the host shows after a successful OAuth
    callback) — needs a live consent run with user participation.
 2. Credentials stored per host run beyond the single observed abort run.
-3. `./tui` hot-load/packaging: export map + `solid-js`/`@opentui` dependency
-   placement that host v2.0.18 accepts.
+3. `solid-js`/`@opentui/*` resolution once the production UI imports the
+   Solid runtime (dialog-only smoke imports none).
 4. `credential.switched/updated` event visibility via `ctx.event.subscribe`.
 5. TUI-driven OAuth completion/cancellation (no contract; excluded by design).

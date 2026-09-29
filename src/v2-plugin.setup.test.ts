@@ -106,6 +106,7 @@ describe("V2 Antigravity runtime bridge", () => {
       refresh: "refresh-token|project-id",
       expires: Date.now() + 60_000,
     }
+    const smokeDispose = vi.fn()
     const ctx = {
       location: { directory: "C:/test-project" },
       integration: {
@@ -151,6 +152,9 @@ describe("V2 Antigravity runtime bridge", () => {
       },
       session: { hook: vi.fn(async () => ({ dispose: vi.fn() })) },
       tool: { transform: async (callback: (editor: unknown) => void) => callback({ add: vi.fn() }) },
+      rpc: {
+        register: vi.fn(async () => ({ dispose: smokeDispose })),
+      },
       event: { subscribe: async function* () {} },
     }
 
@@ -165,6 +169,10 @@ describe("V2 Antigravity runtime bridge", () => {
     expect(customGeminiModel?.package).toBe(`aisdk:${sdkPackage}`)
     expect((claudeModel?.settings as Record<string, unknown>)?.fetch).toBeUndefined()
     expect(sdkHook).toEqual(expect.any(Function))
+    const rpcRegister = ctx.rpc.register as unknown as { mock: { calls: Array<[unknown, { ping: () => Promise<string> }]> } }
+    expect(rpcRegister.mock.calls).toHaveLength(1)
+    expect(rpcRegister.mock.calls[0]?.[0]).toBeDefined()
+    await expect(rpcRegister.mock.calls[0]?.[1].ping()).resolves.toBe("ANTIGRAVITY_RPC_SMOKE_OK")
     expect(integrationMethod).toBeDefined()
     expect(typeof integrationMethod?.refresh).toBe("function")
     const label = integrationMethod?.label as (credential: { refresh: string; metadata?: Record<string, unknown> }) => string | undefined
@@ -322,7 +330,8 @@ describe("V2 Antigravity runtime bridge", () => {
     expect(mockRefreshQueue.start).toHaveBeenCalledOnce()
 
     expect(cleanup).toEqual(expect.any(Function))
-    cleanup?.()
+    await cleanup?.()
+    expect(smokeDispose).toHaveBeenCalledOnce()
     expect(mockRefreshQueue.stop).toHaveBeenCalledOnce()
     expect(mockDisposeResources).toHaveBeenCalledOnce()
   })
