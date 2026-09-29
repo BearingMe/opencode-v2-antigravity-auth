@@ -7,7 +7,7 @@ Build: `bun run build` (`tsc -p tsconfig.build.json`) green immediately before t
 
 ## Exact command
 
-Run from a neutral working directory (`C:\Users\gomes\AppData\Local\Temp\opencode`) with stdin closed (piped blank line + EOF) so the flow cancels at the code prompt without performing Google consent:
+Run from a neutral working directory (`C:\Users\gomes\AppData\Local\Temp\opencode`) with stdin closed (piped blank line + EOF) so the flow reaches the code prompt without performing Google consent. The closed stdin made the host abort at the code prompt with `Failed`, exit code 1 — this was not an interactive cancellation.
 
 ```powershell
 cmd /c "echo. | opencode auth login google --standalone 2>&1"
@@ -19,7 +19,9 @@ No `--method` and no `--answer` flags were passed. No code was submitted and no 
 
 1. `┌ Connect an integration`
 2. `◇ Authorization started`
-3. `● Saved accounts: 5/10 — bearingme001@gmail.com, bearingme002@gmail.com (disabled), bearingme003@gmail.com (disabled), gomes.bruno201@gmail.com (disabled), Unnamed account.`
+3. `● Saved accounts: 5/10 — <4 redacted addresses, 3 marked (disabled)>, Unnamed account.`
+
+(Full addresses appeared in the live output with per-account disabled markers; they are redacted here. The committed Task 3 instructions render `email ?? "Unnamed account"` plus ` (disabled)` markers.)
 4. `One account per login. Run login again to add another account; signing in again refreshes an existing account.`
 5. `Manage saved accounts: /antigravity.`
 6. `Complete Google sign-in, then paste either the authorization code or the full localhost redirect URL.`
@@ -39,8 +41,8 @@ No `--method` and no `--answer` flags were passed. No code was submitted and no 
 - No Google consent was performed and no authorization code was submitted, so the `callback → persistOAuthAccount(result, "add")` write path was exercised only by unit tests, not live.
 - Post-success `N/10` channel behavior (what the host renders after a successful login) is unconfirmed. Instructions-only `N/10` is the documented fallback per user approval, not a failure.
 - The at-cap (`10/10`) instructions branch was exercised only by unit tests, not live.
-- Host credentials were not touched: `antigravity-accounts.json` mtime (2026-09-29 00:27:17) predates the smoke run (~00:30), and the cancelled login wrote nothing.
+- Host credential-store state was not inspected: only the plugin file (`antigravity-accounts.json` mtime 2026-09-29 00:27:17, predating the ~00:30 run) was checked. Whether the host wrote anything to its own credential store during the aborted run is UNVERIFIED.
 
-## Known bounded TOCTOU note
+## Concurrency note (resolved 2026-09-29)
 
-`persistOAuthAccount` (`src/plugin/account-service.ts`) performs an unlocked `loadAccounts()` read, then a `saveAccountsReplace` blind-replace write that is atomic only within its own file-lock window (`src/plugin/storage.ts`). Two concurrent OAuth completions could therefore lost-update each other (read-check-write across separate lock acquisitions). Risk accepted for interactive single-user login; fixing cross-process read-modify-write atomicity is service-owner territory.
+All account-service write paths (`persistOAuthAccount`, `mutateAccount`, `verifyAccount`, `persistRefreshRotation`, quota-rotation persistence) now run as single-lock-acquisition read-modify-write transactions via `updateAccounts` (`src/plugin/storage.ts`), which replaces the file with no merge. The pre-existing unlocked read-check-write race is closed for service paths. Remaining non-service write path: `AccountManager.saveToDisk` (`src/plugin/accounts.ts`) still uses merging `saveAccounts`, so a background manager save racing a service delete could still resurrect the deleted entry; the tool and login paths reset the manager after mutations, bounding this to concurrent background saves. Host connection precedence (`getAuth` resolves the active host connection first) is unchanged and gated by Task 1.

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { authorizeAntigravity, exchangeAntigravity, loadAccounts, saveAccountsReplace, verifyAccountAccess, mockNativeFetch, mockLoadManager, mockUnifiedRefresh, mockRefreshQueue, mockDisposeResources } = vi.hoisted(() => ({
+const { authorizeAntigravity, exchangeAntigravity, loadAccounts, updateAccounts, verifyAccountAccess, mockNativeFetch, mockLoadManager, mockUnifiedRefresh, mockRefreshQueue, mockDisposeResources, written } = vi.hoisted(() => ({
   authorizeAntigravity: vi.fn(async () => ({
     url: "https://accounts.google.com/auth?state=encoded-state",
     verifier: "verifier",
@@ -15,7 +15,7 @@ const { authorizeAntigravity, exchangeAntigravity, loadAccounts, saveAccountsRep
     projectId: "new-project",
   })),
   loadAccounts: vi.fn(),
-  saveAccountsReplace: vi.fn(async () => undefined),
+  updateAccounts: vi.fn(),
   verifyAccountAccess: vi.fn(async () => ({ status: "ok" as const, message: "verified" })),
   mockNativeFetch: vi.fn(),
   mockLoadManager: vi.fn(),
@@ -26,7 +26,23 @@ const { authorizeAntigravity, exchangeAntigravity, loadAccounts, saveAccountsRep
     stop: vi.fn(),
   },
   mockDisposeResources: vi.fn(async () => undefined),
+  written: [] as unknown[],
 }))
+
+// Transactional storage mock mirroring src/plugin/storage.ts updateAccounts:
+// the updater runs against a clone of the latest loadAccounts value and its
+// replacement store is recorded. Unchanged inputs record nothing.
+updateAccounts.mockImplementation(async (updater: (current: unknown) => Promise<{ storage: unknown; result: unknown }>) => {
+  const current = (await loadAccounts()) ?? { version: 4, accounts: [], activeIndex: 0 }
+  const input = structuredClone(current)
+  const { storage, result } = await updater(input)
+  if (storage !== input) written.push(storage)
+  return result
+})
+
+beforeEach(() => {
+  written.length = 0
+})
 
 vi.mock("./plugin/verify.js", () => ({
   verifyAccountAccess,
@@ -37,7 +53,7 @@ vi.mock("./plugin/version.js", () => ({
 }))
 
 vi.mock("./antigravity/oauth.js", () => ({ authorizeAntigravity, exchangeAntigravity }))
-vi.mock("./plugin/storage.js", () => ({ loadAccounts, saveAccountsReplace }))
+vi.mock("./plugin/storage.js", () => ({ loadAccounts, updateAccounts }))
 vi.mock("./plugin/engine.js", () => ({
   executeAntigravityRequest: mockNativeFetch,
   disposeAntigravityRuntimeResources: mockDisposeResources,
@@ -225,21 +241,22 @@ describe("V2 Antigravity runtime bridge", () => {
     expect(authorization.instructions).toContain("old@example.com")
     expect(authorization.instructions).toContain("/antigravity")
     // Cancelling before callback has no persistence side effect.
-    expect(saveAccountsReplace).not.toHaveBeenCalled()
+    expect(updateAccounts).not.toHaveBeenCalled()
     const login = await authorization.callback("oauth-code")
     expect(login.refresh).toBe("new-refresh-token|new-project")
-    expect(saveAccountsReplace).toHaveBeenCalledWith(expect.objectContaining({
+    expect(written[0]).toMatchObject({
       accounts: expect.arrayContaining([
         expect.objectContaining({ refreshToken: "old-refresh-token" }),
         expect.objectContaining({ refreshToken: "new-refresh-token", email: "new@example.com" }),
       ]),
       activeIndex: 1,
-    }))
+    })
 
-    saveAccountsReplace.mockClear()
+    written.length = 0
+    updateAccounts.mockClear()
     exchangeAntigravity.mockRejectedValueOnce(new Error("OAuth denied"))
     await expect(authorization.callback("denied-code")).rejects.toThrow("OAuth denied")
-    expect(saveAccountsReplace).not.toHaveBeenCalled()
+    expect(updateAccounts).not.toHaveBeenCalled()
 
     const fullPool = Array.from({ length: 10 }, (_, index) => ({
       id: `account-${index}`,
@@ -253,7 +270,8 @@ describe("V2 Antigravity runtime bridge", () => {
     expect(atCap.instructions).toContain("10/10")
     expect(atCap.instructions).toContain("Maximum of 10 Antigravity accounts reached")
     await expect(atCap.callback("new-account-code")).rejects.toThrow("Maximum of 10 Antigravity accounts reached")
-    expect(saveAccountsReplace).not.toHaveBeenCalled()
+    // The throwing updater aborts the transaction without recording a store.
+    expect(written).toHaveLength(0)
 
     exchangeAntigravity.mockResolvedValueOnce({
       type: "success",
@@ -264,10 +282,11 @@ describe("V2 Antigravity runtime bridge", () => {
       projectId: "auto-project",
     })
     await atCap.callback("existing-account-code")
-    expect(saveAccountsReplace).toHaveBeenCalledOnce()
-    expect(saveAccountsReplace).toHaveBeenCalledWith(expect.objectContaining({
+    expect(updateAccounts).toHaveBeenCalledTimes(2)
+    expect(written).toHaveLength(1)
+    expect(written[0]).toMatchObject({
       accounts: [expect.objectContaining({ id: "account-0", refreshToken: "rotated-existing-token" }), ...fullPool.slice(1)],
-    }))
+    })
 
     const sdkEvent: {
       package: string

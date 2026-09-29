@@ -42,7 +42,8 @@ export-map requirement.
 
 ## (a) Removing the inherited API-key method; dropping optional fields
 
-**Verdict: SUPPORTED at SDK-type level, UNVERIFIED at host-runtime level.**
+**Verdict: SUPPORTED at SDK-type level, OBSERVED at host-runtime level on v2.0.18
+(see runtime note below; investigation run 2026-09-29).**
 
 - `IntegrationEditor` exposes both primitives —
   `node_modules/@opencode/plugin/dist/promise/integration.d.ts:60-70`:
@@ -52,32 +53,26 @@ export-map requirement.
 - The inherited Google key method is `IntegrationKeyMethod`
   (`{ type: "key", label?, form? }`, same file lines 22-26) — note it has **no
   `id` field**, so `remove()` must be called with the method object obtained
-  from `method.list("google")`, not an ID. The current code only calls
-  `editor.update(INTEGRATION_ID, ...)` and `editor.method.update({...})`
-  (`src/v2-plugin.ts:276-347`) and never lists/removes.
+  from `method.list("google")`, not an ID. The current code lists methods and
+  removes the inherited key entry (`src/v2-plugin.ts`).
 - `IntegrationOAuthMethod.form` is optional (`form?: Form.Fields`, same file
   line 14). `Form.Fields = NonEmptyArray(...)` —
   `node_modules/@opencode/schema/dist/form.d.ts:279` — so at the SDK-type
   level, the way to declare an OAuth method with **zero** declared fields is to
   **omit `form`** (or leave it `undefined`); passing `form: []` is a type
   error. Dropping `accountAction` and `projectId` from the type declaration is
-  therefore type-supported. This says nothing about the resulting host UX
-  (see UNVERIFIED below).
-- Runtime UNVERIFIED: whether the host's built-in `google` integration
-  actually exposes its API-key entry through `method.list()` as a removable
-  `{ type: "key" }` method, and whether `remove()` suppresses it in
-  `opencode auth login` on the observed host v2.0.18, can only be confirmed by
-  running the transform against the real host. Likewise, whether omitting
-  `form` actually renders a prompt-free login step with no Skip affordance is
-  UNVERIFIED — the SDK types permit the declaration, but a verified
-  prompt-free login UX is not established by types alone.
+  therefore type-supported, and the current code omits `form` entirely.
+- Runtime OBSERVED on host v2.0.18 (`docs/task3-login-runtime.md`): the live
+  `opencode auth login google --standalone` run showed no method picker, no
+  form prompts, and no Skip option. Zero-`form` renders as a prompt-free,
+  Skip-free login step on the observed host.
 
 ---
 
 ## (b) Where the auth-login "Skip" option comes from; how to eliminate it
 
-**Verdict: mechanism SUPPORTED by SDK evidence; exact host rendering UNVERIFIED
-(host is a binary, source not shipped).**
+**Verdict: mechanism SUPPORTED by SDK evidence; Skip-free rendering OBSERVED on
+v2.0.18 for the zero-`form` method (host is a binary, source not shipped).**
 
 - SDK evidence for Skip semantics:
   `node_modules/@opencode/schema/dist/form.js:32` (FieldBase `hidden`
@@ -96,8 +91,8 @@ export-map requirement.
   There is no per-method "disable Skip" flag in `IntegrationOAuthMethod`
   (`integration.d.ts:10-15`); the only field-level controls are
   `required: true` (forces an answer) and `hidden: true` (skips prompt, uses
-  default). Whether this yields a Skip-free login UX on the observed host
-  v2.0.18 is UNVERIFIED (see (a)).
+  default). OBSERVED on host v2.0.18 (`docs/task3-login-runtime.md`): the
+  form-less method login shows no Skip affordance.
 - UNVERIFIED: the exact `opencode auth login` prompt/loop implementation
   (method picker, form pages, post-success behavior) — host source is not in
   `node_modules/@opencode/*` (only SDK types + generated client stubs ship).
@@ -109,8 +104,9 @@ export-map requirement.
 ## (c) Repeated add-account loop inside `opencode auth login`
 
 **Verdict: no SDK-supported mechanism found for a plugin-controlled in-flow
-loop; host invocation/persistence semantics UNVERIFIED. Approval gate for
-Task 3.**
+loop; single-shot-per-run invocation OBSERVED on v2.0.18. Approval gate
+resolved: the one-account-per-run alternative was approved and implemented
+(commit `cf6961e`; `docs/task3-login-runtime.md`).**
 
 - The plugin's OAuth contract, as far as SDK types show —
   `node_modules/@opencode/plugin/dist/promise/integration.d.ts:32-49`:
@@ -129,23 +125,19 @@ Task 3.**
 - **Precise limitation:** no SDK-supported mechanism was found for the agreed
   login loop (list → Add account → OAuth → back to list, up to 10) as a
   plugin-controlled in-flow loop *inside* `opencode auth login`. Host
-  invocation semantics (whether the host calls `authorize` once or repeatedly
-  per CLI run) and host persistence semantics (how many credentials one CLI
-  run can store) remain **UNVERIFIED until exercised against host v2.0.18** —
-  this doc does not assert a proven one-account-per-run ceiling or a proven
-  impossibility, only the absence of a supporting plugin API.
-- **Proposed alternative (needs user approval before Task 3 implementation):**
-  keep `opencode auth login` as an OAuth-only step with no Project ID,
-  no add/replace action, and no declared optional field to Skip — per (a)/(b),
-  subject to the runtime verification noted there; enforce dedupe-by-email and
-  the 10-account cap at persistence time (already partially present in
-  `persistOAuthAccount`, `src/v2-plugin.ts:648-689`); and, if host runs prove
-  single-shot, document the loop as repeated `opencode auth login`
-  invocations with the "saved N/10" list shown in the `/antigravity` screen
-  and hint text. Do NOT silently replace the agreed flow with an unexplained
-  one-shot: per the task plan, this alternative requires explicit user
-  approval, and the Task 3 acceptance criterion "repeated additions work up to
-  the cap" must be re-scoped only as approved.
+  invocation semantics are now OBSERVED on v2.0.18: one CLI run performs one
+  `authorize` round-trip (live run in `docs/task3-login-runtime.md` reached a
+  single code prompt with no loop-back affordance). Host persistence semantics
+  (how many credentials one CLI run can store) remain UNVERIFIED beyond the
+  single observed run.
+- **Approved alternative (implemented):** `opencode auth login` is an
+  OAuth-only step with no Project ID, no add/replace action, and no declared
+  optional field to Skip; dedupe-by-email and the 10-account cap are enforced
+  at persistence time inside a single-lock transaction (`updateAccounts`,
+  `src/plugin/storage.ts`); the loop is repeated `opencode auth login`
+  invocations with the saved N/10 list shown in the login instructions and
+  hint text. Task 3 acceptance "repeated additions work up to the cap" was
+  re-scoped to repeated invocations per the 2026-09-28 approval.
 
 ---
 
@@ -189,8 +181,10 @@ Packaging caveats (Task 5 work, all UNVERIFIED at runtime):
 
 ## (e) Credential-sync invariant (removed accounts must stay removed)
 
-**Verdict: invariant expressible, but host-side removal is UNVERIFIED
-plugin-only. Approval/runtime-verification gate for Task 2.**
+**Verdict: plugin-side removal is now transactional (single-lock replace, no
+merge); host-side removal is NOT supported from the server plugin context
+under the installed SDK types. Tombstone-or-host-work decision gate for
+Task 2 remains.**
 
 Verified facts:
 
@@ -215,14 +209,14 @@ Verified facts:
 - Server plugin context exposes **only**
   `connection.active` / `connection.resolve`
   (`plugin/dist/promise/integration.d.ts:74-77`) — no credential remove/deactivate
-  in the server SDK. The generated *client* does have
-  `credential.update/activate/remove` plus `credential.updated/switched`
-  events (`client/dist/promise/generated/client.d.ts:140-143`; event union in
-  `generated/types.d.ts:3308-3310`), but whether a server-context plugin may
-  call them (no raw client handle in server `Context`,
-  `promise/plugin.d.ts:25-53`) is UNVERIFIED, as is whether
-  `ctx.event.subscribe` delivers `credential.switched` (subscription surface
-  not confirmed against host v2.0.18).
+  in the server SDK. Verified 2026-09-29: the server `Context` type
+  (`plugin/dist/promise/plugin.d.ts:25-53`) carries no raw `OpenCodeClient`
+  handle (only domain facades: integration, rpc, session, etc.), so the
+  generated client's `credential.update/activate/remove` endpoints (present in
+  `client/dist/.../contract-*.js`) are **not reachable from the server plugin
+  context** under the installed SDK types. Host-side removal therefore needs
+  host work (a supported removal/deactivation entrypoint) — it is not a
+  plugin-only change.
 - Proposed invariant for Task 2 (all steps need runtime verification):
   removal = delete from plugin disk store + clear/rotate `currentAuth` +
   dispose + reload `AccountManager`/refresh queue + remove or deactivate the
@@ -248,16 +242,24 @@ Verified facts:
 
 - **Task 2 (shared service): PARTIAL GO.** Credential-free response models
   and read-only extraction (list/quota shapes, stable-identity reads) may
-  proceed. Host-credential sync/removal implementation is **GATED**: it
-  requires either a verified removal path on host v2.0.18 or an approved
-  tombstone design specifying identity key, reauthorization behavior, restart
-  persistence, and concurrent-update handling (see (e)). No tombstone or
-  host-store mutation work starts before one of those two conditions is met.
-- **Task 3 (login screen): APPROVAL GATE (blocking).** The field-free OAuth
-  method declaration is type-permitted, but no SDK-supported mechanism was
-  found for a plugin-controlled in-flow add-account loop (c), and host
-  invocation/persistence semantics are UNVERIFIED. Do not start Task 3 until
-  the user approves the proposed alternative (or directs host-side work).
+  proceed. Service-side read-modify-write is now transactional
+  (`updateAccounts`, single lock, replace-no-merge), closing the concurrent
+  lost-update/resurrection race for service paths. Host-credential sync/removal
+  implementation is **GATED**: server-context removal is confirmed unsupported
+  by the installed SDK types (see (e)), so it requires either host-side work
+  (a supported removal/deactivation entrypoint) or an approved tombstone
+  design specifying identity key, reauthorization behavior, restart
+  persistence, and concurrent-update handling. No tombstone or host-store
+  mutation work starts before one of those two conditions is met. Remaining
+  non-service write path: `AccountManager.saveToDisk` still uses merging
+  `saveAccounts` (resurrection vector for racing background saves; bounded —
+  tool/login paths reset the manager after mutations).
+- **Task 3 (login screen): GATE RESOLVED.** The one-account-per-run
+  alternative was approved 2026-09-28 and implemented (commit `cf6961e`);
+  zero-`form`, key-method removal, and Skip-free rendering are runtime-observed
+  on v2.0.18 (`docs/task3-login-runtime.md`). Remaining: live successful-OAuth
+  completion (needs user participation; Task 6) and concurrent-login
+  regression coverage via the new transactional persistence.
 - **Task 4 (quota data): QUALIFIED GO — no host SDK blocker identified, full
   GO withheld.** Nothing in the SDK types blocks exposing quota/reset/selection
   data via RPC/tool responses, but field-level source validation for every
@@ -275,21 +277,21 @@ Verified facts:
 
 ## UNVERIFIED list (must be proven at runtime, not assumed)
 
-1. `method.remove()` suppresses the inherited Google key method in the login
-   UI on the observed host v2.0.18 (method identity discoverable via
-   `method.list("google")`).
-2. Zero-`form` OAuth method declaration is permitted by SDK types; whether it
-   renders as a prompt-free, Skip-free login step on the observed host is
-   UNVERIFIED (types alone do not establish UX).
-3. Exact `opencode auth login` picker/loop/post-success behavior (host binary;
-   no local source).
-4. No SDK-supported mechanism found for a plugin-controlled multi-account
-   loop inside the host login flow; host invocation/persistence semantics
-   (calls per CLI run, credentials stored per run) UNVERIFIED until exercised
-   against host v2.0.18 — only host runs or a host-maintainer answer can
-   settle this.
-5. `./tui` hot-load/packaging: export map + `solid-js`/`@opentui` dependency
+Resolved since investigation (observed on host v2.0.18, `docs/task3-login-runtime.md`):
+- ~~`method.remove()` suppresses the inherited Google key method~~ — OBSERVED.
+- ~~Zero-`form` OAuth method renders prompt-free and Skip-free~~ — OBSERVED.
+- ~~Host calls `authorize` once per CLI run (no in-flow loop API)~~ — OBSERVED
+  single-shot; no SDK loop mechanism exists (absence established by type
+  inspection, single-shot behavior by live run).
+- ~~Host credential `remove`/deactivate reachability from server plugin
+  context~~ — RESOLVED negative: not present in the server `Context` type;
+  needs host work.
+
+Still open:
+1. Post-success login rendering (what the host shows after a successful OAuth
+   callback) — needs a live consent run with user participation.
+2. Credentials stored per host run beyond the single observed abort run.
+3. `./tui` hot-load/packaging: export map + `solid-js`/`@opentui` dependency
    placement that host v2.0.18 accepts.
-6. Host credential `remove`/deactivate reachability from server plugin context;
-   `credential.switched/updated` event visibility via `ctx.event.subscribe`.
-7. TUI-driven OAuth completion/cancellation (no contract; excluded by design).
+4. `credential.switched/updated` event visibility via `ctx.event.subscribe`.
+5. TUI-driven OAuth completion/cancellation (no contract; excluded by design).

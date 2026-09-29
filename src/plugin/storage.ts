@@ -756,6 +756,53 @@ export async function saveAccountsReplace(storage: AccountStorageV4): Promise<vo
   });
 }
 
+/**
+ * Read-modify-write accounts inside a single file-lock acquisition.
+ * The updater receives the current store and returns the replacement store
+ * plus a result value. A throwing updater aborts without writing.
+ * Unlike saveAccounts there is no merge: the returned store replaces the
+ * file, so deletions cannot be resurrected by a concurrent stale read.
+ */
+export async function updateAccounts<T>(
+  updater: (current: AccountStorageV4) => { storage: AccountStorageV4; result: T } | Promise<{ storage: AccountStorageV4; result: T }>,
+): Promise<T> {
+  const path = getStoragePath();
+  const configDir = dirname(path);
+  await fs.mkdir(configDir, { recursive: true });
+  await ensureGitignore(configDir);
+
+  return withFileLock(path, async () => {
+    const loaded = await loadAccountsUnsafe();
+    const current: AccountStorageV4 = loaded ?? { version: 4, accounts: [], activeIndex: 0 };
+    const clamped = current.accounts.length > 0
+      ? Math.min(Math.max(current.activeIndex, 0), current.accounts.length - 1)
+      : 0;
+    const normalized: AccountStorageV4 = { ...current, version: 4, activeIndex: clamped };
+
+    const { storage, result } = await updater(normalized);
+
+    // Updaters return the input reference unchanged to signal "no change":
+    // skip the write so read-only transactions never bump the file mtime.
+    if (storage === normalized) return result;
+
+    const tempPath = `${path}.${randomBytes(6).toString("hex")}.tmp`;
+    const content = JSON.stringify(storage, null, 2);
+
+    try {
+      await fs.writeFile(tempPath, content, { encoding: "utf-8", mode: 0o600 });
+      await fs.rename(tempPath, path);
+    } catch (error) {
+      try {
+        await fs.unlink(tempPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+      throw error;
+    }
+    return result;
+  });
+}
+
 async function loadAccountsUnsafe(): Promise<AccountStorageV4 | null> {
   try {
     const path = getStoragePath();

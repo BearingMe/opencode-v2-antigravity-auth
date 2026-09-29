@@ -546,4 +546,64 @@ describe("Storage Migration", () => {
       expect(appendFileSync).not.toHaveBeenCalled();
     });
   });
+
+  describe("updateAccounts", () => {
+    const gitignoreComplete = [
+      ".gitignore",
+      "antigravity-accounts.json",
+      "antigravity-accounts.json.*.tmp",
+      "antigravity-signature-cache.json",
+      "antigravity-logs/",
+    ].join("\n");
+    const stored = {
+      version: 4,
+      accounts: [{ refreshToken: "r1", addedAt: 1, lastUsed: 2 }],
+      activeIndex: 0,
+    };
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.mocked(fs.readFile).mockImplementation((path) => {
+        if ((path as string).endsWith(".gitignore")) return Promise.resolve(gitignoreComplete);
+        return Promise.resolve(JSON.stringify(stored));
+      });
+    });
+
+    it("reads once and writes the updater replacement atomically", async () => {
+      const { updateAccounts } = await import("./storage");
+
+      const result = await updateAccounts((current) => ({
+        storage: { ...current, activeIndex: 0 },
+        result: `saw-${current.accounts.length}`,
+      }));
+
+      expect(result).toBe("saw-1");
+      const tmpWrite = vi.mocked(fs.writeFile).mock.calls.find(
+        (call) => (call[0] as string).includes(".tmp"),
+      );
+      if (!tmpWrite) throw new Error("updateAccounts did not write a tmp file");
+      expect(JSON.parse(tmpWrite[1] as string).accounts).toHaveLength(1);
+      expect(fs.rename).toHaveBeenCalledOnce();
+    });
+
+    it("skips the write when the updater returns its input unchanged", async () => {
+      const { updateAccounts } = await import("./storage");
+
+      const result = await updateAccounts((current) => ({ storage: current, result: "noop" }));
+
+      expect(result).toBe("noop");
+      expect(fs.writeFile).not.toHaveBeenCalled();
+      expect(fs.rename).not.toHaveBeenCalled();
+    });
+
+    it("aborts without writing when the updater throws", async () => {
+      const { updateAccounts } = await import("./storage");
+
+      await expect(updateAccounts(() => {
+        throw new Error("Maximum of 10 Antigravity accounts reached");
+      })).rejects.toThrow("Maximum of 10 Antigravity accounts reached");
+      expect(fs.writeFile).not.toHaveBeenCalled();
+      expect(fs.rename).not.toHaveBeenCalled();
+    });
+  });
 });

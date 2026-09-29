@@ -1,10 +1,11 @@
 import { createHash, randomUUID } from "node:crypto"
+import { z } from "zod"
 import { ANTIGRAVITY_PROVIDER_ID } from "../constants.js"
 import { formatRefreshParts } from "./auth.js"
 import { checkAccountsQuota, type AccountQuotaResult } from "./quota.js"
 import {
   loadAccounts,
-  saveAccountsReplace,
+  updateAccounts,
   type AccountMetadataV3,
   type AccountStorageV4,
   type ModelFamily,
@@ -69,6 +70,40 @@ export interface QuotaCheckOutcome {
   results: RedactedQuotaResult[]
   /** Number of accounts whose rotated token/project metadata was persisted. */
   persistedUpdates: number
+}
+
+export type QuotaPresentationGroup = "claude" | "gemini-pro" | "gemini-flash"
+
+export const quotaPresentationSchema = z.object({
+  activeIndexByFamily: z.object({ claude: z.number().int().nonnegative(), gemini: z.number().int().nonnegative() }),
+  accounts: z.array(z.object({
+    id: z.string(),
+    email: z.string(),
+    enabled: z.boolean(),
+    status: z.enum(["ok", "error", "unknown"]),
+    groups: z.record(z.enum(["claude", "gemini-pro", "gemini-flash"]), z.object({
+      remainingFraction: z.number().min(0).max(1).nullable(),
+      consumedPercent: z.number().min(0).max(100).nullable(),
+      resetTime: z.number().finite().nullable(),
+    }).strict()),
+    checkedAt: z.number().finite().nullable(),
+    freshness: z.enum(["fresh", "stale", "unchecked"]),
+    verificationRequired: z.boolean(),
+    cooldownUntil: z.number().finite().nullable(),
+    coolingDown: z.boolean(),
+    selectedByFamily: z.object({ claude: z.boolean(), gemini: z.boolean() }).strict(),
+  }).strict()),
+}).strict()
+
+export type QuotaPresentation = z.infer<typeof quotaPresentationSchema>
+
+export interface QuotaPresentationOptions {
+  /** Refresh quota before returning; defaults to true. */
+  refresh?: boolean
+  /** Maximum wait for each account check, clamped to 1–30 seconds. */
+  timeoutMs?: number
+  /** Cached values older than this are marked stale. Defaults to 15 minutes. */
+  staleAfterMs?: number
 }
 
 export type AccountTarget = { id: string } | { index: number }
@@ -267,23 +302,157 @@ export async function checkQuota(
   let persistedUpdates = 0
   const pending = results.filter((result) => result.updatedAccount !== undefined)
   if (pending.length > 0) {
-    const fresh = await loadAccounts() ?? emptyStorage()
-    let dirty = ensureAccountIds(fresh.accounts)
-    for (const [position, account] of accounts.entries()) {
-      const updated = results[position]?.updatedAccount
-      if (!updated) continue
-      const candidates = fresh.accounts.filter((entry) => entry.refreshToken === account.refreshToken)
-      if (candidates.length !== 1 || !candidates[0]) continue
-      candidates[0].refreshToken = updated.refreshToken
-      candidates[0].projectId = updated.projectId
-      candidates[0].managedProjectId = updated.managedProjectId
-      dirty = true
-      persistedUpdates += 1
-    }
-    if (dirty) await saveAccountsReplace(fresh)
+    // Apply rotated token/project metadata inside one lock acquisition so a
+    // concurrent mutation cannot interleave between the read and the write.
+    // Matching is by previous refresh token against freshly locked storage;
+    // unmatched or ambiguous entries are skipped without failing the check.
+    persistedUpdates = await updateAccounts((current) => {
+      const freshAccounts = [...current.accounts]
+      ensureAccountIds(freshAccounts)
+      let applied = 0
+      let dirty = false
+      for (const [position, account] of accounts.entries()) {
+        const updated = results[position]?.updatedAccount
+        if (!updated) continue
+        const candidates = freshAccounts.filter((entry) => entry.refreshToken === account.refreshToken)
+        if (candidates.length !== 1 || !candidates[0]) continue
+        candidates[0].refreshToken = updated.refreshToken
+        candidates[0].projectId = updated.projectId
+        candidates[0].managedProjectId = updated.managedProjectId
+        dirty = true
+        applied += 1
+      }
+      if (!dirty) return { storage: current, result: 0 }
+      return { storage: { ...current, accounts: freshAccounts }, result: applied }
+    })
   }
 
   return { results: results.map(redactQuotaResult), persistedUpdates }
+}
+
+const QUOTA_PRESENTATION_GROUPS: QuotaPresentationGroup[] = ["claude", "gemini-pro", "gemini-flash"]
+const DEFAULT_QUOTA_STALE_AFTER_MS = 15 * 60 * 1000
+const DEFAULT_QUOTA_TIMEOUT_MS = 12_000
+
+function parseQuotaResetTime(value: unknown): number | null {
+  if (typeof value !== "string" || value.trim() === "") return null
+  const parsed = Date.parse(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function boundedTimeout(value: number | undefined): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(Math.max(Math.trunc(value), 1_000), 30_000)
+    : DEFAULT_QUOTA_TIMEOUT_MS
+}
+
+async function checkSingleAccountQuota(
+  account: AccountMetadataV3,
+  index: number,
+  client: PluginClient,
+  providerId: string,
+  timeoutMs: number,
+): Promise<AccountQuotaResult | undefined> {
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  try {
+    const check = checkAccountsQuota([account], client, providerId).then((results) => results[0])
+    return await Promise.race([
+      check,
+      new Promise<undefined>((resolve) => {
+        timeout = setTimeout(() => resolve(undefined), timeoutMs)
+      }),
+    ]).then((result) => result ? { ...result, index } : undefined)
+  } catch {
+    return undefined
+  } finally {
+    if (timeout) clearTimeout(timeout)
+  }
+}
+
+/**
+ * Build validated, credential-free quota bars and account state for the UI.
+ * Quota values are sourced only from Antigravity fetchAvailableModels; an
+ * absent group/value remains null, and Gemini CLI's empty buckets are ignored.
+ */
+export async function getQuotaPresentation(
+  client: PluginClient,
+  options: QuotaPresentationOptions = {},
+  providerId: string = ANTIGRAVITY_PROVIDER_ID,
+): Promise<QuotaPresentation> {
+  const storage = await loadAccounts() ?? emptyStorage()
+  const familySelection = familyCursors(storage, storage.accounts.length)
+  const refresh = options.refresh !== false
+  const timeoutMs = boundedTimeout(options.timeoutMs)
+  const staleAfterMs = typeof options.staleAfterMs === "number" && Number.isFinite(options.staleAfterMs)
+    ? Math.max(0, options.staleAfterMs)
+    : DEFAULT_QUOTA_STALE_AFTER_MS
+
+  const refreshed = refresh
+    ? await Promise.all(storage.accounts.map(async (account, index) => {
+      if (account.enabled === false) return undefined
+      return checkSingleAccountQuota(account, index, client, providerId, timeoutMs)
+    }))
+    : []
+
+  const now = Date.now()
+  const accounts = storage.accounts.map((account, index) => {
+    const result = refreshed[index]
+    const cachedAt = typeof account.cachedQuotaUpdatedAt === "number" && Number.isFinite(account.cachedQuotaUpdatedAt)
+      ? account.cachedQuotaUpdatedAt
+      : null
+    const checkedAt = result ? now : cachedAt
+    const cacheIsStale = cachedAt === null || now - cachedAt > staleAfterMs || cachedAt > now
+    const checkAttempted = refresh && account.enabled !== false
+    const resultHasError = checkAttempted && (!result || result.status === "error" || !!result.quota?.error)
+    const useFreshQuota = !!result && !resultHasError
+    const quotaGroups = useFreshQuota ? result.quota?.groups : account.cachedQuota
+    const groups = Object.fromEntries(QUOTA_PRESENTATION_GROUPS.map((group) => {
+      const quota = quotaGroups?.[group]
+      const fraction = typeof quota?.remainingFraction === "number" && Number.isFinite(quota.remainingFraction)
+        ? Math.min(1, Math.max(0, quota.remainingFraction))
+        : null
+      return [group, {
+        remainingFraction: fraction,
+        consumedPercent: fraction === null ? null : Math.round((1 - fraction) * 1000) / 10,
+        resetTime: parseQuotaResetTime(quota?.resetTime),
+      }]
+    })) as QuotaPresentation["accounts"][number]["groups"]
+    const hasKnownQuota = Object.values(groups).some((group) => group.remainingFraction !== null)
+    const status: QuotaPresentation["accounts"][number]["status"] = resultHasError
+      ? "error"
+      : hasKnownQuota
+        ? "ok"
+        : "unknown"
+    const freshness: QuotaPresentation["accounts"][number]["freshness"] = useFreshQuota
+      ? "fresh"
+      : cachedAt === null
+        ? "unchecked"
+        : cacheIsStale
+          ? "stale"
+          : "fresh"
+    const accountId = account.id ?? fingerprintRefreshToken(account.refreshToken)
+
+    return {
+      id: accountId,
+      email: account.email ?? `Account ${index + 1}`,
+      enabled: account.enabled !== false,
+      status,
+      groups,
+      checkedAt,
+      freshness,
+      verificationRequired: account.verificationRequired === true,
+      cooldownUntil: typeof account.coolingDownUntil === "number" && Number.isFinite(account.coolingDownUntil)
+        ? account.coolingDownUntil
+        : null,
+      coolingDown: typeof account.coolingDownUntil === "number" && account.coolingDownUntil > now,
+      selectedByFamily: {
+        claude: index === familySelection.claude,
+        gemini: index === familySelection.gemini,
+      },
+    }
+  })
+
+  return quotaPresentationSchema.parse({ activeIndexByFamily: familySelection, accounts })
 }
 
 export async function verifyAccount(
@@ -298,32 +467,59 @@ export async function verifyAccount(
   const account = accounts[resolution.index]
   if (!account) return { ok: false, kind: "not-found", accountCount: accounts.length }
   ensureAccountIds(accounts)
+  // Capture a stable identity before the network call: durable id when the
+  // account has one, refresh token as a legacy fallback. The write path
+  // re-resolves inside the lock, so a concurrent delete/select cannot be
+  // clobbered by index and a vanished target fails closed.
+  const targetId = accounts[resolution.index]?.id
+  const targetRefreshToken = account.refreshToken
 
   const verification = await verifyAccountAccess(account, client, providerId)
-  if (verification.status === "ok") {
-    if (account.verificationRequired) account.enabled = true
-    delete account.verificationRequired
-    delete account.verificationRequiredAt
-    delete account.verificationRequiredReason
-    delete account.verificationUrl
-  } else if (verification.status === "blocked") {
-    account.enabled = false
-    account.verificationRequired = true
-    account.verificationRequiredAt = Date.now()
-    account.verificationRequiredReason = verification.message
-    account.verificationUrl = verification.verifyUrl
-  }
-  account.lastVerificationStatus = verification.status
-  account.lastVerificationAt = Date.now()
-  await saveAccountsReplace({ ...stored, accounts })
-  return {
-    index: resolution.index,
-    email: account.email,
-    checkedAt: account.lastVerificationAt,
-    status: verification.status,
-    message: verification.message,
-    verifyUrl: verification.verifyUrl,
-  }
+  const checkedAt = Date.now()
+  return updateAccounts<VerifyOutcome | ResolutionFailure>((current) => {
+    const currentAccounts = [...current.accounts]
+    ensureAccountIds(currentAccounts)
+    let index = targetId !== undefined
+      ? currentAccounts.findIndex((entry) => entry.id === targetId)
+      : -1
+    if (index < 0) {
+      const tokenMatches: number[] = []
+      currentAccounts.forEach((entry, entryIndex) => {
+        if (entry.refreshToken === targetRefreshToken) tokenMatches.push(entryIndex)
+      })
+      index = tokenMatches.length === 1 && tokenMatches[0] !== undefined ? tokenMatches[0] : -1
+    }
+    const entry = index >= 0 ? currentAccounts[index] : undefined
+    if (!entry || index < 0) {
+      return { storage: current, result: { ok: false, kind: "not-found", accountCount: currentAccounts.length } }
+    }
+    if (verification.status === "ok") {
+      if (entry.verificationRequired) entry.enabled = true
+      delete entry.verificationRequired
+      delete entry.verificationRequiredAt
+      delete entry.verificationRequiredReason
+      delete entry.verificationUrl
+    } else if (verification.status === "blocked") {
+      entry.enabled = false
+      entry.verificationRequired = true
+      entry.verificationRequiredAt = checkedAt
+      entry.verificationRequiredReason = verification.message
+      entry.verificationUrl = verification.verifyUrl
+    }
+    entry.lastVerificationStatus = verification.status
+    entry.lastVerificationAt = checkedAt
+    return {
+      storage: { ...current, accounts: currentAccounts },
+      result: {
+        index,
+        email: entry.email,
+        checkedAt,
+        status: verification.status,
+        message: verification.message,
+        verifyUrl: verification.verifyUrl,
+      },
+    }
+  })
 }
 
 function selectedAccount(accounts: AccountMetadataV3[], index: number): SelectedAccount | null {
@@ -367,65 +563,75 @@ export async function mutateAccount(
     const stored = await loadAccounts() ?? emptyStorage()
     return { ok: false, kind: "unknown-op", accountCount: stored.accounts.length }
   }
-  const stored = await loadAccounts() ?? emptyStorage()
-  const accounts = [...stored.accounts]
-  const resolution = resolveAccountTarget(accounts, target)
-  if (!resolution.ok) return resolution
-  const index = resolution.index
-  ensureAccountIds(accounts)
-  const previous = familyCursors(stored, accounts.length)
+  // Resolve and apply inside one lock acquisition: a concurrent delete or
+  // persist between the read and the write must not shift the target or
+  // resurrect removed accounts via a stale snapshot.
+  return updateAccounts<MutationOutcome | MutationFailure>((current) => {
+    const accounts = [...current.accounts]
+    const resolution = resolveAccountTarget(accounts, target)
+    if (!resolution.ok) return { storage: current, result: resolution }
+    const index = resolution.index
+    ensureAccountIds(accounts)
+    const previous = familyCursors(current, accounts.length)
 
-  if (op === "delete") {
-    accounts.splice(index, 1)
-  } else if (op === "enable" || op === "disable") {
-    const account = accounts[index]
-    if (account) account.enabled = op === "enable"
-  } else if (op !== "select") {
-    return { ok: false, kind: "unknown-op", accountCount: accounts.length }
-  }
-
-  const nextActiveIndex = op === "select"
-    ? index
-    : accounts.length === 0
-      ? 0
-      : index < stored.activeIndex
-        ? stored.activeIndex - 1
-        : Math.min(stored.activeIndex, accounts.length - 1)
-
-  let nextFamily: { claude: number; gemini: number }
-  if (op === "select" && options.family) {
-    nextFamily = {
-      ...familyCursors(stored, accounts.length),
-      [options.family]: clampCursor(index, nextActiveIndex, accounts.length),
+    if (op === "delete") {
+      accounts.splice(index, 1)
+    } else if (op === "enable" || op === "disable") {
+      const account = accounts[index]
+      if (account) account.enabled = op === "enable"
+    } else if (op !== "select") {
+      return { storage: current, result: { ok: false, kind: "unknown-op", accountCount: accounts.length } }
     }
-  } else if (op === "select" && LEGACY_TOOL_SELECT_UPDATES_BOTH_FAMILIES) {
-    nextFamily = { claude: nextActiveIndex, gemini: nextActiveIndex }
-  } else if (op === "delete") {
-    nextFamily = accounts.length === 0
-      ? { claude: 0, gemini: 0 }
-      : remapFamilyCursorsAfterDelete(previous, index, nextActiveIndex, accounts.length)
-  } else {
-    nextFamily = familyCursors({ ...stored, accounts, activeIndex: nextActiveIndex }, accounts.length)
-  }
 
-  await saveAccountsReplace({
-    version: 4,
-    accounts,
-    activeIndex: nextActiveIndex,
-    activeIndexByFamily: nextFamily,
+    const nextActiveIndex = op === "select"
+      ? index
+      : accounts.length === 0
+        ? 0
+        : index < current.activeIndex
+          ? current.activeIndex - 1
+          : Math.min(current.activeIndex, accounts.length - 1)
+
+    let nextFamily: { claude: number; gemini: number }
+    if (op === "select" && options.family) {
+      nextFamily = {
+        ...familyCursors(current, accounts.length),
+        [options.family]: clampCursor(index, nextActiveIndex, accounts.length),
+      }
+    } else if (op === "select" && LEGACY_TOOL_SELECT_UPDATES_BOTH_FAMILIES) {
+      nextFamily = { claude: nextActiveIndex, gemini: nextActiveIndex }
+    } else if (op === "delete") {
+      nextFamily = accounts.length === 0
+        ? { claude: 0, gemini: 0 }
+        : remapFamilyCursorsAfterDelete(previous, index, nextActiveIndex, accounts.length)
+    } else {
+      nextFamily = familyCursors({ ...current, accounts, activeIndex: nextActiveIndex }, accounts.length)
+    }
+
+    const storage: AccountStorageV4 = {
+      version: 4,
+      accounts,
+      activeIndex: nextActiveIndex,
+      activeIndexByFamily: nextFamily,
+    }
+    return {
+      storage,
+      result: {
+        op,
+        index,
+        nextActiveIndex,
+        activeIndexByFamily: nextFamily,
+        remaining: accounts.length,
+        selected: selectedAccount(accounts, nextActiveIndex),
+      },
+    }
   })
-  return {
-    op,
-    index,
-    nextActiveIndex,
-    activeIndexByFamily: nextFamily,
-    remaining: accounts.length,
-    selected: selectedAccount(accounts, nextActiveIndex),
-  }
 }
 
 export async function deleteAllAccounts(): Promise<{ remaining: 0 }> {
-  await saveAccountsReplace({ version: 4, accounts: [], activeIndex: 0, activeIndexByFamily: { claude: 0, gemini: 0 } })
+  await updateAccounts((current) => ({
+    storage: { version: 4, accounts: [], activeIndex: 0, activeIndexByFamily: { claude: 0, gemini: 0 } },
+    result: { remaining: 0 as const },
+  }))
   return { remaining: 0 }
 }
 
@@ -438,57 +644,62 @@ export async function persistOAuthAccount(
   input: OAuthPersistInput,
   action: "add" | "replace",
 ): Promise<OAuthPersistOutcome> {
-  const stored = await loadAccounts()
-  const now = Date.now()
-  const account: AccountMetadataV3 = {
-    id: randomUUID(),
-    email: input.email,
-    refreshToken: input.refresh,
-    projectId: input.projectId,
-    addedAt: now,
-    lastUsed: now,
-    enabled: true,
-    lastVerificationAt: undefined,
-    lastVerificationStatus: undefined,
-    verificationRequired: undefined,
-    verificationRequiredAt: undefined,
-    verificationRequiredReason: undefined,
-    verificationUrl: undefined,
-  }
+  // Dedupe and the 10-account cap are enforced inside the transaction, so two
+  // concurrent logins cannot both pass the check and exceed the cap.
+  return updateAccounts<OAuthPersistOutcome>((current) => {
+    const now = Date.now()
+    const account: AccountMetadataV3 = {
+      id: randomUUID(),
+      email: input.email,
+      refreshToken: input.refresh,
+      projectId: input.projectId,
+      addedAt: now,
+      lastUsed: now,
+      enabled: true,
+      lastVerificationAt: undefined,
+      lastVerificationStatus: undefined,
+      verificationRequired: undefined,
+      verificationRequiredAt: undefined,
+      verificationRequiredReason: undefined,
+      verificationUrl: undefined,
+    }
 
-  const accounts = action === "replace" ? [] : [...(stored?.accounts ?? [])]
-  ensureAccountIds(accounts)
-  const matchIndex = accounts.findIndex((existing) =>
-    existing.refreshToken === account.refreshToken ||
-    (!!account.email && existing.email?.toLowerCase() === account.email.toLowerCase()),
-  )
-  let isNew = false
-  if (matchIndex >= 0) {
-    const existing = accounts[matchIndex]
-    // Preserve the durable id and original add time across reconnects.
-    if (existing) accounts[matchIndex] = { ...existing, ...account, id: existing.id ?? account.id, addedAt: existing.addedAt }
-  } else {
-    if (accounts.length >= MAX_SAVED_ACCOUNTS) throw new Error("Maximum of 10 Antigravity accounts reached")
-    accounts.push(account)
-    isNew = true
-  }
+    const accounts = action === "replace" ? [] : [...current.accounts]
+    ensureAccountIds(accounts)
+    const matchIndex = accounts.findIndex((existing) =>
+      existing.refreshToken === account.refreshToken ||
+      (!!account.email && existing.email?.toLowerCase() === account.email.toLowerCase()),
+    )
+    let isNew = false
+    if (matchIndex >= 0) {
+      const existing = accounts[matchIndex]
+      // Preserve the durable id and original add time across reconnects.
+      if (existing) accounts[matchIndex] = { ...existing, ...account, id: existing.id ?? account.id, addedAt: existing.addedAt }
+    } else {
+      if (accounts.length >= MAX_SAVED_ACCOUNTS) throw new Error("Maximum of 10 Antigravity accounts reached")
+      accounts.push(account)
+      isNew = true
+    }
 
-  const activeIndex = accounts.findIndex((entry) => entry.refreshToken === account.refreshToken)
-  const selectedIndex = activeIndex >= 0 ? activeIndex : 0
-  await saveAccountsReplace({
-    version: 4,
-    accounts,
-    activeIndex: selectedIndex,
-    activeIndexByFamily: { claude: selectedIndex, gemini: selectedIndex },
+    const activeIndex = accounts.findIndex((entry) => entry.refreshToken === account.refreshToken)
+    const selectedIndex = activeIndex >= 0 ? activeIndex : 0
+    const selected = accounts[selectedIndex]
+    return {
+      storage: {
+        version: 4,
+        accounts,
+        activeIndex: selectedIndex,
+        activeIndexByFamily: { claude: selectedIndex, gemini: selectedIndex },
+      },
+      result: {
+        selectedIndex,
+        selectedId: selected?.id ?? account.id ?? "",
+        selectedRefreshParts: { refreshToken: account.refreshToken, projectId: account.projectId },
+        accountCount: accounts.length,
+        isNew,
+      },
+    }
   })
-  const selected = accounts[selectedIndex]
-  return {
-    selectedIndex,
-    selectedId: selected?.id ?? account.id ?? "",
-    selectedRefreshParts: { refreshToken: account.refreshToken, projectId: account.projectId },
-    accountCount: accounts.length,
-    isNew,
-  }
 }
 
 /**
@@ -502,16 +713,21 @@ export async function persistRefreshRotation(
   rotatedRefreshToken: string,
 ): Promise<boolean> {
   if (!rotatedRefreshToken || rotatedRefreshToken === previousRefreshToken) return false
-  const stored = await loadAccounts()
-  if (!stored) return false
-  if (!stored.accounts.some((account) => account.refreshToken === previousRefreshToken)) return false
-  ensureAccountIds(stored.accounts)
-  const accounts = stored.accounts.map((account) =>
-    account.refreshToken === previousRefreshToken
-      ? { ...account, refreshToken: rotatedRefreshToken }
-      : account)
-  await saveAccountsReplace({ ...stored, accounts })
-  return true
+  // Fast path: avoid the lock when nothing matches. The transaction below
+  // re-checks, so a concurrent change cannot corrupt the store.
+  const snapshot = await loadAccounts()
+  if (!snapshot?.accounts.some((account) => account.refreshToken === previousRefreshToken)) return false
+  return updateAccounts<boolean>((current) => {
+    if (!current.accounts.some((account) => account.refreshToken === previousRefreshToken)) {
+      return { storage: current, result: false }
+    }
+    ensureAccountIds(current.accounts)
+    const accounts = current.accounts.map((account) =>
+      account.refreshToken === previousRefreshToken
+        ? { ...account, refreshToken: rotatedRefreshToken }
+        : account)
+    return { storage: { ...current, accounts }, result: true }
+  })
 }
 
 export function formatSelectedRefresh(parts: RefreshParts): string {
