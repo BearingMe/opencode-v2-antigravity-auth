@@ -353,13 +353,17 @@ async function checkSingleAccountQuota(
   providerId: string,
   timeoutMs: number,
 ): Promise<AccountQuotaResult | undefined> {
+  const controller = new AbortController()
   let timeout: ReturnType<typeof setTimeout> | undefined
   try {
-    const check = checkAccountsQuota([account], client, providerId).then((results) => results[0])
+    const check = checkAccountsQuota([account], client, providerId, controller.signal).then((results) => results[0])
     return await Promise.race([
       check,
       new Promise<undefined>((resolve) => {
-        timeout = setTimeout(() => resolve(undefined), timeoutMs)
+        timeout = setTimeout(() => {
+          controller.abort()
+          resolve(undefined)
+        }, timeoutMs)
       }),
     ]).then((result) => result ? { ...result, index } : undefined)
   } catch {
@@ -373,6 +377,10 @@ async function checkSingleAccountQuota(
  * Build validated, credential-free quota bars and account state for the UI.
  * Quota values are sourced only from Antigravity fetchAvailableModels; an
  * absent group/value remains null, and Gemini CLI's empty buckets are ignored.
+ * The Gemini-CLI quota pool (`geminiCliQuota` on the raw check result) is
+ * intentionally not represented here: it carries a separate model list with
+ * its own buckets, and the presentation DTO models only the Antigravity
+ * fetchAvailableModels groups (claude, gemini-pro, gemini-flash).
  */
 export async function getQuotaPresentation(
   client: PluginClient,
@@ -400,16 +408,17 @@ export async function getQuotaPresentation(
     const cachedAt = typeof account.cachedQuotaUpdatedAt === "number" && Number.isFinite(account.cachedQuotaUpdatedAt)
       ? account.cachedQuotaUpdatedAt
       : null
-    const checkedAt = result ? now : cachedAt
-    const cacheIsStale = cachedAt === null || now - cachedAt > staleAfterMs || cachedAt > now
     const checkAttempted = refresh && account.enabled !== false
     const resultHasError = checkAttempted && (!result || result.status === "error" || !!result.quota?.error)
     const useFreshQuota = !!result && !resultHasError
+    const checkedAt = useFreshQuota ? now : cachedAt
+    const cacheIsStale = cachedAt === null || now - cachedAt > staleAfterMs || cachedAt > now
     const quotaGroups = useFreshQuota ? result.quota?.groups : account.cachedQuota
     const groups = Object.fromEntries(QUOTA_PRESENTATION_GROUPS.map((group) => {
       const quota = quotaGroups?.[group]
-      const fraction = typeof quota?.remainingFraction === "number" && Number.isFinite(quota.remainingFraction)
-        ? Math.min(1, Math.max(0, quota.remainingFraction))
+      const raw = quota?.remainingFraction
+      const fraction = typeof raw === "number" && Number.isFinite(raw) && raw >= 0 && raw <= 1
+        ? raw
         : null
       return [group, {
         remainingFraction: fraction,

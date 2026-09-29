@@ -250,7 +250,7 @@ describe("getQuotaPresentation", () => {
     expect(dto.accounts[0]).toMatchObject({ status: "error", freshness: "stale", checkedAt: staleAt, verificationRequired: true, coolingDown: true })
     expect(dto.accounts[0]?.cooldownUntil).toBeGreaterThan(Date.now())
     expect(dto.accounts[0]?.groups.claude).toEqual({ remainingFraction: 0.25, consumedPercent: 75, resetTime: null })
-    expect(dto.accounts[1]).toMatchObject({ status: "error", freshness: "unchecked", checkedAt: expect.any(Number) })
+    expect(dto.accounts[1]).toMatchObject({ status: "error", freshness: "unchecked", checkedAt: null })
     expect(JSON.stringify(dto)).not.toContain("secret-refresh-token")
     expect(JSON.stringify(dto)).not.toContain("another-secret")
     expect(JSON.stringify(dto)).not.toContain("rotated-secret")
@@ -294,6 +294,65 @@ describe("getQuotaPresentation", () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it("maps out-of-range fractions to null instead of clamping them", async () => {
+    // Each account is checked with a single-account call, so key the fixture
+    // off the input email: one@example.com gets impossible values,
+    // two@example.com gets Infinity plus the exact 0/1 boundaries.
+    checkAccountsQuota.mockImplementation(async (checked: Array<{ email?: string }>) => {
+      const outOfRange = checked[0]?.email !== "two@example.com"
+      return [{
+        index: 0,
+        status: "ok",
+        quota: {
+          groups: outOfRange
+            ? {
+              claude: { remainingFraction: 1.5 },
+              "gemini-pro": { remainingFraction: -0.2 },
+              "gemini-flash": { remainingFraction: NaN },
+            }
+            : {
+              claude: { remainingFraction: Number.POSITIVE_INFINITY },
+              "gemini-pro": { remainingFraction: 1 },
+              "gemini-flash": { remainingFraction: 0 },
+            },
+          modelCount: 3,
+        },
+        geminiCliQuota: { models: [] },
+      }]
+    })
+
+    const dto = await getQuotaPresentation({} as never)
+
+    expect(dto.accounts[0]?.groups.claude).toEqual({ remainingFraction: null, consumedPercent: null, resetTime: null })
+    expect(dto.accounts[0]?.groups["gemini-pro"]?.remainingFraction).toBeNull()
+    expect(dto.accounts[0]?.groups["gemini-flash"]?.remainingFraction).toBeNull()
+    // Invalid values are unknown, never clamped into a false ok reading.
+    expect(dto.accounts[0]?.status).toBe("unknown")
+    // Infinite is unknown; exact boundaries 0 and 1 are preserved verbatim.
+    expect(dto.accounts[1]?.groups.claude?.remainingFraction).toBeNull()
+    expect(dto.accounts[1]?.groups["gemini-pro"]).toEqual({ remainingFraction: 1, consumedPercent: 0, resetTime: null })
+    expect(dto.accounts[1]?.groups["gemini-flash"]).toEqual({ remainingFraction: 0, consumedPercent: 100, resetTime: null })
+    expect(dto.accounts[1]?.status).toBe("ok")
+  })
+
+  it("keeps checkedAt at the cached timestamp when a refresh fails over cached data", async () => {
+    const cachedAt = Date.now() - 30_000
+    loadAccounts.mockResolvedValue(storage([
+      account({
+        id: "cached-failed", email: "cached-failed@example.com", refreshToken: "cached-secret",
+        cachedQuota: { claude: { remainingFraction: 0.4, resetTime: "2030-05-01T00:00:00Z", modelCount: 1 } },
+        cachedQuotaUpdatedAt: cachedAt,
+      }),
+    ], 0))
+    checkAccountsQuota.mockResolvedValue([{ index: 0, status: "error", error: "quota network error" }])
+
+    const dto = await getQuotaPresentation({} as never, { staleAfterMs: 60_000 })
+
+    expect(dto.accounts[0]).toMatchObject({ status: "error", freshness: "fresh", checkedAt: cachedAt })
+    expect(dto.accounts[0]?.groups.claude?.remainingFraction).toBe(0.4)
+    expect(JSON.stringify(dto)).not.toContain("cached-secret")
   })
 })
 

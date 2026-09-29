@@ -30,7 +30,7 @@ export interface QuotaSummary {
 // Gemini CLI quota types
 export interface GeminiCliQuotaModel {
   modelId: string;
-  remainingFraction: number;
+  remainingFraction?: number;
   resetTime?: string;
 }
 
@@ -88,13 +88,15 @@ function buildAuthFromAccount(account: AccountMetadataV3): OAuthAuthDetails {
   };
 }
 
-function normalizeRemainingFraction(value: unknown): number {
-  // If value is missing or invalid, treat as exhausted (0%)
+function normalizeRemainingFraction(value: unknown): number | undefined {
+  // Missing, non-finite, or out-of-range values are unknown, not exhausted.
+  // Valid 0 (exhausted) and 1 (full) pass through unchanged; nothing is clamped.
   if (typeof value !== "number" || !Number.isFinite(value)) {
-    return 0;
+    return undefined;
   }
-  if (value < 0) return 0;
-  if (value > 1) return 1;
+  if (value < 0 || value > 1) {
+    return undefined;
+  }
   return value;
 }
 
@@ -172,11 +174,16 @@ function aggregateQuota(models?: Record<string, FetchAvailableModelEntry>): Quot
   return { groups, modelCount: totalCount };
 }
 
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = FETCH_TIMEOUT_MS, signal?: AbortSignal): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  // AbortSignal.any needs Node >= 20.3 while engines allow >= 20.0: without
+  // it the external signal is ignored and only the timeout applies.
+  const combinedSignal = signal && typeof AbortSignal.any === "function"
+    ? AbortSignal.any([controller.signal, signal])
+    : controller.signal;
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    return await fetch(url, { ...options, signal: combinedSignal });
   } finally {
     clearTimeout(timeout);
   }
@@ -185,6 +192,7 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = F
 async function fetchAvailableModels(
   accessToken: string,
   projectId: string,
+  quotaSignal?: AbortSignal,
 ): Promise<FetchAvailableModelsResponse> {
   const endpoint = ANTIGRAVITY_ENDPOINT_PROD;
   const quotaUserAgent = getAntigravityHeaders()["User-Agent"] || "antigravity/windows/amd64";
@@ -199,7 +207,7 @@ async function fetchAvailableModels(
       "User-Agent": quotaUserAgent,
     },
     body: JSON.stringify(body),
-  });
+  }, FETCH_TIMEOUT_MS, quotaSignal);
 
   if (response.ok) {
     return (await response.json()) as FetchAvailableModelsResponse;
@@ -217,6 +225,7 @@ async function fetchAvailableModels(
 async function fetchGeminiCliQuota(
   accessToken: string,
   projectId: string,
+  quotaSignal?: AbortSignal,
 ): Promise<RetrieveUserQuotaResponse> {
   const endpoint = ANTIGRAVITY_ENDPOINT_PROD;
   // Use Gemini CLI user-agent to get CLI quota buckets (not Antigravity buckets)
@@ -235,7 +244,7 @@ async function fetchGeminiCliQuota(
         "User-Agent": geminiCliUserAgent,
       },
       body: JSON.stringify(body),
-    });
+    }, FETCH_TIMEOUT_MS, quotaSignal);
 
     if (response.ok) {
       const data = (await response.json()) as RetrieveUserQuotaResponse;
@@ -311,6 +320,7 @@ export async function checkAccountsQuota(
   accounts: AccountMetadataV3[],
   client: PluginClient,
   providerId = ANTIGRAVITY_PROVIDER_ID,
+  quotaSignal?: AbortSignal,
 ): Promise<AccountQuotaResult[]> {
   const results: AccountQuotaResult[] = [];
   
@@ -337,11 +347,13 @@ export async function checkAccountsQuota(
       let quotaResult: QuotaSummary;
       let geminiCliQuotaResult: GeminiCliQuotaSummary;
       
-      // Fetch both Antigravity and Gemini CLI quotas in parallel
+      // Fetch both Antigravity and Gemini CLI quotas in parallel.
+      // quotaSignal cancels only these two fetch calls; token refresh and
+      // project-context resolution above are left untouched.
       const [antigravityResponse, geminiCliResponse] = await Promise.all([
-        fetchAvailableModels(auth.access ?? "", projectContext.effectiveProjectId)
+        fetchAvailableModels(auth.access ?? "", projectContext.effectiveProjectId, quotaSignal)
           .catch((error): FetchAvailableModelsResponse => ({ models: undefined })),
-        fetchGeminiCliQuota(auth.access ?? "", projectContext.effectiveProjectId),
+        fetchGeminiCliQuota(auth.access ?? "", projectContext.effectiveProjectId, quotaSignal),
       ]);
 
       // Process Antigravity quota
@@ -373,10 +385,13 @@ export async function checkAccountsQuota(
         updatedAccount,
       });
       
-      // Log quota status for each family
+      // Log quota status for each family; unknown fractions stay unlogged
+      // rather than being reported as exhausted.
       for (const [family, groupQuota] of Object.entries(quotaResult.groups)) {
-        const remainingPercent = (groupQuota.remainingFraction ?? 0) * 100;
-        logQuotaStatus(account.email, index, remainingPercent, family);
+        if (groupQuota.remainingFraction === undefined) {
+          continue;
+        }
+        logQuotaStatus(account.email, index, groupQuota.remainingFraction * 100, family);
       }
     } catch (error) {
       results.push({
