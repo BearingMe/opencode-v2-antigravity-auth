@@ -9,6 +9,7 @@ import { ANTIGRAVITY_PROVIDER_ID } from "./constants.js"
 import { formatRefreshParts, isOAuthAuth, parseRefreshParts } from "./plugin/auth.js"
 import { loadAccounts } from "./plugin/storage.js"
 import {
+  MAX_SAVED_ACCOUNTS,
   checkQuota as checkAccountsQuota,
   deleteAllAccounts,
   listAccounts,
@@ -285,38 +286,31 @@ export default Plugin.define({
       editor.update(INTEGRATION_ID, (integration) => {
         integration.name = "Google Antigravity"
       })
+      const inheritedKey = editor.method.list(INTEGRATION_ID).find((method) => method.type === "key")
+      if (inheritedKey) editor.method.remove(INTEGRATION_ID, inheritedKey)
       editor.method.update({
         integrationID: INTEGRATION_ID,
         method: {
           id: "google-oauth",
           type: "oauth",
           label: "OAuth with Google (Antigravity)",
-          form: [{
-            key: "accountAction",
-            type: "string",
-            title: accountSummary.length
-              ? `Account action — saved: ${accountSummary.map((account) => `${account.email ?? "Unnamed account"}${account.enabled === false ? " (disabled)" : ""}`).join(", ")}`
-              : "Account action — no saved accounts",
-            default: "add",
-            options: [
-              { value: "add", label: "Add or refresh this account" },
-              { value: "replace", label: "Replace all saved accounts" },
-            ],
-          }, {
-            key: "projectId",
-            type: "string",
-            title: "Project ID (optional)",
-            description: "Override automatic Google project detection.",
-          }],
         },
-        authorize: async (answer) => {
-          const action = answer.accountAction === "replace" ? "replace" : "add"
-          const projectId = typeof answer.projectId === "string" ? answer.projectId : ""
-          const authorization = await authorizeAntigravity(projectId)
+        authorize: async () => {
+          accountSummary = (await loadAccounts())?.accounts ?? []
+          const saved = accountSummary.map((account) => `${account.email ?? "Unnamed account"}${account.enabled === false ? " (disabled)" : ""}`).join(", ")
+          const authorization = await authorizeAntigravity("")
           return {
             mode: "code" as const,
             url: authorization.url,
-            instructions: "Complete Google sign-in, then paste either the authorization code or the full localhost redirect URL.",
+            instructions: [
+              `Saved accounts: ${accountSummary.length}/${MAX_SAVED_ACCOUNTS}${saved ? ` — ${saved}` : ""}.`,
+              "One account per login. Run login again to add another account; signing in again refreshes an existing account.",
+              ...(accountSummary.length >= MAX_SAVED_ACCOUNTS
+                ? [`Maximum of ${MAX_SAVED_ACCOUNTS} Antigravity accounts reached. Sign in to an existing account or delete a saved account before adding another.`]
+                : []),
+              "Manage saved accounts: /antigravity.",
+              "Complete Google sign-in, then paste either the authorization code or the full localhost redirect URL.",
+            ].join("\n"),
             callback: async (code: string) => {
               const params = parseOAuthCallbackInput(
                 code,
@@ -324,7 +318,7 @@ export default Plugin.define({
               )
               const result = await exchangeAntigravity(params.code, params.state)
               if (result.type !== "success") throw new Error(result.error)
-              await persistOAuthAccount(result, action)
+              await persistOAuthAccount(result, "add")
               accountSummary = (await loadAccounts())?.accounts ?? []
               currentAuth = {
                 type: "oauth",

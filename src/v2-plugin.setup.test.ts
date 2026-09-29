@@ -68,6 +68,11 @@ describe("V2 Antigravity runtime bridge", () => {
   it("registers Antigravity models on Google and routes SDK JSON through the native engine", async () => {
     let modelDefinitions: Array<Record<string, unknown>> = []
     let integrationMethod: Record<string, unknown> | undefined
+    const inheritedKey = { type: "key", label: "API key" }
+    const inheritedEnv = { type: "env", names: ["GOOGLE_API_KEY"] }
+    const otherOAuth = { type: "oauth", id: "other-oauth", label: "Other OAuth" }
+    const listMethods = vi.fn(() => [inheritedKey, inheritedEnv, otherOAuth])
+    const removeMethod = vi.fn()
     const googleProviderInfo: { activation?: string; package?: string } = { activation: "auto", package: "@opencode/ai/providers/google" }
     let sdkHook: ((event: {
       package: string
@@ -90,7 +95,11 @@ describe("V2 Antigravity runtime bridge", () => {
       integration: {
         transform: async (callback: (editor: unknown) => void) => callback({
           update: vi.fn(),
-          method: { update: (value: Record<string, unknown>) => { integrationMethod = value } },
+          method: {
+            list: listMethods,
+            remove: removeMethod,
+            update: (value: Record<string, unknown>) => { integrationMethod = value },
+          },
         }),
         connection: {
           active: vi.fn(async () => activeConnection),
@@ -145,7 +154,10 @@ describe("V2 Antigravity runtime bridge", () => {
     const label = integrationMethod?.label as (credential: { refresh: string; metadata?: Record<string, unknown> }) => string | undefined
     expect(label({ refresh: "old-refresh-token|old-project" })).toBe("old@example.com")
     expect(label({ refresh: "other-token", metadata: { email: "connected@example.com" } })).toBe("connected@example.com")
-    expect(JSON.stringify(integrationMethod?.method)).toContain("saved: old@example.com")
+    expect(listMethods).toHaveBeenCalledWith("google")
+    expect(removeMethod).toHaveBeenCalledExactlyOnceWith("google", inheritedKey)
+    expect(removeMethod.mock.calls[0]?.[1]).toBe(inheritedKey)
+    expect(integrationMethod?.method).not.toHaveProperty("form")
 
     const sdkOptions: Record<string, unknown> = {}
     const unnormalizedSdkEvent: {
@@ -202,9 +214,18 @@ describe("V2 Antigravity runtime bridge", () => {
 
     const authorize = integrationMethod?.authorize as (answer: Record<string, string>) => Promise<{
       mode: string
+      instructions: string
       callback: (code: string) => Promise<{ refresh: string; access: string }>
     }>
-    const authorization = await authorize({ accountAction: "add" })
+    // Legacy answers cannot replace the pool or override automatic detection.
+    const authorization = await authorize({ accountAction: "replace", projectId: "ignored-project" })
+    expect(authorizeAntigravity).toHaveBeenCalledWith("")
+    expect(authorization.mode).toBe("code")
+    expect(authorization.instructions).toContain("1/10")
+    expect(authorization.instructions).toContain("old@example.com")
+    expect(authorization.instructions).toContain("/antigravity")
+    // Cancelling before callback has no persistence side effect.
+    expect(saveAccountsReplace).not.toHaveBeenCalled()
     const login = await authorization.callback("oauth-code")
     expect(login.refresh).toBe("new-refresh-token|new-project")
     expect(saveAccountsReplace).toHaveBeenCalledWith(expect.objectContaining({
@@ -213,6 +234,39 @@ describe("V2 Antigravity runtime bridge", () => {
         expect.objectContaining({ refreshToken: "new-refresh-token", email: "new@example.com" }),
       ]),
       activeIndex: 1,
+    }))
+
+    saveAccountsReplace.mockClear()
+    exchangeAntigravity.mockRejectedValueOnce(new Error("OAuth denied"))
+    await expect(authorization.callback("denied-code")).rejects.toThrow("OAuth denied")
+    expect(saveAccountsReplace).not.toHaveBeenCalled()
+
+    const fullPool = Array.from({ length: 10 }, (_, index) => ({
+      id: `account-${index}`,
+      email: `saved-${index}@example.com`,
+      refreshToken: `saved-token-${index}`,
+      addedAt: 1,
+      lastUsed: 2,
+    }))
+    loadAccounts.mockResolvedValue({ version: 4, accounts: fullPool, activeIndex: 0 })
+    const atCap = await authorize({})
+    expect(atCap.instructions).toContain("10/10")
+    expect(atCap.instructions).toContain("Maximum of 10 Antigravity accounts reached")
+    await expect(atCap.callback("new-account-code")).rejects.toThrow("Maximum of 10 Antigravity accounts reached")
+    expect(saveAccountsReplace).not.toHaveBeenCalled()
+
+    exchangeAntigravity.mockResolvedValueOnce({
+      type: "success",
+      refresh: "rotated-existing-token",
+      access: "new-access-token",
+      expires: Date.now() + 3600_000,
+      email: "SAVED-0@example.com",
+      projectId: "auto-project",
+    })
+    await atCap.callback("existing-account-code")
+    expect(saveAccountsReplace).toHaveBeenCalledOnce()
+    expect(saveAccountsReplace).toHaveBeenCalledWith(expect.objectContaining({
+      accounts: [expect.objectContaining({ id: "account-0", refreshToken: "rotated-existing-token" }), ...fullPool.slice(1)],
     }))
 
     const sdkEvent: {
