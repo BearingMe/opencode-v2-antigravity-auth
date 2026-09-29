@@ -213,7 +213,7 @@ export function ensureAccountIds(accounts: AccountMetadataV3[]): boolean {
 }
 
 function summarize(storage: AccountStorageV4, account: AccountMetadataV3, index: number): AccountSummary {
-  return {
+  const summary: AccountSummary = {
     id: account.id ?? fingerprintRefreshToken(account.refreshToken),
     index,
     email: account.email ?? `Account ${index + 1}`,
@@ -223,10 +223,27 @@ function summarize(storage: AccountStorageV4, account: AccountMetadataV3, index:
     verificationStatus: account.verificationRequired === true
       ? "verification_required"
       : account.lastVerificationStatus ?? "not_checked",
-    lastVerificationAt: account.lastVerificationAt,
-    cooldownUntil: account.coolingDownUntil,
-    quotaResetTimes: account.rateLimitResetTimes,
   }
+  if (typeof account.lastVerificationAt === "number" && Number.isFinite(account.lastVerificationAt)) {
+    summary.lastVerificationAt = account.lastVerificationAt
+  }
+  if (typeof account.coolingDownUntil === "number" && Number.isFinite(account.coolingDownUntil)) {
+    summary.cooldownUntil = account.coolingDownUntil
+  }
+  if (account.rateLimitResetTimes && typeof account.rateLimitResetTimes === "object") {
+    const validResetTimes: Record<string, number> = {}
+    let hasValid = false
+    for (const [key, value] of Object.entries(account.rateLimitResetTimes)) {
+      if (typeof value === "number" && Number.isFinite(value)) {
+        validResetTimes[key] = value
+        hasValid = true
+      }
+    }
+    if (hasValid) {
+      summary.quotaResetTimes = validResetTimes
+    }
+  }
+  return summary
 }
 
 function familyCursors(storage: AccountStorageV4, length: number): { claude: number; gemini: number } {

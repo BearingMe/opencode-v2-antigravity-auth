@@ -106,7 +106,7 @@ describe("V2 Antigravity runtime bridge", () => {
       refresh: "refresh-token|project-id",
       expires: Date.now() + 60_000,
     }
-    const smokeDispose = vi.fn()
+    const accountsDispose = vi.fn()
     const ctx = {
       location: { directory: "C:/test-project" },
       integration: {
@@ -153,7 +153,7 @@ describe("V2 Antigravity runtime bridge", () => {
       session: { hook: vi.fn(async () => ({ dispose: vi.fn() })) },
       tool: { transform: async (callback: (editor: unknown) => void) => callback({ add: vi.fn() }) },
       rpc: {
-        register: vi.fn(async () => ({ dispose: smokeDispose })),
+        register: vi.fn(async () => ({ dispose: accountsDispose })),
       },
       event: { subscribe: async function* () {} },
     }
@@ -169,10 +169,19 @@ describe("V2 Antigravity runtime bridge", () => {
     expect(customGeminiModel?.package).toBe(`aisdk:${sdkPackage}`)
     expect((claudeModel?.settings as Record<string, unknown>)?.fetch).toBeUndefined()
     expect(sdkHook).toEqual(expect.any(Function))
-    const rpcRegister = ctx.rpc.register as unknown as { mock: { calls: Array<[unknown, { ping: () => Promise<string> }]> } }
+    const rpcRegister = ctx.rpc.register as unknown as { mock: { calls: Array<[unknown, Record<string, (input: unknown) => Promise<unknown>>]> } }
     expect(rpcRegister.mock.calls).toHaveLength(1)
     expect(rpcRegister.mock.calls[0]?.[0]).toBeDefined()
-    await expect(rpcRegister.mock.calls[0]?.[1].ping()).resolves.toBe("ANTIGRAVITY_RPC_SMOKE_OK")
+    const handlers = rpcRegister.mock.calls[0]?.[1]
+    expect(handlers).toBeDefined()
+    if (!handlers) throw new Error("expected RPC handlers")
+    expect(Object.keys(handlers).sort()).toEqual(["deleteAll", "list", "mutate", "ping", "quota", "verify"])
+    const call = async (name: string, input: unknown) => {
+      const handler = handlers[name]
+      if (!handler) throw new Error(`missing RPC handler: ${name}`)
+      return handler(input)
+    }
+    await expect(call("ping", {})).resolves.toBe("ANTIGRAVITY_RPC_ACCOUNTS_OK")
     expect(integrationMethod).toBeDefined()
     expect(typeof integrationMethod?.refresh).toBe("function")
     const label = integrationMethod?.label as (credential: { refresh: string; metadata?: Record<string, unknown> }) => string | undefined
@@ -296,6 +305,37 @@ describe("V2 Antigravity runtime bridge", () => {
       accounts: [expect.objectContaining({ id: "account-0", refreshToken: "rotated-existing-token" }), ...fullPool.slice(1)],
     })
 
+    // Every RPC method output is credential-free even with token material
+    // seeded. Placed after the auth assertions: mutate/deleteAll repoint the
+    // in-memory auth, which earlier assertions must not observe.
+    loadAccounts.mockResolvedValue({
+      version: 4,
+      accounts: [
+        { id: "acc-one", email: "one@example.com", refreshToken: "secret-refresh-token-one", projectId: "p1", addedAt: 1, lastUsed: 2 },
+        { id: "acc-two", email: "two@example.com", refreshToken: "secret-refresh-token-two", projectId: "p2", addedAt: 2, lastUsed: 3 },
+      ],
+      activeIndex: 0,
+    })
+    const scanSecrets = (value: unknown) => {
+      const text = JSON.stringify(value)
+      expect(text).not.toContain("secret-refresh-token-one")
+      expect(text).not.toContain("secret-refresh-token-two")
+      expect(text).not.toContain("refreshParts")
+      expect(text).not.toContain("updatedAccount")
+      expect(text).not.toContain("access-token")
+    }
+    scanSecrets(await call("list", {}))
+    scanSecrets(await call("quota", { refresh: false }))
+    scanSecrets(await call("verify", { id: "acc-one" }))
+    scanSecrets(await call("mutate", { id: "acc-one", op: "disable" }))
+    // Stale ids fail closed without writing.
+    const staleWrites = written.length
+    const stale = await call("mutate", { id: "acc-missing", op: "select" })
+    expect(stale).toMatchObject({ ok: false, kind: "not-found" })
+    scanSecrets(stale)
+    expect(written.length).toBe(staleWrites)
+    scanSecrets(await call("deleteAll", {}))
+
     const sdkEvent: {
       package: string
       model: { id: string }
@@ -331,7 +371,7 @@ describe("V2 Antigravity runtime bridge", () => {
 
     expect(cleanup).toEqual(expect.any(Function))
     await cleanup?.()
-    expect(smokeDispose).toHaveBeenCalledOnce()
+    expect(accountsDispose).toHaveBeenCalledOnce()
     expect(mockRefreshQueue.stop).toHaveBeenCalledOnce()
     expect(mockDisposeResources).toHaveBeenCalledOnce()
   })

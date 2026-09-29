@@ -6,13 +6,14 @@ import { ID as ProviderID, Info as ProviderInfo } from "@opencode/schema/provide
 import { IntegrationMethodID } from "@opencode/schema/integration-id"
 import { authorizeAntigravity, exchangeAntigravity } from "./antigravity/oauth.js"
 import { ANTIGRAVITY_PROVIDER_ID } from "./constants.js"
-import { AntigravitySmoke } from "./rpc.js"
+import { AntigravityAccounts } from "./rpc.js"
 import { formatRefreshParts, isOAuthAuth, parseRefreshParts } from "./plugin/auth.js"
 import { loadAccounts } from "./plugin/storage.js"
 import {
   MAX_SAVED_ACCOUNTS,
   checkQuota as checkAccountsQuota,
   deleteAllAccounts,
+  getQuotaPresentation,
   listAccounts,
   mutateAccount,
   persistOAuthAccount,
@@ -108,17 +109,76 @@ export default Plugin.define({
     initLogger(bridgeClient)
     await initAntigravityVersion()
 
-    // Smoke RPC lives on the production server plugin: a separate entry has
+    // Accounts RPC lives on the production server plugin: a separate entry has
     // no host auto-load contract (only "." and "./tui" load automatically),
-    // so registering here is what makes the TUI ping reachable.
-    let smokeRegistration: { dispose: () => Promise<void> | void } | null = null
+    // so registering here is what makes the TUI reachable.
+    let accountsRegistration: { dispose: () => Promise<void> | void } | null = null
     try {
-      smokeRegistration = await ctx.rpc.register(AntigravitySmoke, {
-        ping: async () => "ANTIGRAVITY_RPC_SMOKE_OK",
+      accountsRegistration = await ctx.rpc.register(AntigravityAccounts, {
+        list: async () => listAccounts(),
+        quota: async (input) => getQuotaPresentation(bridgeClient, {
+          refresh: input.refresh ?? true,
+        }, ANTIGRAVITY_PROVIDER_ID),
+        verify: async (input) => {
+          const outcome = await verifyAccount({ id: input.id }, bridgeClient, ANTIGRAVITY_PROVIDER_ID)
+          if ("ok" in outcome) return outcome
+          resetNativeManager()
+          const projected: {
+            index: number
+            email?: string
+            checkedAt: number
+            status: "ok" | "blocked" | "error"
+            message: string
+            verifyUrl?: string
+          } = {
+            index: outcome.index,
+            checkedAt: outcome.checkedAt,
+            status: outcome.status,
+            message: outcome.message,
+          }
+          if (outcome.email !== undefined) projected.email = outcome.email
+          if (outcome.verifyUrl !== undefined) projected.verifyUrl = outcome.verifyUrl
+          return projected
+        },
+        mutate: async (input) => {
+          const outcome = await mutateAccount({ id: input.id }, input.op, input.family ? { family: input.family } : {})
+          if ("ok" in outcome) return outcome
+          const selected = outcome.selected
+          if (selected) {
+            currentAuth = {
+              type: "oauth",
+              refresh: formatRefreshParts(selected.refreshParts),
+              access: "",
+              expires: 0,
+            }
+          } else {
+            currentAuth = { type: "oauth", refresh: "", access: "", expires: 0 }
+          }
+          resetNativeManager()
+          return {
+            op: outcome.op,
+            index: outcome.index,
+            nextActiveIndex: outcome.nextActiveIndex,
+            activeIndexByFamily: outcome.activeIndexByFamily,
+            remaining: outcome.remaining,
+            selected: selected ? {
+              id: selected.id,
+              index: selected.index,
+              ...(selected.email !== undefined ? { email: selected.email } : {}),
+            } : null,
+          }
+        },
+        deleteAll: async () => {
+          await deleteAllAccounts()
+          currentAuth = { type: "oauth", refresh: "", access: "", expires: 0 }
+          resetNativeManager()
+          return { remaining: 0 as const }
+        },
+        ping: async () => "ANTIGRAVITY_RPC_ACCOUNTS_OK",
       })
     } catch (error: unknown) {
-      bridgeLog.debug("smoke-rpc-unavailable", { error: error instanceof Error ? error.message : String(error) })
-      smokeRegistration = null
+      bridgeLog.debug("accounts-rpc-unavailable", { error: error instanceof Error ? error.message : String(error) })
+      accountsRegistration = null
     }
 
     if (nativeConfig.health_score) {
@@ -494,7 +554,7 @@ export default Plugin.define({
       controller.abort()
       refreshQueue?.stop()
       refreshQueue = null
-      await smokeRegistration?.dispose()
+      await accountsRegistration?.dispose()
       await disposeAntigravityRuntimeResources()
     }
 
