@@ -957,7 +957,9 @@ export async function saveAccounts(storage: AccountStorageV4): Promise<void> {
   await ensureGitignore(configDir);
 
   await withFileLock(path, async () => {
-    const existing = await loadAccountsUnsafe();
+    const storeRead = await readStoreUnsafe();
+    throwIfUnreadable(storeRead, path);
+    const existing = storeRead.storage;
     const merged = existing ? mergeAccountStorage(existing, storage) : storage;
 
     // Defensive: the merged result is already tombstone-filtered by
@@ -1018,7 +1020,11 @@ export async function saveAccountsReplace(
     // merged in, so a stale snapshot passed here can never resurrect a
     // deleted account. Pass { clearTombstones: true } only for intentional
     // full clears.
-    const existing = options?.clearTombstones ? undefined : await loadAccountsUnsafe();
+    const storeRead = options?.clearTombstones ? undefined : await readStoreUnsafe();
+    if (storeRead) {
+      throwIfUnreadable(storeRead, path);
+    }
+    const existing = storeRead?.storage;
     const tombstones = options?.clearTombstones
       ? sanitizeTombstones(storage.removedAccounts)
       : addTombstones(existing?.removedAccounts, storage.removedAccounts ?? []);
@@ -1059,8 +1065,9 @@ export async function updateAccounts<T>(
   await ensureGitignore(configDir);
 
   return withFileLock(path, async () => {
-    const loaded = await loadAccountsUnsafe();
-    const current: AccountStorageV4 = loaded ?? { version: 4, accounts: [], activeIndex: 0 };
+    const storeRead = await readStoreUnsafe();
+    throwIfUnreadable(storeRead, path);
+    const current: AccountStorageV4 = storeRead.storage ?? { version: 4, accounts: [], activeIndex: 0 };
     const clamped = current.accounts.length > 0
       ? Math.min(Math.max(current.activeIndex, 0), current.accounts.length - 1)
       : 0;
@@ -1112,7 +1119,36 @@ export async function updateAccounts<T>(
   });
 }
 
-async function loadAccountsUnsafe(): Promise<AccountStorageV4 | null> {
+/**
+ * Thrown when the account store exists but cannot be read or parsed.
+ *
+ * Write paths fail with this instead of overwriting the store with an
+ * empty pool, so a corrupt or inaccessible file can never destroy accounts.
+ */
+export class AccountStoreUnreadableError extends Error {
+  readonly code: string | undefined;
+  readonly storePath: string;
+
+  constructor(storePath: string, code: string | undefined, message?: string) {
+    super(
+      message ??
+        "Antigravity account store is unreadable (" +
+          (code ?? "unknown error") +
+          "). Refusing to overwrite " +
+          storePath +
+          " so saved accounts are preserved.",
+    );
+    this.name = "AccountStoreUnreadableError";
+    this.code = code;
+    this.storePath = storePath;
+  }
+}
+
+type StoreReadResult =
+  | { status: "ok"; storage: AccountStorageV4 | null }
+  | { status: "unreadable"; error: unknown };
+
+async function readStoreUnsafe(): Promise<StoreReadResult> {
   try {
     const path = getStoragePath();
     // Ensure permissions are correct on load (fixes existing files)
@@ -1122,7 +1158,7 @@ async function loadAccountsUnsafe(): Promise<AccountStorageV4 | null> {
     const parsed = JSON.parse(content);
 
     if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.accounts)) {
-      return null;
+      throw new Error("Invalid account storage format: accounts is not an array");
     }
 
     const tombstones = sanitizeTombstones(parsed.removedAccounts);
@@ -1130,28 +1166,51 @@ async function loadAccountsUnsafe(): Promise<AccountStorageV4 | null> {
 
     if (parsed.version === 1) {
       const migrated = migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(parsed)));
-      return { ...migrated, accounts: filterTombstonedAccounts(migrated.accounts, tombstones), removedAccounts: tombstones };
+      return { status: "ok", storage: { ...migrated, accounts: filterTombstonedAccounts(migrated.accounts, tombstones), removedAccounts: tombstones } };
     }
     if (parsed.version === 2) {
       const migrated = migrateV3ToV4(migrateV2ToV3(parsed));
-      return { ...migrated, accounts: filterTombstonedAccounts(migrated.accounts, tombstones), removedAccounts: tombstones };
+      return { status: "ok", storage: { ...migrated, accounts: filterTombstonedAccounts(migrated.accounts, tombstones), removedAccounts: tombstones } };
     }
     if (parsed.version === 3) {
       const migrated = migrateV3ToV4(parsed);
-      return { ...migrated, accounts: filterTombstonedAccounts(migrated.accounts, tombstones), removedAccounts: tombstones };
+      return { status: "ok", storage: { ...migrated, accounts: filterTombstonedAccounts(migrated.accounts, tombstones), removedAccounts: tombstones } };
     }
 
-    return {
-      ...parsed,
-      accounts: deduplicateAccountsByEmail(withoutTombstoned),
-      removedAccounts: tombstones,
-    };
+    if (parsed.version === 4) {
+      return {
+        status: "ok",
+        storage: {
+          ...parsed,
+          accounts: deduplicateAccountsByEmail(withoutTombstoned),
+          removedAccounts: tombstones,
+        },
+      };
+    }
+
+    throw new Error(`Unsupported account storage version: ${String((parsed as { version?: unknown }).version)}`);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code === "ENOENT") {
-      return null;
+      return { status: "ok", storage: null };
     }
-    return null;
+    return { status: "unreadable", error };
+  }
+}
+
+async function loadAccountsUnsafe(): Promise<AccountStorageV4 | null> {
+  const read = await readStoreUnsafe();
+  return read.status === "ok" ? read.storage : null;
+}
+
+function throwIfUnreadable(
+  read: StoreReadResult,
+  path: string
+): asserts read is { status: "ok"; storage: AccountStorageV4 | null } {
+  if (read.status === "unreadable") {
+    const code = (read.error as NodeJS.ErrnoException)?.code;
+    log.error("Refusing to overwrite unreadable account storage", { error: String(read.error) });
+    throw new AccountStoreUnreadableError(path, code);
   }
 }
 

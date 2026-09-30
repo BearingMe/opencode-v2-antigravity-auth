@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -9,8 +9,10 @@ import {
   persistOAuthAccount,
 } from "./account-service.js";
 import {
+  AccountStoreUnreadableError,
   MAX_TOMBSTONES,
   addTombstones,
+  getStoragePath,
   loadAccounts,
   saveAccounts,
   saveAccountsReplace,
@@ -222,4 +224,59 @@ describe("account tombstones", () => {
     expect(reloaded?.accounts).toHaveLength(2);
     expect(reloaded?.removedAccounts ?? []).toHaveLength(0);
   });
+
+  it("a corrupt store is never overwritten by an update", async () => {
+    const storePath = getStoragePath();
+    const before = await readFile(storePath, "utf-8");
+    await writeFile(storePath, "{corrupt-json");
+    await expect(
+      updateAccounts((current) => ({
+        storage: { ...current, accounts: [] },
+        result: undefined,
+      })),
+    ).rejects.toThrow(AccountStoreUnreadableError);
+    expect(await readFile(storePath, "utf-8")).toBe("{corrupt-json");
+    await writeFile(storePath, before);
+    expect((await loadAccounts())?.accounts).toHaveLength(2);
+  });
+
+  it("a corrupt store is never overwritten by a merging save", async () => {
+    const storePath = getStoragePath();
+    const before = await readFile(storePath, "utf-8");
+    await writeFile(storePath, "{corrupt-json");
+    await expect(saveAccounts({ version: 4, accounts: [], activeIndex: 0 })).rejects.toThrow(
+      AccountStoreUnreadableError,
+    );
+    expect(await readFile(storePath, "utf-8")).toBe("{corrupt-json");
+    await writeFile(storePath, before);
+  });
+
+  it("a corrupt store is never overwritten by a replace save", async () => {
+    const storePath = getStoragePath();
+    const before = await readFile(storePath, "utf-8");
+    await writeFile(storePath, "{corrupt-json");
+    await expect(
+      saveAccountsReplace({ version: 4, accounts: [], activeIndex: 0 }),
+    ).rejects.toThrow(AccountStoreUnreadableError);
+    expect(await readFile(storePath, "utf-8")).toBe("{corrupt-json");
+    await writeFile(storePath, before);
+    expect((await loadAccounts())?.accounts).toHaveLength(2);
+  });
+
+  it("an unknown future version is never overwritten", async () => {
+    const storePath = getStoragePath();
+    const before = await readFile(storePath, "utf-8");
+    const future = JSON.stringify({ version: 999, accounts: [], activeIndex: 0 });
+    await writeFile(storePath, future);
+    const empty: AccountStorageV4 = { version: 4, accounts: [], activeIndex: 0 };
+    await expect(
+      updateAccounts((current) => ({ storage: { ...current, accounts: [] }, result: undefined })),
+    ).rejects.toThrow(AccountStoreUnreadableError);
+    await expect(saveAccounts(empty)).rejects.toThrow(AccountStoreUnreadableError);
+    await expect(saveAccountsReplace(empty)).rejects.toThrow(AccountStoreUnreadableError);
+    expect(await readFile(storePath, "utf-8")).toBe(future);
+    await writeFile(storePath, before);
+    expect((await loadAccounts())?.accounts).toHaveLength(2);
+  });
 });
+

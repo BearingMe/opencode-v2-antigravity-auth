@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest"
-import { isInvalidRpcResponse, isStaleMutate } from "./tui.js"
+import { describe, expect, it, vi } from "vitest"
+import plugin, { isInvalidRpcResponse, isStaleMutate } from "./tui.js"
 
 describe("isInvalidRpcResponse", () => {
   it("matches the host transport-codec rejection shape", () => {
@@ -33,5 +33,70 @@ describe("isStaleMutate", () => {
 
   it("routes success outcomes to the success toast", () => {
     expect(isStaleMutate({ op: "select", remaining: 1 })).toBe(false)
+  })
+})
+
+describe("refresh-quota on a deleted account", () => {
+  it("alerts once then returns to the refreshed list instead of stale actions", async () => {
+    const account = {
+      id: "acc-one",
+      email: "one@example.com",
+      enabled: true,
+      active: true,
+      verificationRequired: false,
+    }
+    const listResponses = [
+      { accounts: [account] },
+      { accounts: [] },
+    ]
+    const listMock = vi.fn(async () => listResponses.shift() ?? { accounts: [] })
+    const quotaMock = vi.fn(async () => ({ accounts: [] }))
+    const alerts: Array<{ title: string; message: string }> = []
+    const selectCalls: Array<{ title: string; value: unknown }> = []
+    const selectQueue: Array<unknown> = [account.id, "refresh-quota", undefined]
+    type SetupContext = Parameters<typeof plugin.setup>[0]
+    let registeredRun: (() => Promise<void>) | undefined
+
+    const context = {
+      location: "test-location",
+      data: { location: { default: () => "test-location" } },
+      client: {
+        rpc: vi.fn(() => ({ list: listMock, quota: quotaMock })),
+      },
+      ui: {
+        toast: { show: vi.fn() },
+        dialog: {
+          select: vi.fn(async (options: { title: string }) => {
+            selectCalls.push({ title: options.title, value: selectQueue.length })
+            return selectQueue.shift()
+          }),
+          alert: vi.fn(async (options: { title: string; message: string }) => {
+            alerts.push(options)
+          }),
+          confirm: vi.fn(async () => false),
+        },
+        slot: vi.fn((options: { render: () => null }) => {
+          const render = options.render
+          render()
+          return () => {}
+        }),
+      },
+      keymap: {
+        layer: vi.fn((define: () => { commands: Array<{ run: () => Promise<void> }> }) => {
+          const layer = define()
+          registeredRun = layer.commands[0]?.run
+        }),
+      },
+    } as unknown as SetupContext
+
+    plugin.setup(context)
+    if (!registeredRun) throw new Error("antigravity.accounts command was not registered")
+    await registeredRun()
+
+    expect(alerts.some((entry) => entry.message === "That account is no longer saved.")).toBe(true)
+    expect(listMock).toHaveBeenCalledTimes(2)
+    expect(quotaMock).toHaveBeenCalledTimes(2)
+    const actionDialogs = selectCalls.filter((call) => call.title === account.email)
+    expect(actionDialogs).toHaveLength(1)
   })
 })

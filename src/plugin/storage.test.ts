@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
+  AccountStoreUnreadableError,
   deduplicateAccountsByEmail,
   migrateV2ToV3,
   loadAccounts,
@@ -602,6 +603,41 @@ describe("Storage Migration", () => {
       await expect(updateAccounts(() => {
         throw new Error("Maximum of 10 Antigravity accounts reached");
       })).rejects.toThrow("Maximum of 10 Antigravity accounts reached");
+      expect(fs.writeFile).not.toHaveBeenCalled();
+      expect(fs.rename).not.toHaveBeenCalled();
+    });
+
+    it("fails closed without writing when the store is unreadable (EACCES)", async () => {
+      const { updateAccounts } = await import("./storage");
+      const denied = new Error("EACCES") as NodeJS.ErrnoException;
+      denied.code = "EACCES";
+      vi.mocked(fs.readFile).mockImplementation((path) => {
+        if ((path as string).endsWith(".gitignore")) return Promise.resolve(gitignoreComplete);
+        return Promise.reject(denied);
+      });
+
+      await expect(updateAccounts((current) => ({
+        storage: { ...current, accounts: [] },
+        result: undefined,
+      }))).rejects.toThrow(AccountStoreUnreadableError);
+      expect(fs.writeFile).not.toHaveBeenCalled();
+      expect(fs.rename).not.toHaveBeenCalled();
+    });
+
+    it("fails closed without writing when the store read fails (EIO)", async () => {
+      const { saveAccountsReplace } = await import("./storage");
+      const ioError = new Error("EIO") as NodeJS.ErrnoException;
+      ioError.code = "EIO";
+      vi.mocked(fs.readFile).mockImplementation((path) => {
+        if ((path as string).endsWith(".gitignore")) return Promise.resolve(gitignoreComplete);
+        return Promise.reject(ioError);
+      });
+
+      await expect(saveAccountsReplace({
+        version: 4,
+        accounts: [],
+        activeIndex: 0,
+      })).rejects.toThrow(AccountStoreUnreadableError);
       expect(fs.writeFile).not.toHaveBeenCalled();
       expect(fs.rename).not.toHaveBeenCalled();
     });

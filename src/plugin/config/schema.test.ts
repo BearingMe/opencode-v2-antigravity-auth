@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_CONFIG } from "./schema";
+import { AntigravityConfigSchema, DEFAULT_CONFIG } from "./schema";
 
 describe("cli_first config", () => {
   it("includes cli_first default in DEFAULT_CONFIG", () => {
@@ -44,5 +44,17 @@ describe("claude_prompt_auto_caching config", () => {
     });
     expect(typeof claudePromptAutoCaching?.description).toBe("string");
     expect(claudePromptAutoCaching?.description?.length ?? 0).toBeGreaterThan(0);
+  });
+});
+
+describe("auto_resume default", () => {
+  it("defaults to false in DEFAULT_CONFIG", () => {
+    expect(DEFAULT_CONFIG).toHaveProperty("auto_resume", false);
+  });
+
+  it("matches the Zod schema default", () => {
+    const parsed = AntigravityConfigSchema.parse({});
+    expect(parsed.auto_resume).toBe(false);
+    expect(DEFAULT_CONFIG.auto_resume).toBe(parsed.auto_resume);
   });
 });

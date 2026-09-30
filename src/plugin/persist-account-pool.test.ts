@@ -187,6 +187,12 @@ describe("saveAccounts", () => {
   });
 
   it("saves valid storage to disk", async () => {
+    vi.mocked(fs.readFile).mockImplementation((path) => {
+      if ((path as string).endsWith(".gitignore")) return Promise.resolve(".gitignore\nantigravity-accounts.json\nantigravity-accounts.json.*.tmp\nantigravity-signature-cache.json\nantigravity-logs/");
+      const enoent = new Error("ENOENT") as NodeJS.ErrnoException;
+      enoent.code = "ENOENT";
+      return Promise.reject(enoent);
+    });
     vi.mocked(fs.writeFile).mockResolvedValue(undefined);
     vi.mocked(fs.mkdir).mockResolvedValue(undefined);
 

@@ -3,8 +3,7 @@
  * 
  * Config file locations (in priority order, highest wins):
  * - Project: .opencode/antigravity.json
- * - User: ~/.config/opencode/antigravity.json (Linux/Mac)
- *         %APPDATA%\opencode\antigravity.json (Windows)
+ * - User: ~/.config/opencode/antigravity.json (all platforms, including Windows)
  * 
  * Environment variables always override config file values.
  */
@@ -453,7 +452,7 @@ export const DEFAULT_CONFIG: AntigravityConfig = {
   debug_tui: false,
   keep_thinking: false,
   session_recovery: true,
-  auto_resume: true,
+  auto_resume: false,
   resume_text: "continue",
   empty_response_max_attempts: 4,
   empty_response_retry_delay_ms: 2000,

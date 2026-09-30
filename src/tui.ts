@@ -205,9 +205,17 @@ export default Plugin.define({
             location: rpcLocation(context),
           }) as { accounts: Array<QuotaAccount> }
           const entry = presentation.accounts.find((item) => item.id === account.id)
+          if (!entry) {
+            await context.ui.dialog.alert({
+              title: account.email,
+              message: "That account is no longer saved.",
+            })
+            await openList()
+            return
+          }
           await context.ui.dialog.alert({
             title: account.email,
-            message: entry ? quotaLines(entry) : "That account is no longer saved.",
+            message: quotaLines(entry),
           })
         } catch (error: unknown) {
           toastRpcFailure(error)
