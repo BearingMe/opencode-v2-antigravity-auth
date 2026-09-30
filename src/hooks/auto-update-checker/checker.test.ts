@@ -53,11 +53,11 @@ describe("isLocalDevMode / getLocalDevPath", () => {
     );
     fsMock.readFileSync.mockReturnValue(
       JSON.stringify({
-        plugin: ["file:///home/user/opencode-antigravity-auth/dist/plugin.js"],
+        plugin: ["file:///home/user/opencode-v2-antigravity-auth/dist/plugin.js"],
       }),
     );
     const result = getLocalDevPath("/project");
-    expect(result).toContain("opencode-antigravity-auth");
+    expect(result).toContain("opencode-v2-antigravity-auth");
   });
 
   it("handles JSONC config with comments and trailing commas", async () => {
@@ -69,12 +69,12 @@ describe("isLocalDevMode / getLocalDevPath", () => {
       `{
         // dev plugin
         "plugin": [
-          "file:///home/user/opencode-antigravity-auth/dist/plugin.js",
+          "file:///home/user/opencode-v2-antigravity-auth/dist/plugin.js",
         ]
       }`,
     );
     const result = getLocalDevPath("/project");
-    expect(result).toContain("opencode-antigravity-auth");
+    expect(result).toContain("opencode-v2-antigravity-auth");
   });
 
   it("returns null and does not throw when config file is malformed JSON", async () => {
@@ -101,7 +101,7 @@ describe("findPluginEntry", () => {
     const { findPluginEntry } = await import("./checker");
     fsMock.existsSync.mockImplementation((p: string) => p.endsWith("opencode.json"));
     fsMock.readFileSync.mockReturnValue(
-      JSON.stringify({ plugin: ["opencode-antigravity-auth"] }),
+      JSON.stringify({ plugin: ["opencode-v2-antigravity-auth"] }),
     );
     const result = findPluginEntry("/project");
     expect(result).not.toBeNull();
@@ -113,7 +113,7 @@ describe("findPluginEntry", () => {
     const { findPluginEntry } = await import("./checker");
     fsMock.existsSync.mockImplementation((p: string) => p.endsWith("opencode.json"));
     fsMock.readFileSync.mockReturnValue(
-      JSON.stringify({ plugin: ["opencode-antigravity-auth@1.5.0"] }),
+      JSON.stringify({ plugin: ["opencode-v2-antigravity-auth@1.5.0"] }),
     );
     const result = findPluginEntry("/project");
     expect(result).not.toBeNull();
@@ -125,7 +125,7 @@ describe("findPluginEntry", () => {
     const { findPluginEntry } = await import("./checker");
     fsMock.existsSync.mockImplementation((p: string) => p.endsWith("opencode.json"));
     fsMock.readFileSync.mockReturnValue(
-      JSON.stringify({ plugin: ["opencode-antigravity-auth@latest"] }),
+      JSON.stringify({ plugin: ["opencode-v2-antigravity-auth@latest"] }),
     );
     const result = findPluginEntry("/project");
     expect(result!.isPinned).toBe(false);

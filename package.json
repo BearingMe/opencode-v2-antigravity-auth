@@ -1,7 +1,7 @@
 {
-    "name": "opencode-antigravity-auth",
-    "version": "1.6.0",
-    "description": "Google Antigravity IDE OAuth auth plugin for Opencode - access Gemini 3 Pro and Claude 4.6 using Google credentials",
+    "name": "opencode-v2-antigravity-auth",
+    "version": "0.1.0",
+    "description": "Google Antigravity IDE OAuth auth plugin for OpenCode V2 - access Gemini 3 Pro and Claude 4.6 using Google credentials (maintained V2 port)",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "exports": {
@@ -11,14 +11,14 @@
     },
     "type": "module",
     "license": "MIT",
-    "author": "noefabris",
+    "author": "BearingMe",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/NoeFabris/opencode-antigravity-auth.git"
+        "url": "git+https://github.com/BearingMe/opencode-v2-antigravity-auth.git"
     },
-    "homepage": "https://github.com/NoeFabris/opencode-antigravity-auth#readme",
+    "homepage": "https://github.com/BearingMe/opencode-v2-antigravity-auth#readme",
     "bugs": {
-        "url": "https://github.com/NoeFabris/opencode-antigravity-auth/issues"
+        "url": "https://github.com/BearingMe/opencode-v2-antigravity-auth/issues"
     },
     "keywords": [
         "opencode",
@@ -40,6 +40,8 @@
         "LICENSE"
     ],
     "scripts": {
+        "clean": "node -e \"import{rmSync}from'node:fs';rmSync('dist',{recursive:true,force:true})\"",
+        "prebuild": "bun run clean",
         "build": "tsc -p tsconfig.build.json",
         "build:schema": "bun run script/build-schema.ts",
         "typecheck": "tsc --noEmit",

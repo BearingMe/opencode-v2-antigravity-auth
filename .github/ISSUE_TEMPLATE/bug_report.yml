@@ -19,8 +19,8 @@ body:
         > Issues must be written in English. Issues in other languages will be closed immediately.
 
         Check the following resources first:
-        - **[📋 Troubleshooting Guide](https://github.com/NoeFabris/opencode-antigravity-auth/blob/main/docs/TROUBLESHOOTING.md)** - common issues and solutions
-        - [Existing issues](https://github.com/NoeFabris/opencode-antigravity-auth/issues?q=is%3Aissue) - your issue may already be reported
+        - **[📋 Troubleshooting Guide](https://github.com/BearingMe/opencode-v2-antigravity-auth/blob/main/docs/user/troubleshooting.md)** - common issues and solutions
+        - [Existing issues](https://github.com/BearingMe/opencode-v2-antigravity-auth/issues?q=is%3Aissue) - your issue may already be reported
 
         **Issues without debug logs will be closed.**
 
@@ -31,9 +31,9 @@ body:
       options:
         - label: I have searched existing issues for duplicates
           required: true
-        - label: I have read the [📋 Troubleshooting Guide](https://github.com/NoeFabris/opencode-antigravity-auth/blob/main/docs/TROUBLESHOOTING.md)
+        - label: I have read the [📋 Troubleshooting Guide](https://github.com/BearingMe/opencode-v2-antigravity-auth/blob/main/docs/user/troubleshooting.md)
           required: true
-        - label: I have read the [README](https://github.com/NoeFabris/opencode-antigravity-auth#readme) installation instructions
+        - label: I have read the [README](https://github.com/BearingMe/opencode-v2-antigravity-auth#readme) installation instructions
 
   - type: dropdown
     id: model
@@ -42,6 +42,7 @@ body:
       description: Which model were you using when the issue occurred?
       options:
         - antigravity-gemini-3-pro
+        - antigravity-gemini-3.1-pro
         - antigravity-gemini-3-flash
         - antigravity-claude-sonnet-4-6
         - antigravity-claude-opus-4-6-thinking
@@ -49,6 +50,8 @@ body:
         - gemini-2.5-pro
         - gemini-3-flash-preview
         - gemini-3-pro-preview
+        - gemini-3.1-pro-preview
+        - gemini-3.1-pro-preview-customtools
         - Other (specify in description)
         - Not applicable
     validations:
@@ -192,11 +195,11 @@ body:
       description: |
         **Issues without logs will be closed.**
 
-        1. Enable debug logging: `export OPENCODE_ANTIGRAVITY_DEBUG=2`
+        1. Enable debug logging: `export OPENCODE_ANTIGRAVITY_DEBUG=1` (`=2` or `=verbose` for verbose output)
         2. Reproduce the issue
-        3. Find log file at:
-           - macOS/Linux: `~/.config/opencode/antigravity-logs/antigravity-debug-<timestamp>.log`
-           - Windows: `%APPDATA%\opencode\antigravity-logs\antigravity-debug-<timestamp>.log`
+        3. Find log files under `~/.config/opencode/antigravity-logs/` on all
+           platforms (`OPENCODE_CONFIG_DIR` overrides the config directory;
+           `~` is your home directory, including Windows)
         4. Paste relevant sections or attach the file
       placeholder: Paste your debug logs here...
       render: text

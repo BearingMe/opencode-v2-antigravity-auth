@@ -42,8 +42,8 @@ In scope:
   `project.ts`, `storage.ts`, `refresh-queue.ts`).
 - Recovery (in-flight turn repair + session-error hook), debug file/TUI
   logging split (`debug` vs `debug_tui`, 1.6.0), version pinning,
-  auto-update checker, `antigravity_accounts` tool, TUI smoke RPC
-  (`src/tui.ts`, `src/rpc.ts`).
+  auto-update checker, `antigravity_accounts` tool, `/antigravity` dialog
+  over the `AntigravityAccounts` RPC (`src/tui.ts`, `src/rpc.ts`).
   (Historical, REMOVED: OAuth localhost server `server.ts`, CLI prompts
   `cli.ts`, terminal UI `ui/`, dedicated `google_search` tool
   `plugin/search.ts` — model-declared web search is still sanitized via

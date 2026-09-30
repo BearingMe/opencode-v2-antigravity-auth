@@ -2,27 +2,34 @@
 
 ## F1 — First login (OAuth)
 
-Trigger: `opencode auth login` or integrations authorize (V2).
-Participants: V2 `google-oauth` form → `antigravity/oauth.ts` →
-`storage.ts` → `project.ts` → `quota.ts`.
+Trigger: `opencode auth login` (one account per run; repeat to grow the
+pool to the 10-account cap).
+Participants: V2 form-less `google-oauth` method → `antigravity/oauth.ts` →
+`storage.ts` (via `account-service.ts`) → `project.ts` → `quota.ts`.
 (Historical V1: `cli.ts` → `server.ts` localhost listener → same tail;
-both deleted Task 2.)
+both deleted Task 2. Historical V2 intermediate: declared `accountAction` /
+`projectId` form fields — removed; the method now declares zero fields and
+renders prompt-free and Skip-free.)
 
-1. Prompt login mode / account action (`add` vs `replace`) + optional
-   project override.
-2. `authorizeAntigravity(projectId)` → open consent URL (PKCE S256,
-   `state=base64url({verifier,projectId})`).
+1. Login instructions show live pool state (`Saved accounts: N/10` with
+   disabled markers), the one-account-per-run note, and the `/antigravity`
+   management hint. No method picker, no form prompts, no Skip option.
+2. `authorizeAntigravity("")` → open consent URL (PKCE S256,
+   `state=base64url({verifier,projectId:""})`, `prompt=consent`).
 3. Manual code/redirect-URL paste via the authorize `callback`
-   (V2; validates state equality). (Historical V1: localhost listener on
-   port 51121 unless WSL/remote/`shouldSkipLocalServer`.)
+   (validates state equality; raw code requires the expected state from the
+   authorize URL). No localhost listener.
 4. `exchangeAntigravity(code, state)` → validate state → token POST →
    userinfo GET → `loadCodeAssist` project discovery → packed
    `refresh|project`.
-5. V2 `persistOAuthAccount` (`src/v2-plugin.ts`; dedupe by refresh
-   token or case-insensitive email, cap 10, `saveAccountsReplace` v4 +
-   per-family index) → `currentAuth` set, native manager reset.
-6. Post-login `verifyAccountAccess` sweep; configure-models via updater.
-   Completion: account persisted, enabled, selectable by rotation.
+5. `persistOAuthAccount(result, "add")` (`src/plugin/account-service.ts`;
+   dedupe by refresh token or case-insensitive email, cap 10,
+   single-lock replace write + per-family index) → `currentAuth` set, native
+   manager reset.
+6. Completion: account persisted, enabled, selectable by rotation.
+   Re-signing with a saved account reconnects in place (count unchanged,
+   durable id preserved); a new account at 10/10 fails cleanly; cancelling
+   writes nothing.
 
 Error propagation: `failed{error}` surfaces raw token-exchange text; userinfo
 failure tolerated; project failure tolerated to empty-project (deferred).

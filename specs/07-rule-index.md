@@ -19,8 +19,9 @@ Inferred (likely intent). Details live in the referenced sections.
 
 - R-STATE-PACKED-REFRESH (Explicit, §04): use `parse/formatRefreshParts`;
   accept 2- and 3-segment forms.
-- R-STATE-DELETE-USES-REPLACE (Explicit, §04): deletes MUST use
-  `saveAccountsReplace`, never merging `saveAccounts`.
+- R-STATE-DELETE-USES-REPLACE (Explicit, §04): deletes MUST go through
+  single-lock `updateAccounts` replace-transactions (with same-transaction
+  tombstoning), never merging `saveAccounts`.
 - Max 10 accounts; dedupe by refresh token or case-insensitive email
   preserving `addedAt` (Explicit, F1).
 - Out-of-range/unknown account actions are messages, not writes (Explicit).

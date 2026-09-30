@@ -16,9 +16,13 @@
 
 ### Rule: R-STATE-DELETE-USES-REPLACE
 
-**Requirement:** Account deletion and `delete_all` MUST use
-`saveAccountsReplace`. `saveAccounts` (merge-by-refreshToken) MUST NOT be
-used for deletes — it can resurrect deleted accounts.
+**Requirement:** Account deletion and `delete_all` MUST go through
+single-lock `updateAccounts` transactions with replace (not merge)
+semantics, tombstoning the removed identity in the same transaction.
+`saveAccounts` (merge-by-refreshToken) MUST NOT be used for deletes — it
+can resurrect deleted accounts. (`saveAccountsReplace` was the earlier
+spelling of this rule; `updateAccounts` is the current implementation and
+the only writer service code MUST use.)
 
 **Status:** Explicit (implementation + test evidence).
 

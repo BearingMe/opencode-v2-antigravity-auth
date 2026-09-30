@@ -89,12 +89,18 @@ in `request.ts`, `accounts.ts`, `storage.ts`, `quota.ts`, `project.ts`.
   backed by `src/plugin/account-service.ts`).
   (`google_search` tool + `src/plugin/search.ts` REMOVED 2026-09-28, Task 3;
   the D-SEARCH-MUTEX guard in `transform/gemini.ts` stays.)
-- TUI smoke surface (`src/tui.ts :: antigravity-smoke-tui`,
-  `src/rpc.ts :: AntigravitySmoke/ping`) — smoke-test only, no product flow.
+- Production account UI (`src/tui.ts :: /antigravity` dialog,
+  `src/rpc.ts :: AntigravityAccounts` with `list/quota/verify/mutate/
+  deleteAll/ping`) — the interactive management surface sharing the
+  `account-service.ts` backend with the legacy tool. The `/antigravity-smoke`
+  command and `ANTIGRAVITY_RPC_SMOKE_OK` ping were removed with the smoke
+  phase; `ping` now returns `ANTIGRAVITY_RPC_ACCOUNTS_OK`.
 - (Historical, REMOVED Task 2) `AuthMenuAction/AccountAction` UI actions
   (`src/plugin/ui/auth-menu.ts`), `cli.ts` readline prompts, `server.ts`
-  localhost listener. V2 replacements: `google-oauth` integration form +
-  `antigravity_accounts` tool + manual code/URL paste callback.
+  localhost listener. V2 replacements: form-less `google-oauth` integration
+  method (no declared fields, prompt-free and Skip-free; one account per
+  login run) + `antigravity_accounts` tool + `/antigravity` dialog +
+  manual code/URL paste callback.
 
 ## Forbidden relationships
 

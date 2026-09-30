@@ -38,7 +38,7 @@ import { initHealthTracker, initTokenTracker } from "./plugin/rotation.js"
 import { initAntigravityVersion } from "./plugin/version.js"
 import { createAutoUpdateCheckerHook } from "./hooks/auto-update-checker/index.js"
 
-const PLUGIN_ID = "opencode-antigravity-auth"
+const PLUGIN_ID = "opencode-v2-antigravity-auth"
 const INTEGRATION_ID = "google"
 const GOOGLE_PROVIDER_ID = ProviderID.google
 const ANTIGRAVITY_SDK = new URL("./google-sdk.js", import.meta.url).href
