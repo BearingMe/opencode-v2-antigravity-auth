@@ -3,9 +3,10 @@
 ## F1 — First login (OAuth)
 
 Trigger: `opencode auth login` or integrations authorize (V2).
-Participants: V2 form → `antigravity/oauth.ts` →
+Participants: V2 `google-oauth` form → `antigravity/oauth.ts` →
 `storage.ts` → `project.ts` → `quota.ts`.
-(Historical V1: `cli.ts` → `server.ts` localhost listener → same tail.)
+(Historical V1: `cli.ts` → `server.ts` localhost listener → same tail;
+both deleted Task 2.)
 
 1. Prompt login mode / account action (`add` vs `replace`) + optional
    project override.
@@ -37,8 +38,9 @@ streaming transformer`.
 
 1. V2: `requireOAuthAuth`; reject non-model GL paths; strip credentials for
    external origins and direct-fetch.
-2. V1: normalize Request clone (method/headers/body/signal preserved without
-   consuming original); re-`getAuth()`; empty pool → throw login error.
+2. V2: normalize Request clone via `normalizeFetchBody`
+   (method/headers/body/signal preserved without consuming original);
+   re-`getAuth()`; empty pool → throw login error.
 3. `while(true)` loop per §02.5: route (`resolveHeaderRoutingDecision`;
    gemini-only cross-style fallback) → select
    (`getCurrentOrNextForFamily`) → soft-quota gate (wait
@@ -60,8 +62,8 @@ via response, throw (quota/auth/abort), or fatal error.
 
 ## F3 — Quota refresh / verification
 
-Trigger: `antigravity_accounts{check_quota|verify}` tool, CLI menu, or
-automatic post-login sweep. `checkAccountsQuota` refreshes expired tokens,
+Trigger: `antigravity_accounts{check_quota|verify}` tool or automatic
+post-login sweep. `checkAccountsQuota` refreshes expired tokens,
 ensures project context, probes BOTH pools in parallel, returns per-account
 `{status, quota, geminiCliQuota, updatedAccount}`. `verify` maps
 blocked → disabled + verification fields + URL; ok → clears flags; error →

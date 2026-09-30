@@ -1,7 +1,7 @@
 ---
 description: Read-only senior consultant that answers hard technical questions with evidence-backed judgment. Use when another agent needs a reliable second opinion, architectural judgment, failure diagnosis, approach comparison, premise checking, or reconciliation of conflicting sources. Consults ./specs first, then repository evidence and authoritative docs.
 mode: subagent
-model: openai/gpt-6-luna
+model: openai/gpt-6-sol
 permission:
   edit: deny
   bash:

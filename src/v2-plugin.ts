@@ -6,11 +6,23 @@ import { ID as ProviderID, Info as ProviderInfo } from "@opencode/schema/provide
 import { IntegrationMethodID } from "@opencode/schema/integration-id"
 import { authorizeAntigravity, exchangeAntigravity } from "./antigravity/oauth.js"
 import { ANTIGRAVITY_PROVIDER_ID } from "./constants.js"
+import { AntigravityAccounts } from "./rpc.js"
 import { formatRefreshParts, isOAuthAuth, parseRefreshParts } from "./plugin/auth.js"
-import { loadAccounts, saveAccountsReplace, type AccountMetadataV3 } from "./plugin/storage.js"
+import { loadAccounts } from "./plugin/storage.js"
+import {
+  MAX_SAVED_ACCOUNTS,
+  checkQuota as checkAccountsQuota,
+  deleteAllAccounts,
+  getQuotaPresentation,
+  listAccounts,
+  mutateAccount,
+  persistOAuthAccount,
+  persistRefreshRotation,
+  verifyAccount,
+  type MutationOp,
+} from "./plugin/account-service.js"
 import { OPENCODE_MODEL_DEFINITIONS } from "./plugin/config/models.js"
 import type { OAuthAuthDetails, PluginClient } from "./plugin/types.js"
-import { checkAccountsQuota } from "./plugin/quota.js"
 import { createLogger, initLogger } from "./plugin/logger.js"
 import { initRuntimeConfig, loadConfig } from "./plugin/config/index.js"
 import { AccountManager } from "./plugin/accounts.js"
@@ -19,7 +31,6 @@ import {
   executeAntigravityRequest,
   refreshOAuthCredentialUnified,
 } from "./plugin/engine.js"
-import { verifyAccountAccess } from "./plugin/verify.js"
 import { createSessionRecoveryHook, getRecoverySuccessToast } from "./plugin/recovery.js"
 import { initDiskSignatureCache } from "./plugin/cache.js"
 import { createProactiveRefreshQueue, type ProactiveRefreshQueue } from "./plugin/refresh-queue.js"
@@ -97,6 +108,78 @@ export default Plugin.define({
     initRuntimeConfig(nativeConfig)
     initLogger(bridgeClient)
     await initAntigravityVersion()
+
+    // Accounts RPC lives on the production server plugin: a separate entry has
+    // no host auto-load contract (only "." and "./tui" load automatically),
+    // so registering here is what makes the TUI reachable.
+    let accountsRegistration: { dispose: () => Promise<void> | void } | null = null
+    try {
+      accountsRegistration = await ctx.rpc.register(AntigravityAccounts, {
+        list: async () => listAccounts(),
+        quota: async (input) => getQuotaPresentation(bridgeClient, {
+          refresh: input.refresh ?? true,
+        }, ANTIGRAVITY_PROVIDER_ID),
+        verify: async (input) => {
+          const outcome = await verifyAccount({ id: input.id }, bridgeClient, ANTIGRAVITY_PROVIDER_ID)
+          if ("ok" in outcome) return outcome
+          resetNativeManager()
+          const projected: {
+            index: number
+            email?: string
+            checkedAt: number
+            status: "ok" | "blocked" | "error"
+            message: string
+            verifyUrl?: string
+          } = {
+            index: outcome.index,
+            checkedAt: outcome.checkedAt,
+            status: outcome.status,
+            message: outcome.message,
+          }
+          if (outcome.email !== undefined) projected.email = outcome.email
+          if (outcome.verifyUrl !== undefined) projected.verifyUrl = outcome.verifyUrl
+          return projected
+        },
+        mutate: async (input) => {
+          const outcome = await mutateAccount({ id: input.id }, input.op, input.family ? { family: input.family } : {})
+          if ("ok" in outcome) return outcome
+          const selected = outcome.selected
+          if (selected) {
+            currentAuth = {
+              type: "oauth",
+              refresh: formatRefreshParts(selected.refreshParts),
+              access: "",
+              expires: 0,
+            }
+          } else {
+            currentAuth = { type: "oauth", refresh: "", access: "", expires: 0 }
+          }
+          resetNativeManager()
+          return {
+            op: outcome.op,
+            index: outcome.index,
+            nextActiveIndex: outcome.nextActiveIndex,
+            activeIndexByFamily: outcome.activeIndexByFamily,
+            remaining: outcome.remaining,
+            selected: selected ? {
+              id: selected.id,
+              index: selected.index,
+              ...(selected.email !== undefined ? { email: selected.email } : {}),
+            } : null,
+          }
+        },
+        deleteAll: async () => {
+          await deleteAllAccounts()
+          currentAuth = { type: "oauth", refresh: "", access: "", expires: 0 }
+          resetNativeManager()
+          return { remaining: 0 as const }
+        },
+        ping: async () => "ANTIGRAVITY_RPC_ACCOUNTS_OK",
+      })
+    } catch (error: unknown) {
+      bridgeLog.debug("accounts-rpc-unavailable", { error: error instanceof Error ? error.message : String(error) })
+      accountsRegistration = null
+    }
 
     if (nativeConfig.health_score) {
       initHealthTracker({
@@ -277,38 +360,31 @@ export default Plugin.define({
       editor.update(INTEGRATION_ID, (integration) => {
         integration.name = "Google Antigravity"
       })
+      const inheritedKey = editor.method.list(INTEGRATION_ID).find((method) => method.type === "key")
+      if (inheritedKey) editor.method.remove(INTEGRATION_ID, inheritedKey)
       editor.method.update({
         integrationID: INTEGRATION_ID,
         method: {
           id: "google-oauth",
           type: "oauth",
           label: "OAuth with Google (Antigravity)",
-          form: [{
-            key: "accountAction",
-            type: "string",
-            title: accountSummary.length
-              ? `Account action — saved: ${accountSummary.map((account) => `${account.email ?? "Unnamed account"}${account.enabled === false ? " (disabled)" : ""}`).join(", ")}`
-              : "Account action — no saved accounts",
-            default: "add",
-            options: [
-              { value: "add", label: "Add or refresh this account" },
-              { value: "replace", label: "Replace all saved accounts" },
-            ],
-          }, {
-            key: "projectId",
-            type: "string",
-            title: "Project ID (optional)",
-            description: "Override automatic Google project detection.",
-          }],
         },
-        authorize: async (answer) => {
-          const action = answer.accountAction === "replace" ? "replace" : "add"
-          const projectId = typeof answer.projectId === "string" ? answer.projectId : ""
-          const authorization = await authorizeAntigravity(projectId)
+        authorize: async () => {
+          accountSummary = (await loadAccounts())?.accounts ?? []
+          const saved = accountSummary.map((account) => `${account.email ?? "Unnamed account"}${account.enabled === false ? " (disabled)" : ""}`).join(", ")
+          const authorization = await authorizeAntigravity("")
           return {
             mode: "code" as const,
             url: authorization.url,
-            instructions: "Complete Google sign-in, then paste either the authorization code or the full localhost redirect URL.",
+            instructions: [
+              `Saved accounts: ${accountSummary.length}/${MAX_SAVED_ACCOUNTS}${saved ? ` — ${saved}` : ""}.`,
+              "One account per login. Run login again to add another account; signing in again refreshes an existing account.",
+              ...(accountSummary.length >= MAX_SAVED_ACCOUNTS
+                ? [`Maximum of ${MAX_SAVED_ACCOUNTS} Antigravity accounts reached. Sign in to an existing account or delete a saved account before adding another.`]
+                : []),
+              "Manage saved accounts: /antigravity.",
+              "Complete Google sign-in, then paste either the authorization code or the full localhost redirect URL.",
+            ].join("\n"),
             callback: async (code: string) => {
               const params = parseOAuthCallbackInput(
                 code,
@@ -316,7 +392,7 @@ export default Plugin.define({
               )
               const result = await exchangeAntigravity(params.code, params.state)
               if (result.type !== "success") throw new Error(result.error)
-              await persistOAuthAccount(result, action)
+              await persistOAuthAccount(result, "add")
               accountSummary = (await loadAccounts())?.accounts ?? []
               currentAuth = {
                 type: "oauth",
@@ -478,6 +554,7 @@ export default Plugin.define({
       controller.abort()
       refreshQueue?.stop()
       refreshQueue = null
+      await accountsRegistration?.dispose()
       await disposeAntigravityRuntimeResources()
     }
 
@@ -633,59 +710,8 @@ export async function refreshOAuthCredential<T extends OAuthValue & { methodID: 
   const refreshed = await refreshOAuthCredentialUnified(credential, client, ANTIGRAVITY_PROVIDER_ID)
   const previousRefreshToken = parseRefreshParts(credential.refresh).refreshToken
   const [rotatedRefreshToken = ""] = refreshed.refresh.split("|")
-  if (rotatedRefreshToken && rotatedRefreshToken !== previousRefreshToken) {
-    const stored = await loadAccounts()
-    if (stored) {
-      const accounts = stored.accounts.map((account) => account.refreshToken === previousRefreshToken
-        ? { ...account, refreshToken: rotatedRefreshToken }
-        : account)
-      await saveAccountsReplace({ ...stored, accounts })
-    }
-  }
+  await persistRefreshRotation(previousRefreshToken, rotatedRefreshToken)
   return refreshed
-}
-
-async function persistOAuthAccount(
-  result: Extract<Awaited<ReturnType<typeof exchangeAntigravity>>, { type: "success" }>,
-  action: "add" | "replace",
-): Promise<void> {
-  const stored = await loadAccounts()
-  const account: AccountMetadataV3 = {
-    email: result.email,
-    refreshToken: result.refresh,
-    projectId: result.projectId,
-    addedAt: Date.now(),
-    lastUsed: Date.now(),
-    enabled: true,
-    lastVerificationAt: undefined,
-    lastVerificationStatus: undefined,
-    verificationRequired: undefined,
-    verificationRequiredAt: undefined,
-    verificationRequiredReason: undefined,
-    verificationUrl: undefined,
-  }
-
-  let accounts = action === "replace" ? [] : [...(stored?.accounts ?? [])]
-  const matchIndex = accounts.findIndex((existing) =>
-    existing.refreshToken === account.refreshToken ||
-    (!!account.email && existing.email?.toLowerCase() === account.email.toLowerCase()),
-  )
-  if (matchIndex >= 0) {
-    const existing = accounts[matchIndex]
-    if (existing) accounts[matchIndex] = { ...existing, ...account, addedAt: existing.addedAt }
-  } else {
-    if (accounts.length >= 10) throw new Error("Maximum of 10 Antigravity accounts reached")
-    accounts.push(account)
-  }
-
-  const activeIndex = accounts.findIndex((entry) => entry.refreshToken === account.refreshToken)
-  const selectedIndex = activeIndex >= 0 ? activeIndex : 0
-  await saveAccountsReplace({
-    version: 4,
-    accounts,
-    activeIndex: selectedIndex,
-    activeIndexByFamily: { claude: selectedIndex, gemini: selectedIndex },
-  })
 }
 
 export async function manageAccounts(
@@ -694,110 +720,95 @@ export async function manageAccounts(
   invalidateFetch: () => void,
   setAuth: (auth: OAuthAuthDetails) => void,
 ): Promise<{ content: string }> {
-  const storage = await loadAccounts() ?? { version: 4 as const, accounts: [], activeIndex: 0 }
-  const accounts = [...storage.accounts]
-
+  // Legacy tool adapter: input/output contract is unchanged. All storage
+  // reads/writes live in src/plugin/account-service.ts; this wrapper only
+  // formats tool strings and applies in-memory effects (auth/invalidation).
   if (input.action === "list") {
+    const dto = await listAccounts()
     return {
       content: JSON.stringify({
-        activeIndex: storage.activeIndex,
-        accounts: accounts.map((account, index) => ({
-          index,
-          email: account.email ?? `Account ${index + 1}`,
-          enabled: account.enabled !== false,
-          active: index === storage.activeIndex,
-          verificationRequired: account.verificationRequired === true,
-          verificationStatus: account.verificationRequired === true
-            ? "verification_required"
-            : account.lastVerificationStatus ?? "not_checked",
+        activeIndex: dto.activeIndex,
+        accounts: dto.accounts.map((account) => ({
+          index: account.index,
+          email: account.email,
+          enabled: account.enabled,
+          active: account.active,
+          verificationRequired: account.verificationRequired,
+          verificationStatus: account.verificationStatus,
           lastVerificationAt: account.lastVerificationAt,
-          cooldownUntil: account.coolingDownUntil,
-          quotaResetTimes: account.rateLimitResetTimes,
+          cooldownUntil: account.cooldownUntil,
+          quotaResetTimes: account.quotaResetTimes,
         })),
       }, null, 2),
     }
   }
 
   if (input.action === "check_quota") {
-    return { content: JSON.stringify(await checkAccountsQuota(accounts, client, ANTIGRAVITY_PROVIDER_ID), null, 2) }
+    const outcome = await checkAccountsQuota(client, ANTIGRAVITY_PROVIDER_ID)
+    return { content: JSON.stringify(outcome.results, null, 2) }
   }
 
   if (input.action === "verify") {
-    if (!Number.isInteger(input.index) || input.index! < 0 || input.index! >= accounts.length) {
-      return { content: `Invalid account index. There are ${accounts.length} saved accounts.` }
+    const outcome = await verifyAccount({ index: input.index ?? NaN }, client, ANTIGRAVITY_PROVIDER_ID)
+    if ("ok" in outcome) {
+      if (outcome.kind === "invalid-index") {
+        return { content: `Invalid account index. There are ${outcome.accountCount} saved accounts.` }
+      }
+      if (outcome.kind === "not-found") {
+        return { content: `Account ${input.index} was not found.` }
+      }
+      return { content: `Ambiguous account reference. There are ${outcome.accountCount} saved accounts.` }
     }
-    const index = input.index!
-    const account = accounts[index]
-    if (!account) return { content: `Account ${index} was not found.` }
-    const verification = await verifyAccountAccess(account, client, ANTIGRAVITY_PROVIDER_ID)
-    if (verification.status === "ok") {
-      if (account.verificationRequired) account.enabled = true
-      delete account.verificationRequired
-      delete account.verificationRequiredAt
-      delete account.verificationRequiredReason
-      delete account.verificationUrl
-    } else if (verification.status === "blocked") {
-      account.enabled = false
-      account.verificationRequired = true
-      account.verificationRequiredAt = Date.now()
-      account.verificationRequiredReason = verification.message
-      account.verificationUrl = verification.verifyUrl
-    }
-    account.lastVerificationStatus = verification.status
-    account.lastVerificationAt = Date.now()
-    await saveAccountsReplace({ ...storage, accounts })
     invalidateFetch()
-    return { content: JSON.stringify({ index, email: account.email, checkedAt: account.lastVerificationAt, ...verification }) }
+    const body: Record<string, unknown> = {
+      index: outcome.index,
+      email: outcome.email,
+      checkedAt: outcome.checkedAt,
+      status: outcome.status,
+      message: outcome.message,
+    }
+    if (outcome.verifyUrl !== undefined) body.verifyUrl = outcome.verifyUrl
+    return { content: JSON.stringify(body) }
   }
 
   if (input.action === "delete_all") {
-    await saveAccountsReplace({ version: 4, accounts: [], activeIndex: 0, activeIndexByFamily: { claude: 0, gemini: 0 } })
+    await deleteAllAccounts()
     setAuth({ type: "oauth", refresh: "", access: "", expires: 0 })
     invalidateFetch()
     return { content: "All Antigravity accounts deleted." }
   }
 
-  if (!Number.isInteger(input.index) || input.index! < 0 || input.index! >= accounts.length) {
-    return { content: `Invalid account index. There are ${accounts.length} saved accounts.` }
-  }
-  const index = input.index!
-
-  if (input.action === "delete") {
-    accounts.splice(index, 1)
-  } else if (input.action === "enable" || input.action === "disable") {
-    const account = accounts[index]
-    if (account) account.enabled = input.action === "enable"
-  } else if (input.action !== "select") {
-    return { content: `Unknown account action: ${input.action}` }
-  }
-
-  const nextActiveIndex = input.action === "select"
-    ? index
-    : accounts.length === 0
-      ? 0
-      : index < storage.activeIndex
-        ? storage.activeIndex - 1
-        : Math.min(storage.activeIndex, accounts.length - 1)
-  await saveAccountsReplace({
-    version: 4,
-    accounts,
-    activeIndex: nextActiveIndex,
-    activeIndexByFamily: { claude: nextActiveIndex, gemini: nextActiveIndex },
-  })
-
-  const selected = accounts[nextActiveIndex]
-  setAuth(selected
-    ? {
-        type: "oauth",
-        refresh: formatRefreshParts({
-          refreshToken: selected.refreshToken,
-          projectId: selected.projectId,
-          managedProjectId: selected.managedProjectId,
-        }),
-        access: "",
-        expires: 0,
+  if (input.action === "delete" || input.action === "enable" || input.action === "disable" || input.action === "select") {
+    const op = input.action as MutationOp
+    const outcome = await mutateAccount({ index: input.index ?? NaN }, op)
+    if ("ok" in outcome) {
+      if (outcome.kind === "invalid-index") {
+        return { content: `Invalid account index. There are ${outcome.accountCount} saved accounts.` }
       }
-    : { type: "oauth", refresh: "", access: "", expires: 0 })
-  invalidateFetch()
-  return { content: selected ? `Selected ${selected.email ?? `account ${nextActiveIndex + 1}`}.` : "No Antigravity accounts remain." }
+      if (outcome.kind === "not-found") {
+        return { content: `Account ${input.index} was not found.` }
+      }
+      return { content: `Unknown account action: ${input.action}` }
+    }
+    const selected = outcome.selected
+    setAuth(selected
+      ? {
+          type: "oauth",
+          refresh: formatRefreshParts(selected.refreshParts),
+          access: "",
+          expires: 0,
+        }
+      : { type: "oauth", refresh: "", access: "", expires: 0 })
+    invalidateFetch()
+    return { content: selected ? `Selected ${selected.email ?? `account ${outcome.nextActiveIndex + 1}`}.` : "No Antigravity accounts remain." }
+  }
+
+  // Unknown actions never reach the service, so they cannot write. The legacy
+  // ordering is preserved: an out-of-range index reports the index error even
+  // for an unknown action.
+  const count = (await listAccounts()).accounts.length
+  if (!Number.isInteger(input.index) || (input.index as number) < 0 || (input.index as number) >= count) {
+    return { content: `Invalid account index. There are ${count} saved accounts.` }
+  }
+  return { content: `Unknown account action: ${input.action}` }
 }

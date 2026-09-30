@@ -4,6 +4,11 @@
     "description": "Google Antigravity IDE OAuth auth plugin for Opencode - access Gemini 3 Pro and Claude 4.6 using Google credentials",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
+    "exports": {
+        ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+        "./tui": { "types": "./dist/src/tui.d.ts", "import": "./dist/src/tui.js" },
+        "./rpc": { "types": "./dist/src/rpc.d.ts", "import": "./dist/src/rpc.js" }
+    },
     "type": "module",
     "license": "MIT",
     "author": "noefabris",
@@ -47,6 +52,9 @@
         "test:e2e:regression": "bun run script/test-regression.ts"
     },
     "peerDependencies": {
+        "@opentui/core": ">=0.5.12",
+        "@opentui/solid": ">=0.5.12",
+        "solid-js": ">=1.9.0",
         "typescript": "^5"
     },
     "devDependencies": {

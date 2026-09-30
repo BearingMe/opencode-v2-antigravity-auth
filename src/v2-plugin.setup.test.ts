@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { authorizeAntigravity, exchangeAntigravity, loadAccounts, saveAccountsReplace, verifyAccountAccess, mockNativeFetch, mockLoadManager, mockUnifiedRefresh, mockRefreshQueue, mockDisposeResources } = vi.hoisted(() => ({
+const { authorizeAntigravity, exchangeAntigravity, loadAccounts, updateAccounts, verifyAccountAccess, mockNativeFetch, mockLoadManager, mockUnifiedRefresh, mockRefreshQueue, mockDisposeResources, written } = vi.hoisted(() => ({
   authorizeAntigravity: vi.fn(async () => ({
     url: "https://accounts.google.com/auth?state=encoded-state",
     verifier: "verifier",
@@ -15,7 +15,7 @@ const { authorizeAntigravity, exchangeAntigravity, loadAccounts, saveAccountsRep
     projectId: "new-project",
   })),
   loadAccounts: vi.fn(),
-  saveAccountsReplace: vi.fn(async () => undefined),
+  updateAccounts: vi.fn(),
   verifyAccountAccess: vi.fn(async () => ({ status: "ok" as const, message: "verified" })),
   mockNativeFetch: vi.fn(),
   mockLoadManager: vi.fn(),
@@ -26,7 +26,23 @@ const { authorizeAntigravity, exchangeAntigravity, loadAccounts, saveAccountsRep
     stop: vi.fn(),
   },
   mockDisposeResources: vi.fn(async () => undefined),
+  written: [] as unknown[],
 }))
+
+// Transactional storage mock mirroring src/plugin/storage.ts updateAccounts:
+// the updater runs against a clone of the latest loadAccounts value and its
+// replacement store is recorded. Unchanged inputs record nothing.
+updateAccounts.mockImplementation(async (updater: (current: unknown) => Promise<{ storage: unknown; result: unknown }>) => {
+  const current = (await loadAccounts()) ?? { version: 4, accounts: [], activeIndex: 0 }
+  const input = structuredClone(current)
+  const { storage, result } = await updater(input)
+  if (storage !== input) written.push(storage)
+  return result
+})
+
+beforeEach(() => {
+  written.length = 0
+})
 
 vi.mock("./plugin/verify.js", () => ({
   verifyAccountAccess,
@@ -37,7 +53,10 @@ vi.mock("./plugin/version.js", () => ({
 }))
 
 vi.mock("./antigravity/oauth.js", () => ({ authorizeAntigravity, exchangeAntigravity }))
-vi.mock("./plugin/storage.js", () => ({ loadAccounts, saveAccountsReplace }))
+vi.mock("./plugin/storage.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./plugin/storage.js")>()
+  return { ...actual, loadAccounts, updateAccounts }
+})
 vi.mock("./plugin/engine.js", () => ({
   executeAntigravityRequest: mockNativeFetch,
   disposeAntigravityRuntimeResources: mockDisposeResources,
@@ -68,6 +87,11 @@ describe("V2 Antigravity runtime bridge", () => {
   it("registers Antigravity models on Google and routes SDK JSON through the native engine", async () => {
     let modelDefinitions: Array<Record<string, unknown>> = []
     let integrationMethod: Record<string, unknown> | undefined
+    const inheritedKey = { type: "key", label: "API key" }
+    const inheritedEnv = { type: "env", names: ["GOOGLE_API_KEY"] }
+    const otherOAuth = { type: "oauth", id: "other-oauth", label: "Other OAuth" }
+    const listMethods = vi.fn(() => [inheritedKey, inheritedEnv, otherOAuth])
+    const removeMethod = vi.fn()
     const googleProviderInfo: { activation?: string; package?: string } = { activation: "auto", package: "@opencode/ai/providers/google" }
     let sdkHook: ((event: {
       package: string
@@ -85,12 +109,17 @@ describe("V2 Antigravity runtime bridge", () => {
       refresh: "refresh-token|project-id",
       expires: Date.now() + 60_000,
     }
+    const accountsDispose = vi.fn()
     const ctx = {
       location: { directory: "C:/test-project" },
       integration: {
         transform: async (callback: (editor: unknown) => void) => callback({
           update: vi.fn(),
-          method: { update: (value: Record<string, unknown>) => { integrationMethod = value } },
+          method: {
+            list: listMethods,
+            remove: removeMethod,
+            update: (value: Record<string, unknown>) => { integrationMethod = value },
+          },
         }),
         connection: {
           active: vi.fn(async () => activeConnection),
@@ -126,6 +155,9 @@ describe("V2 Antigravity runtime bridge", () => {
       },
       session: { hook: vi.fn(async () => ({ dispose: vi.fn() })) },
       tool: { transform: async (callback: (editor: unknown) => void) => callback({ add: vi.fn() }) },
+      rpc: {
+        register: vi.fn(async () => ({ dispose: accountsDispose })),
+      },
       event: { subscribe: async function* () {} },
     }
 
@@ -140,12 +172,28 @@ describe("V2 Antigravity runtime bridge", () => {
     expect(customGeminiModel?.package).toBe(`aisdk:${sdkPackage}`)
     expect((claudeModel?.settings as Record<string, unknown>)?.fetch).toBeUndefined()
     expect(sdkHook).toEqual(expect.any(Function))
+    const rpcRegister = ctx.rpc.register as unknown as { mock: { calls: Array<[unknown, Record<string, (input: unknown) => Promise<unknown>>]> } }
+    expect(rpcRegister.mock.calls).toHaveLength(1)
+    expect(rpcRegister.mock.calls[0]?.[0]).toBeDefined()
+    const handlers = rpcRegister.mock.calls[0]?.[1]
+    expect(handlers).toBeDefined()
+    if (!handlers) throw new Error("expected RPC handlers")
+    expect(Object.keys(handlers).sort()).toEqual(["deleteAll", "list", "mutate", "ping", "quota", "verify"])
+    const call = async (name: string, input: unknown) => {
+      const handler = handlers[name]
+      if (!handler) throw new Error(`missing RPC handler: ${name}`)
+      return handler(input)
+    }
+    await expect(call("ping", {})).resolves.toBe("ANTIGRAVITY_RPC_ACCOUNTS_OK")
     expect(integrationMethod).toBeDefined()
     expect(typeof integrationMethod?.refresh).toBe("function")
     const label = integrationMethod?.label as (credential: { refresh: string; metadata?: Record<string, unknown> }) => string | undefined
     expect(label({ refresh: "old-refresh-token|old-project" })).toBe("old@example.com")
     expect(label({ refresh: "other-token", metadata: { email: "connected@example.com" } })).toBe("connected@example.com")
-    expect(JSON.stringify(integrationMethod?.method)).toContain("saved: old@example.com")
+    expect(listMethods).toHaveBeenCalledWith("google")
+    expect(removeMethod).toHaveBeenCalledExactlyOnceWith("google", inheritedKey)
+    expect(removeMethod.mock.calls[0]?.[1]).toBe(inheritedKey)
+    expect(integrationMethod?.method).not.toHaveProperty("form")
 
     const sdkOptions: Record<string, unknown> = {}
     const unnormalizedSdkEvent: {
@@ -202,18 +250,94 @@ describe("V2 Antigravity runtime bridge", () => {
 
     const authorize = integrationMethod?.authorize as (answer: Record<string, string>) => Promise<{
       mode: string
+      instructions: string
       callback: (code: string) => Promise<{ refresh: string; access: string }>
     }>
-    const authorization = await authorize({ accountAction: "add" })
+    // Legacy answers cannot replace the pool or override automatic detection.
+    const authorization = await authorize({ accountAction: "replace", projectId: "ignored-project" })
+    expect(authorizeAntigravity).toHaveBeenCalledWith("")
+    expect(authorization.mode).toBe("code")
+    expect(authorization.instructions).toContain("1/10")
+    expect(authorization.instructions).toContain("old@example.com")
+    expect(authorization.instructions).toContain("/antigravity")
+    // Cancelling before callback has no persistence side effect.
+    expect(updateAccounts).not.toHaveBeenCalled()
     const login = await authorization.callback("oauth-code")
     expect(login.refresh).toBe("new-refresh-token|new-project")
-    expect(saveAccountsReplace).toHaveBeenCalledWith(expect.objectContaining({
+    expect(written[0]).toMatchObject({
       accounts: expect.arrayContaining([
         expect.objectContaining({ refreshToken: "old-refresh-token" }),
         expect.objectContaining({ refreshToken: "new-refresh-token", email: "new@example.com" }),
       ]),
       activeIndex: 1,
+    })
+
+    written.length = 0
+    updateAccounts.mockClear()
+    exchangeAntigravity.mockRejectedValueOnce(new Error("OAuth denied"))
+    await expect(authorization.callback("denied-code")).rejects.toThrow("OAuth denied")
+    expect(updateAccounts).not.toHaveBeenCalled()
+
+    const fullPool = Array.from({ length: 10 }, (_, index) => ({
+      id: `account-${index}`,
+      email: `saved-${index}@example.com`,
+      refreshToken: `saved-token-${index}`,
+      addedAt: 1,
+      lastUsed: 2,
     }))
+    loadAccounts.mockResolvedValue({ version: 4, accounts: fullPool, activeIndex: 0 })
+    const atCap = await authorize({})
+    expect(atCap.instructions).toContain("10/10")
+    expect(atCap.instructions).toContain("Maximum of 10 Antigravity accounts reached")
+    await expect(atCap.callback("new-account-code")).rejects.toThrow("Maximum of 10 Antigravity accounts reached")
+    // The throwing updater aborts the transaction without recording a store.
+    expect(written).toHaveLength(0)
+
+    exchangeAntigravity.mockResolvedValueOnce({
+      type: "success",
+      refresh: "rotated-existing-token",
+      access: "new-access-token",
+      expires: Date.now() + 3600_000,
+      email: "SAVED-0@example.com",
+      projectId: "auto-project",
+    })
+    await atCap.callback("existing-account-code")
+    expect(updateAccounts).toHaveBeenCalledTimes(2)
+    expect(written).toHaveLength(1)
+    expect(written[0]).toMatchObject({
+      accounts: [expect.objectContaining({ id: "account-0", refreshToken: "rotated-existing-token" }), ...fullPool.slice(1)],
+    })
+
+    // Every RPC method output is credential-free even with token material
+    // seeded. Placed after the auth assertions: mutate/deleteAll repoint the
+    // in-memory auth, which earlier assertions must not observe.
+    loadAccounts.mockResolvedValue({
+      version: 4,
+      accounts: [
+        { id: "acc-one", email: "one@example.com", refreshToken: "secret-refresh-token-one", projectId: "p1", addedAt: 1, lastUsed: 2 },
+        { id: "acc-two", email: "two@example.com", refreshToken: "secret-refresh-token-two", projectId: "p2", addedAt: 2, lastUsed: 3 },
+      ],
+      activeIndex: 0,
+    })
+    const scanSecrets = (value: unknown) => {
+      const text = JSON.stringify(value)
+      expect(text).not.toContain("secret-refresh-token-one")
+      expect(text).not.toContain("secret-refresh-token-two")
+      expect(text).not.toContain("refreshParts")
+      expect(text).not.toContain("updatedAccount")
+      expect(text).not.toContain("access-token")
+    }
+    scanSecrets(await call("list", {}))
+    scanSecrets(await call("quota", { refresh: false }))
+    scanSecrets(await call("verify", { id: "acc-one" }))
+    scanSecrets(await call("mutate", { id: "acc-one", op: "disable" }))
+    // Stale ids fail closed without writing.
+    const staleWrites = written.length
+    const stale = await call("mutate", { id: "acc-missing", op: "select" })
+    expect(stale).toMatchObject({ ok: false, kind: "not-found" })
+    scanSecrets(stale)
+    expect(written.length).toBe(staleWrites)
+    scanSecrets(await call("deleteAll", {}))
 
     const sdkEvent: {
       package: string
@@ -249,7 +373,8 @@ describe("V2 Antigravity runtime bridge", () => {
     expect(mockRefreshQueue.start).toHaveBeenCalledOnce()
 
     expect(cleanup).toEqual(expect.any(Function))
-    cleanup?.()
+    await cleanup?.()
+    expect(accountsDispose).toHaveBeenCalledOnce()
     expect(mockRefreshQueue.stop).toHaveBeenCalledOnce()
     expect(mockDisposeResources).toHaveBeenCalledOnce()
   })

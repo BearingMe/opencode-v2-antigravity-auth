@@ -54,7 +54,9 @@ Inferred (likely intent). Details live in the referenced sections.
 - `exchangeAntigravity` never throws (`failed{error}`); userinfo/project
   failures tolerated to degraded-but-continuable states (Explicit).
 - `invalid_grant` MUST evict project cache + clear cached auth (Explicit;
-  single unified refresh path since Task 1, D-REFRESH-DUAL resolved).
+  single unified refresh path since Task 1, D-REFRESH-DUAL resolved and
+  re-confirmed 2026-09-29; the old V2 generic-error divergence note is
+  retired).
 - Session recovery gated by `session_recovery`; dedup in-flight errors;
   toasts never throw; recovery-success toast honors `quiet_mode` and
   `toast_scope=root_only` with explicit session ID (Explicit, Task 4).
@@ -82,6 +84,13 @@ Inferred (likely intent). Details live in the referenced sections.
 - `hooks/*` MUST NOT gain auth/quota/storage deps (SHOULD, §01).
 - New code MUST use `getAntigravityHeaders()/getAntigravityVersion()/
   invalidatePackage()` over deprecated exports (Explicit).
+- `x-goog-user-project` MUST be stripped for all header styles; content
+  requests MUST NOT send QuotaUser/Device-Id/Api-Client/Client-Metadata
+  (Explicit, §06 items 9–10).
+- `debug` gates file logging only; `debug_tui` gates TUI logging only
+  (Explicit, §06 item 10).
+- Gemini `functionCall` signature validity + empty-part stripping + cloned
+  fallback responses are REQUIRED (Explicit, §06 item 11).
 - Fire-and-forget work MUST NOT reject into session creation (Strong).
 - Runtime (non-test) source imports MUST resolve under BOTH
   `tsconfig.json` and `tsconfig.build.json`: use `.js`-suffixed or

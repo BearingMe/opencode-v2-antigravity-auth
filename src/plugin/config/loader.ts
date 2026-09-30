@@ -6,12 +6,21 @@
  * 1. Schema defaults
  * 2. User config file
  * 3. Project config file
+ * 4. Environment variables (OPENCODE_ANTIGRAVITY_*)
  */
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { AntigravityConfigSchema, DEFAULT_CONFIG, type AntigravityConfig } from "./schema";
+import type { ZodType } from "zod";
+import {
+  AccountSelectionStrategySchema,
+  AntigravityConfigSchema,
+  DEFAULT_CONFIG,
+  SchedulingModeSchema,
+  ToastScopeSchema,
+  type AntigravityConfig,
+} from "./schema";
 import { createLogger } from "../logger";
 
 const log = createLogger("config");
@@ -109,6 +118,76 @@ function mergeConfigs(
 }
 
 // =============================================================================
+// Environment Overrides
+// =============================================================================
+
+/**
+ * Documented OPENCODE_ANTIGRAVITY_* variables win over config files.
+ * Unknown or invalid values warn and are ignored, never applied.
+ */
+function parseEnvBoolean(raw: string | undefined, name: string): boolean | undefined {
+  if (raw === undefined || raw.trim().length === 0) {
+    return undefined;
+  }
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on") {
+    return true;
+  }
+  if (normalized === "0" || normalized === "false" || normalized === "no" || normalized === "off") {
+    return false;
+  }
+  log.warn("Ignoring env override with unrecognized boolean value", { name });
+  return undefined;
+}
+
+/**
+ * Parse an enum env value against its Zod schema. Returns undefined when
+ * unset, blank, or invalid (invalid values warn and are ignored).
+ */
+function parseEnvEnum<T>(raw: string | undefined, name: string, schema: ZodType<T>): T | undefined {
+  if (raw === undefined || raw.trim().length === 0) {
+    return undefined;
+  }
+  const result = schema.safeParse(raw.trim());
+  if (result.success) {
+    return result.data;
+  }
+  log.warn("Ignoring env override with invalid value", { name, value: raw });
+  return undefined;
+}
+
+/**
+ * Apply documented OPENCODE_ANTIGRAVITY_* overrides on top of file config.
+ * Env wins over user and project files. Invalid values are ignored so a
+ * typo can never corrupt the resolved config.
+ */
+function applyEnvOverrides(config: AntigravityConfig): AntigravityConfig {
+  const env = process.env;
+  const quietMode = parseEnvBoolean(env.OPENCODE_ANTIGRAVITY_QUIET, "OPENCODE_ANTIGRAVITY_QUIET");
+  const toastScope = parseEnvEnum(env.OPENCODE_ANTIGRAVITY_TOAST_SCOPE, "OPENCODE_ANTIGRAVITY_TOAST_SCOPE", ToastScopeSchema);
+  const debug = parseEnvBoolean(env.OPENCODE_ANTIGRAVITY_DEBUG, "OPENCODE_ANTIGRAVITY_DEBUG");
+  const debugTui = parseEnvBoolean(env.OPENCODE_ANTIGRAVITY_DEBUG_TUI, "OPENCODE_ANTIGRAVITY_DEBUG_TUI");
+  const keepThinking = parseEnvBoolean(env.OPENCODE_ANTIGRAVITY_KEEP_THINKING, "OPENCODE_ANTIGRAVITY_KEEP_THINKING");
+  const accountSelectionStrategy = parseEnvEnum(env.OPENCODE_ANTIGRAVITY_ACCOUNT_SELECTION_STRATEGY, "OPENCODE_ANTIGRAVITY_ACCOUNT_SELECTION_STRATEGY", AccountSelectionStrategySchema);
+  const pidOffsetEnabled = parseEnvBoolean(env.OPENCODE_ANTIGRAVITY_PID_OFFSET_ENABLED, "OPENCODE_ANTIGRAVITY_PID_OFFSET_ENABLED");
+  const schedulingMode = parseEnvEnum(env.OPENCODE_ANTIGRAVITY_SCHEDULING_MODE, "OPENCODE_ANTIGRAVITY_SCHEDULING_MODE", SchedulingModeSchema);
+  const rawLogDir = env.OPENCODE_ANTIGRAVITY_LOG_DIR;
+  const logDir = rawLogDir !== undefined && rawLogDir.trim().length > 0 ? rawLogDir.trim() : undefined;
+  return {
+    ...config,
+    ...(quietMode !== undefined ? { quiet_mode: quietMode } : {}),
+    ...(toastScope !== undefined ? { toast_scope: toastScope } : {}),
+    ...(debug !== undefined ? { debug } : {}),
+    ...(debugTui !== undefined ? { debug_tui: debugTui } : {}),
+    ...(logDir !== undefined ? { log_dir: logDir } : {}),
+    ...(keepThinking !== undefined ? { keep_thinking: keepThinking } : {}),
+    ...(accountSelectionStrategy !== undefined ? { account_selection_strategy: accountSelectionStrategy } : {}),
+    ...(pidOffsetEnabled !== undefined ? { pid_offset_enabled: pidOffsetEnabled } : {}),
+    ...(schedulingMode !== undefined ? { scheduling_mode: schedulingMode } : {}),
+  };
+}
+
+// =============================================================================
 // Main Loader
 // =============================================================================
 
@@ -136,7 +215,7 @@ export function loadConfig(directory: string): AntigravityConfig {
     config = mergeConfigs(config, projectConfig);
   }
 
-  return config;
+  return applyEnvOverrides(config);
 }
 
 /**

@@ -10,8 +10,8 @@ Gemini and Claude models. It intercepts `fetch()` calls aimed at
 of up to 10 Google accounts with per-account quota rotation, and repairs
 thinking-signature / tool-result failures that would otherwise break sessions.
 
-Evidence: `src/plugin.ts :: createAntigravityPlugin` (V1 engine, ~3411 lines),
-`src/v2-plugin.ts :: setup` (V2 bridge, 707 lines),
+Evidence: `src/v2-plugin.ts :: setup` (V2 bridge),
+`src/plugin/engine.ts :: executeAntigravityRequest` (sole native router),
 `src/constants.ts` (identity/endpoints/headers),
 `src/antigravity/oauth.ts :: authorizeAntigravity / exchangeAntigravity`.
 
@@ -40,9 +40,14 @@ In scope:
 - Multi-account pool, rotation, quota probing, fingerprints, project context
   (`src/plugin/accounts.ts`, `rotation.ts`, `quota.ts`, `fingerprint.ts`,
   `project.ts`, `storage.ts`, `refresh-queue.ts`).
-- Recovery (in-flight turn repair + session-error hook + filesystem storage
-  ops), debug/TUI logging, OAuth localhost server, search and account tools,
-  CLI prompts, version pinning, auto-update checker.
+- Recovery (in-flight turn repair + session-error hook), debug file/TUI
+  logging split (`debug` vs `debug_tui`, 1.6.0), version pinning,
+  auto-update checker, `antigravity_accounts` tool, TUI smoke RPC
+  (`src/tui.ts`, `src/rpc.ts`).
+  (Historical, REMOVED: OAuth localhost server `server.ts`, CLI prompts
+  `cli.ts`, terminal UI `ui/`, dedicated `google_search` tool
+  `plugin/search.ts` — model-declared web search is still sanitized via
+  the D-SEARCH-MUTEX guard.)
 
 Non-goals:
 
@@ -61,8 +66,9 @@ Non-goals:
 - V1 legacy engine (REMOVED 2026-09-28, Task 2): `src/plugin.ts`
   (`createAntigravityPlugin`, `AntigravityCLIOAuthPlugin`,
   `GoogleOAuthPlugin`), `cli.ts`, `server.ts`, `ui/`, and the
-  `@opencode-ai/plugin` dependency were deleted. `verifyAccountAccess`
-  lives in `src/plugin/verify.ts`.
+  `@opencode-ai/plugin` V1 dependency were deleted. `verifyAccountAccess`
+  lives in `src/plugin/verify.ts`; routing lives in
+  `src/plugin/engine.ts :: executeAntigravityRequest`.
 - V2 bridge (current OpenCode V2 product path):
   `src/v2-plugin.ts` default export `Plugin.define({id:
   "opencode-antigravity-auth"})`.

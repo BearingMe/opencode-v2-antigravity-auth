@@ -12,7 +12,10 @@
    is an officially supported LAST-RESORT bypass (degrades model
    performance). Non-functionCall parts are recommended-but-unenforced
    (degraded quality if omitted). Gemini 3 Pro Image is lenient (no 400)
-   yet still needs round-tripping for context.
+   yet still needs round-tripping for context. (Re-verified 2026-09-29:
+   parallel ordering, empty-text streaming part, Gemini 3-vs-2.5 strictness
+   split, and the `context_engineering_is_the_way_to_go` equivalent dummy
+   all still match the live pages; validation is current-turn-only.)
    The plugin's cache → re-inject → sanitize → warmup → sentinel-escalation
    design directly implements this contract (R-SIG-PRESERVE /
    R-SIG-CLAUDE-STRIP / R-SIG-SENTINEL-LAST-RESORT; first-call-keeps,
@@ -50,7 +53,12 @@
    Relevance: the V2 bridge's reliance on `aisdk.hook("sdk")`,
    `provider.transform`, `model.transform`, `integration.transform`,
    `tool.transform`, `session.hook`, `event.subscribe` inherits beta
-   instability — Oracle MUST allow for upstream shape changes.
+   instability — Oracle MUST allow for upstream shape changes. (Verified
+  2026-09-29: `aisdk.sdk {model, package, options, sdk?}` plus `language`
+  variant in `@opencode-ai/plugin` 1.18.x types; current v2 docs route
+  provider/model metadata through `catalog.transform` while this codebase
+  (pinned 2.0.18) uses `provider/model.transform` — treat the naming gap
+  as version-scoped, not a violation.)
 
 ## Testing guarantees (from analysis)
 
@@ -74,7 +82,8 @@
   `antigravity-first-fallback.test.ts`, `cross-model-integration.test.ts`).
 - `src/plugin/engine.test.ts` (2026-09-28, Task 1): 13 native-engine parity
   tests (routing decision, quota fallback, warmup URL, wait formatting,
-  native-enable flag).
+  native-enable flag, unified-refresh delegation
+  `refreshOAuthCredentialUnified → token.ts :: refreshAccessToken`).
 - `src/plugin/verify.ts` + `verify.test.ts` (2026-09-28, Task 2):
   `verifyAccountAccess` extracted from the deleted V1 harness
   (blocked→disabled+URL, ok passthrough, error-without-disable).
@@ -90,9 +99,11 @@
 - `hooks/auto-update-checker`: `checker.test.ts` (config/JSONC/entry
   forms), `index.test.ts` (prerelease skip, toast-only mode,
   once-per-instance, child ignore, local-dev warning; fake timers).
-- Gaps: NO tests in `src/antigravity/`; NO dedicated V1-unit (deleted);
-  `script/` E2E is excluded from typecheck and live-endpoint E2E has never
-  run (needs real quota).
+- Gaps: NO tests in `src/antigravity/`; `script/` E2E is excluded from
+  typecheck and live-endpoint E2E needs real quota. `src/tui.ts` / `rpc.ts`
+  are smoke-only (no colocated tests). `src/plugin/account-service.ts`
+  quota-presentation semantics are specified in `docs/task4-quota-notes.md`
+  (null-vs-0, failed-refresh-keeps-cache, timeout-partial).
 
 ## Compatibility
 
@@ -111,12 +122,14 @@
 
 ## Known divergences (normative for reviewers)
 
-1. D-REFRESH-DUAL (RESOLVED 2026-09-28, Task 1): V1 `refreshAccessToken`
+1. D-REFRESH-DUAL (RESOLVED 2026-09-28, Task 1; confirmed unified 2026-09-29):
+   V1 `refreshAccessToken`
    (skew, `invalid_grant` eviction, project-id preservation, cache store)
    is now the single refresh implementation, called via
    `src/plugin/engine.ts :: refreshOAuthCredentialUnified` and the V2
    authorize-callback path. `src/v2-plugin.ts :: refreshOAuthCredential`
-   remains only as a thin compatibility wrapper. Edits MUST NOT widen the
+   remains only as a thin compatibility wrapper. The prior spec note about a
+   V2 generic-error divergence is retired. Edits MUST NOT widen the
    gap again.
 2. D-REFRESH-SEGMENTS: `oauth.exchangeAntigravity` writes 2-segment
    `refresh|project`; V2 authorize callback re-packs as
@@ -148,6 +161,21 @@
    is committed in `src/constants.ts` (CLI-spoof requirement) and duplicated
    in `scripts/check-quota.mjs`. Rotation means changing both; scripts
    SHOULD import from a single source rather than re-hardcoding.
+9. Post-1.5.0 header contract (Explicit): `x-goog-user-project` MUST be
+   stripped for ALL header styles; content requests MUST NOT send
+   `X-Goog-QuotaUser`, `X-Client-Device-Id`, `X-Goog-Api-Client`, or
+   `Client-Metadata` (fingerprint contributes `User-Agent` only);
+   `quota_fallback` config is deprecated/ignored (Gemini cross-pool fallback
+   is always on).
+10. Debug-sink split 1.6.0 (Explicit): `debug` = file logging only,
+    `debug_tui` = TUI panel only. New code MUST NOT gate file logging on
+    `debug_tui` or TUI logging on `debug`.
+11. Gemini tool-call signature enforcement 1.6.0 (#397, Explicit):
+    `functionCall` parts MUST carry valid `thought_signature` behavior;
+    empty/invalid `contents.parts` and `systemInstruction.parts` MUST be
+    removed before forwarding (#454); response fallback MUST clone before
+    reading so recovery signaling survives without `Body already used`
+    (#444).
 
 ## Unresolved questions (Oracle MUST NOT invent answers)
 
@@ -208,10 +236,10 @@
 - Update: `src/hooks/auto-update-checker/{index,checker,cache,constants,
   types,logging}.ts` + `checker.test.ts`, `index.test.ts`
 - Core: `src/plugin/{auth,token,cache,request,request-helpers,accounts,
-  rotation,quota,storage,fingerprint,project,refresh-queue,recovery,
-  thinking-recovery,errors,debug,logger,logging-utils,verify,verification,
-  version,image-saver,types}.ts` (historical: `search.ts`, `cli.ts`,
-  `server.ts` deleted Tasks 2–3)
+  account-service,rotation,quota,storage,fingerprint,project,refresh-queue,
+  recovery,thinking-recovery,errors,debug,logger,logging-utils,verify,
+  verification,version,image-saver,types}.ts` (historical: `search.ts`,
+  `cli.ts`, `server.ts` deleted Tasks 2–3)
 - Subdirs: `src/plugin/{cache,config,core:streaming,recovery,stores,
   transform}/*`
 - Tests: `src/constants.test.ts`, `src/v2-plugin.test.ts`,
