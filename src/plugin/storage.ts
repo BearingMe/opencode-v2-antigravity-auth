@@ -11,7 +11,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import lockfile from "proper-lockfile";
 import type { HeaderStyle } from "../constants";
 import { createLogger } from "./logger";
@@ -231,6 +231,248 @@ export interface AccountStorageV4 {
     claude?: number;
     gemini?: number;
   };
+  /**
+   * Tombstones for removed accounts. A removed account stays removed:
+   * every load/persist path filters entries matching a tombstone, so a
+   * stale in-memory manager or a merging background save cannot resurrect
+   * a deleted account. Capped (see MAX_TOMBSTONES) to bound growth.
+   */
+  removedAccounts?: RemovedAccountTombstone[];
+}
+
+/**
+ * Credential-free deletion record. Identity is a durable account id when
+ * the account has one, plus a sha256 fingerprint of the refresh token and
+ * a normalized email so pre-id accounts stay deleted too. Never carries
+ * token material.
+ */
+export interface RemovedAccountTombstone {
+  id?: string;
+  tokenFingerprint?: string;
+  email?: string;
+  removedAt: number;
+}
+
+/** Maximum tombstones retained; oldest pruned first.
+ * Bounded retention is intentional: protection covers the 50 most recent
+ * deletions, realistic given the 10-account cap (it takes 50+ distinct
+ * delete events before the oldest tombstone drops and that identity could
+ * resurrect via a stale snapshot). Unbounded growth is rejected to keep the
+ * accounts file small; no cheap strengthening exists because every dropped
+ * tombstone can still reappear in a stale snapshot, so pruning only
+ * "unreappearable" identities is not possible. */
+export const MAX_TOMBSTONES = 50;
+
+/** Deterministic credential-free identity for token matching. */
+export function fingerprintRefreshToken(refreshToken: string): string {
+  return createHash("sha256").update(refreshToken, "utf8").digest("hex");
+}
+
+function normalizeTombstoneEmail(email?: string): string | undefined {
+  const normalized = email?.trim().toLowerCase();
+  return normalized ? normalized : undefined;
+}
+
+/** Builds a tombstone for a removed account. */
+export function tombstoneForAccount(
+  account: { id?: string; refreshToken: string; email?: string },
+  removedAt: number = Date.now(),
+): RemovedAccountTombstone {
+  const tombstone: RemovedAccountTombstone = { removedAt };
+  if (account.id) {
+    tombstone.id = account.id;
+  }
+  if (account.refreshToken) {
+    tombstone.tokenFingerprint = fingerprintRefreshToken(account.refreshToken);
+  }
+  const email = normalizeTombstoneEmail(account.email);
+  if (email) {
+    tombstone.email = email;
+  }
+  return tombstone;
+}
+
+/**
+ * True when the tombstone identifies this account for deletion filtering.
+ *
+ * Generation matching: equal durable ids plus one corroborating field (token
+ * fingerprint or normalized email) always match, and equal token fingerprints
+ * always match — a fingerprint identifies the credential itself, so it holds
+ * across the pre-id upgrade path where a delete backfills an id the stale
+ * snapshot lacks. Email alone only matches as a legacy fallback when both
+ * sides lack an id and token material. In particular a re-added generation
+ * (fresh id and fresh token under the same email) never matches the stale
+ * deletion, so a stale save cannot poison it.
+ */
+export function tombstoneMatchesAccount(
+  tombstone: RemovedAccountTombstone,
+  account: { id?: string; refreshToken?: string; email?: string },
+): boolean {
+  const idMatch = !!tombstone.id && !!account.id && tombstone.id === account.id
+  let fingerprintMatch = false
+  if (tombstone.tokenFingerprint && account.refreshToken) {
+    fingerprintMatch = tombstone.tokenFingerprint === fingerprintRefreshToken(account.refreshToken)
+  }
+  if (idMatch) {
+    const tombstoneEmail = normalizeTombstoneEmail(tombstone.email)
+    const accountEmail = normalizeTombstoneEmail(account.email)
+    const emailMatch = !!tombstoneEmail && !!accountEmail && tombstoneEmail === accountEmail
+    return fingerprintMatch || emailMatch
+  }
+  if (fingerprintMatch) {
+    return true
+  }
+  if (!tombstone.id && !account.id && !tombstone.tokenFingerprint && !account.refreshToken) {
+    const tombstoneEmail = normalizeTombstoneEmail(tombstone.email)
+    const accountEmail = normalizeTombstoneEmail(account.email)
+    return !!tombstoneEmail && !!accountEmail && tombstoneEmail === accountEmail
+  }
+  return false
+}
+
+/**
+ * Loose any-field match for explicit re-add clearing (user intent).
+ * A fresh OAuth login for a previously deleted identity clears its tombstone
+ * through id, token, or email — unlike deletion filtering, which requires
+ * strict generation corroboration.
+ */
+export function tombstoneMatchesReAdd(
+  tombstone: RemovedAccountTombstone,
+  identity: { id?: string; refreshToken?: string; email?: string },
+): boolean {
+  if (tombstone.id && identity.id && tombstone.id === identity.id) {
+    return true
+  }
+  if (
+    tombstone.tokenFingerprint &&
+    identity.refreshToken &&
+    tombstone.tokenFingerprint === fingerprintRefreshToken(identity.refreshToken)
+  ) {
+    return true
+  }
+  const email = normalizeTombstoneEmail(identity.email)
+  if (tombstone.email && email && tombstone.email === email) {
+    return true
+  }
+  return false
+}
+
+/** True when any tombstone identifies this account. */
+export function isTombstoned(
+  account: { id?: string; refreshToken?: string; email?: string },
+  tombstones?: RemovedAccountTombstone[],
+): boolean {
+  if (!tombstones || tombstones.length === 0) {
+    return false;
+  }
+  return tombstones.some((tombstone) => tombstoneMatchesAccount(tombstone, account));
+}
+
+/** Drops every account identified by a tombstone. */
+export function filterTombstonedAccounts<T extends { id?: string; refreshToken?: string; email?: string }>(
+  accounts: T[],
+  tombstones?: RemovedAccountTombstone[],
+): T[] {
+  if (!tombstones || tombstones.length === 0) {
+    return accounts;
+  }
+  return accounts.filter((account) => !isTombstoned(account, tombstones));
+}
+
+function isValidTombstone(value: unknown): value is RemovedAccountTombstone {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const entry = value as Record<string, unknown>;
+  const hasIdentity =
+    typeof entry.id === "string" ||
+    typeof entry.tokenFingerprint === "string" ||
+    typeof entry.email === "string";
+  return hasIdentity && typeof entry.removedAt === "number" && Number.isFinite(entry.removedAt);
+}
+
+/** Drops malformed tombstone entries from untrusted disk data. */
+export function sanitizeTombstones(value: unknown): RemovedAccountTombstone[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const valid = value.filter(isValidTombstone);
+  return valid.length > 0 ? valid : undefined;
+}
+
+/**
+ * Merges tombstone lists, deduplicating by id/token fingerprint and
+ * pruning the oldest entries beyond MAX_TOMBSTONES. A duplicate refreshes
+ * removedAt to the latest deletion time so delete/re-add/delete cycles
+ * keep full protection instead of inheriting a stale timestamp.
+ */
+export function addTombstones(
+  existing: RemovedAccountTombstone[] | undefined,
+  entries: RemovedAccountTombstone[],
+): RemovedAccountTombstone[] | undefined {
+  const merged = (existing ?? []).map((tombstone) => ({ ...tombstone }));
+  for (const entry of entries) {
+    const duplicateIndex = merged.findIndex(
+      (tombstone) =>
+        (entry.id !== undefined && tombstone.id === entry.id) ||
+        (entry.tokenFingerprint !== undefined && tombstone.tokenFingerprint === entry.tokenFingerprint),
+    );
+    if (duplicateIndex >= 0) {
+      const current = merged[duplicateIndex];
+      if (current !== undefined) {
+        merged[duplicateIndex] = { ...current, removedAt: Math.max(current.removedAt, entry.removedAt) };
+      }
+    } else {
+      merged.push({ ...entry });
+    }
+  }
+  merged.sort((a, b) => a.removedAt - b.removedAt);
+  const pruned = merged.length > MAX_TOMBSTONES ? merged.slice(merged.length - MAX_TOMBSTONES) : merged;
+  return pruned.length > 0 ? pruned : undefined;
+}
+
+/**
+ * Clears tombstones identifying a re-added account (fresh OAuth for the
+ * same email or token), so the account can return after deletion.
+ * Intentionally loose (any-field match): an explicit re-add is user intent,
+ * unlike deletion filtering which requires strict generation corroboration.
+ */
+export function clearTombstonesForAccount(
+  tombstones: RemovedAccountTombstone[] | undefined,
+  identity: { id?: string; refreshToken?: string; email?: string },
+): RemovedAccountTombstone[] | undefined {
+  if (!tombstones || tombstones.length === 0) {
+    return tombstones;
+  }
+  const hasIdentity =
+    identity.id !== undefined ||
+    identity.refreshToken !== undefined ||
+    normalizeTombstoneEmail(identity.email) !== undefined;
+  if (!hasIdentity) {
+    return tombstones;
+  }
+  const kept = tombstones.filter((tombstone) => !tombstoneMatchesReAdd(tombstone, identity));
+  return kept.length === tombstones.length ? tombstones : kept.length > 0 ? kept : undefined;
+}
+
+/**
+ * Drops stale pending tombstones that no longer identify anything on disk.
+ * A pending deletion only applies when a disk account still matches it under
+ * strict generation rules (durable id with token/email corroboration, or an
+ * identical token fingerprint); a re-added account with a fresh id and fresh
+ * token is a new generation and is spared, even when the email is unchanged.
+ * Call inside the updateAccounts lock with the freshly loaded disk membership.
+ */
+export function reconcilePendingTombstones(
+  pending: RemovedAccountTombstone[],
+  diskAccounts: { id?: string; refreshToken?: string; email?: string }[],
+): RemovedAccountTombstone[] {
+  return pending.filter((tombstone) =>
+    diskAccounts.some((account) => tombstoneMatchesAccount(tombstone, account)),
+  );
 }
 
 type AnyAccountStorage =
@@ -442,11 +684,15 @@ function mergeAccountStorage(
     }
   }
 
+  // Merging must never resurrect a tombstoned (deleted) account.
+  const tombstones = addTombstones(existing.removedAccounts, incoming.removedAccounts ?? []);
+
   return {
     version: 4,
-    accounts: Array.from(accountMap.values()),
+    accounts: filterTombstonedAccounts(Array.from(accountMap.values()), tombstones),
     activeIndex: incoming.activeIndex,
     activeIndexByFamily: incoming.activeIndexByFamily,
+    removedAccounts: tombstones,
   };
 }
 
@@ -592,6 +838,7 @@ export function migrateV3ToV4(v3: AccountStorageV3): AccountStorageV4 {
     })),
     activeIndex: v3.activeIndex,
     activeIndexByFamily: v3.activeIndexByFamily,
+    removedAccounts: sanitizeTombstones((v3 as unknown as { removedAccounts?: unknown }).removedAccounts),
   };
 }
 
@@ -668,7 +915,10 @@ export async function loadAccounts(): Promise<AccountStorageV4 | null> {
     );
 
     // Deduplicate accounts by email (keeps newest entry for each email)
-    const deduplicatedAccounts = deduplicateAccountsByEmail(validAccounts);
+    // Tombstoned (deleted) accounts are filtered first so a stale disk
+    // entry can never reappear on load.
+    const liveAccounts = filterTombstonedAccounts(validAccounts, storage.removedAccounts);
+    const deduplicatedAccounts = deduplicateAccountsByEmail(liveAccounts);
 
     // Clamp activeIndex to valid range after deduplication
     let activeIndex =
@@ -688,6 +938,7 @@ export async function loadAccounts(): Promise<AccountStorageV4 | null> {
       accounts: deduplicatedAccounts,
       activeIndex,
       activeIndexByFamily: storage.activeIndexByFamily,
+      removedAccounts: storage.removedAccounts,
     };
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
@@ -709,8 +960,18 @@ export async function saveAccounts(storage: AccountStorageV4): Promise<void> {
     const existing = await loadAccountsUnsafe();
     const merged = existing ? mergeAccountStorage(existing, storage) : storage;
 
+    // Defensive: the merged result is already tombstone-filtered by
+    // mergeAccountStorage, but filter again so a direct saveAccounts call
+    // with a stale snapshot can never resurrect a deleted account.
+    const tombstones = addTombstones(existing?.removedAccounts, merged.removedAccounts ?? []);
+    const filtered: AccountStorageV4 = {
+      ...merged,
+      accounts: filterTombstonedAccounts(merged.accounts, tombstones),
+      removedAccounts: tombstones,
+    };
+
     const tempPath = `${path}.${randomBytes(6).toString("hex")}.tmp`;
-    const content = JSON.stringify(merged, null, 2);
+    const content = JSON.stringify(filtered, null, 2);
 
     try {
       await fs.writeFile(tempPath, content, { encoding: "utf-8", mode: 0o600 });
@@ -732,7 +993,20 @@ export async function saveAccounts(storage: AccountStorageV4): Promise<void> {
  * Use this for destructive operations like delete where we need to
  * remove accounts that would otherwise be merged back from existing storage.
  */
-export async function saveAccountsReplace(storage: AccountStorageV4): Promise<void> {
+export interface SaveAccountsReplaceOptions {
+  /**
+   * Skip merging current disk tombstones and write exactly the given store.
+   * Only for intentional full clears; the default preserves disk tombstones
+   * so a stale snapshot lacking removedAccounts can never resurrect a
+   * deleted account.
+   */
+  clearTombstones?: boolean;
+}
+
+export async function saveAccountsReplace(
+  storage: AccountStorageV4,
+  options?: SaveAccountsReplaceOptions,
+): Promise<void> {
   const path = getStoragePath();
   const configDir = dirname(path);
   await fs.mkdir(configDir, { recursive: true });
@@ -740,7 +1014,20 @@ export async function saveAccountsReplace(storage: AccountStorageV4): Promise<vo
 
   await withFileLock(path, async () => {
     const tempPath = `${path}.${randomBytes(6).toString("hex")}.tmp`;
-    const content = JSON.stringify(storage, null, 2);
+    // Replace writes still honor tombstones: current disk tombstones are
+    // merged in, so a stale snapshot passed here can never resurrect a
+    // deleted account. Pass { clearTombstones: true } only for intentional
+    // full clears.
+    const existing = options?.clearTombstones ? undefined : await loadAccountsUnsafe();
+    const tombstones = options?.clearTombstones
+      ? sanitizeTombstones(storage.removedAccounts)
+      : addTombstones(existing?.removedAccounts, storage.removedAccounts ?? []);
+    const filtered: AccountStorageV4 = {
+      ...storage,
+      accounts: filterTombstonedAccounts(storage.accounts, tombstones),
+      removedAccounts: tombstones,
+    };
+    const content = JSON.stringify(filtered, null, 2);
 
     try {
       await fs.writeFile(tempPath, content, { encoding: "utf-8", mode: 0o600 });
@@ -777,7 +1064,15 @@ export async function updateAccounts<T>(
     const clamped = current.accounts.length > 0
       ? Math.min(Math.max(current.activeIndex, 0), current.accounts.length - 1)
       : 0;
-    const normalized: AccountStorageV4 = { ...current, version: 4, activeIndex: clamped };
+    const normalized: AccountStorageV4 = {
+      ...current,
+      version: 4,
+      activeIndex: clamped,
+      // The locked read is already tombstone-filtered; normalize defensively
+      // so a hand-built updater input can never leak a deleted account.
+      accounts: filterTombstonedAccounts(current.accounts, current.removedAccounts),
+      removedAccounts: sanitizeTombstones(current.removedAccounts),
+    };
 
     const { storage, result } = await updater(normalized);
 
@@ -785,8 +1080,22 @@ export async function updateAccounts<T>(
     // skip the write so read-only transactions never bump the file mtime.
     if (storage === normalized) return result;
 
+    // Tombstone ownership is explicit: updaters that spread the locked
+    // input preserve its tombstones, while updaters building a fresh store
+    // set removedAccounts themselves (delete tombstones, re-add clears).
+    // The written accounts are always filtered so a stale snapshot that
+    // forgot tombstones still cannot resurrect a deleted account that is
+    // tombstoned in the written store.
+    const tombstones = sanitizeTombstones(storage.removedAccounts);
+    const filtered: AccountStorageV4 = {
+      ...storage,
+      version: 4,
+      accounts: filterTombstonedAccounts(storage.accounts, tombstones),
+      removedAccounts: tombstones,
+    };
+
     const tempPath = `${path}.${randomBytes(6).toString("hex")}.tmp`;
-    const content = JSON.stringify(storage, null, 2);
+    const content = JSON.stringify(filtered, null, 2);
 
     try {
       await fs.writeFile(tempPath, content, { encoding: "utf-8", mode: 0o600 });
@@ -812,19 +1121,30 @@ async function loadAccountsUnsafe(): Promise<AccountStorageV4 | null> {
     const content = await fs.readFile(path, "utf-8");
     const parsed = JSON.parse(content);
 
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.accounts)) {
+      return null;
+    }
+
+    const tombstones = sanitizeTombstones(parsed.removedAccounts);
+    const withoutTombstoned = filterTombstonedAccounts(parsed.accounts, tombstones);
+
     if (parsed.version === 1) {
-      return migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(parsed)));
+      const migrated = migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(parsed)));
+      return { ...migrated, accounts: filterTombstonedAccounts(migrated.accounts, tombstones), removedAccounts: tombstones };
     }
     if (parsed.version === 2) {
-      return migrateV3ToV4(migrateV2ToV3(parsed));
+      const migrated = migrateV3ToV4(migrateV2ToV3(parsed));
+      return { ...migrated, accounts: filterTombstonedAccounts(migrated.accounts, tombstones), removedAccounts: tombstones };
     }
     if (parsed.version === 3) {
-      return migrateV3ToV4(parsed);
+      const migrated = migrateV3ToV4(parsed);
+      return { ...migrated, accounts: filterTombstonedAccounts(migrated.accounts, tombstones), removedAccounts: tombstones };
     }
 
     return {
       ...parsed,
-      accounts: deduplicateAccountsByEmail(parsed.accounts),
+      accounts: deduplicateAccountsByEmail(withoutTombstoned),
+      removedAccounts: tombstones,
     };
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;

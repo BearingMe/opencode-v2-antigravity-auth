@@ -86,3 +86,38 @@ misattribute one pool's consumption to the other.
 
 Timed-out accounts resolve to `undefined` and surface as `error` (or cached
 fallback) without failing the whole refresh.
+
+## Bug B investigation (2026-09-30): no pool/window regrouping
+
+A user report claimed Antigravity splits quota into Google-models vs
+Claude/GPT-OSS pools with 5-hour and weekly windows, and that the
+`claude` / `gemini-pro` / `gemini-flash` grouping is wrong. Evidence
+review found no such shape anywhere in the repo, so no regrouping was
+made — inventing vendor fields would be guessing.
+
+Real shapes established from code (no live probe is possible here):
+
+- `fetchAvailableModels` (`src/plugin/quota.ts`): returns
+  `{ models: Record<modelId, { quotaInfo?: { remainingFraction?: number,
+  resetTime?: string }, displayName?: string, modelName?: string }> }`.
+  No pool, window, or duration labels exist on any field.
+- `retrieveUserQuota` buckets: `{ remainingAmount?, remainingFraction?,
+  resetTime?, tokenType?, modelId? }`. `tokenType` is present but no code
+  consumes it and no fixture documents its values, so it cannot back a
+  5-hour vs weekly split.
+- Grouping (`classifyQuotaGroup`) is purely a model-name-substring
+  aggregation for display; it creates no vendor pools and claims none.
+
+Grouping therefore stays `claude` / `gemini-pro` / `gemini-flash` with
+unknown-not-zero semantics unchanged (service presentation, RPC schema,
+and TUI render untouched).
+
+Live data needed from the user to revisit this (one anonymized capture
+each, tokens redacted):
+
+1. Raw `fetchAvailableModels` response JSON: the full `models` map
+   including any `gpt-oss` entries and their `quotaInfo` values.
+2. Raw `retrieveUserQuota` response JSON: bucket `tokenType` values and
+   `resetTime` samples per `modelId`.
+3. Which Antigravity surface shows "5-hour" and "weekly" labels, and
+   which models each label covers.

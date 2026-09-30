@@ -11,7 +11,12 @@ const { loadAccounts, updateAccounts, checkAccountsQuota, verifyAccountAccess, w
   written: [] as unknown[],
 }))
 
-vi.mock("./storage.js", () => ({ loadAccounts, updateAccounts }))
+vi.mock("./storage.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./storage.js")>()
+  // Tombstone helpers and the token fingerprint stay real: only the
+  // file-backed load/update paths are faked.
+  return { ...actual, loadAccounts, updateAccounts }
+})
 vi.mock("./quota.js", () => ({ checkAccountsQuota }))
 vi.mock("./verify.js", () => ({ verifyAccountAccess }))
 
@@ -571,8 +576,54 @@ describe("mutateAccount", () => {
   })
 })
 
+describe("tombstones", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    loadAccounts.mockResolvedValue(storage(baseAccounts(), 1, { claude: 1, gemini: 1 }))
+  })
+
+  it("tombstones the removed identity on delete", async () => {
+    const outcome = await mutateAccount({ index: 0 }, "delete")
+
+    expect(outcome).toMatchObject({ remaining: 1 })
+    const writtenDelete = written[0] as { accounts: unknown[]; removedAccounts: Array<Record<string, unknown>> }
+    expect(writtenDelete.accounts).toHaveLength(1)
+    expect(writtenDelete.removedAccounts).toHaveLength(1)
+    expect(writtenDelete.removedAccounts[0]).toMatchObject({ id: "acc-one", email: "one@example.com" })
+    expect(writtenDelete.removedAccounts[0]?.tokenFingerprint).toEqual(expect.any(String))
+    expect(JSON.stringify(writtenDelete.removedAccounts)).not.toContain("token-one")
+  })
+
+  it("preserves existing tombstones on non-delete mutations", async () => {
+    const tombstone = { id: "acc-gone", removedAt: 1 }
+    loadAccounts.mockResolvedValue({ ...storage(baseAccounts(), 1), removedAccounts: [tombstone] })
+
+    await mutateAccount({ index: 0 }, "disable")
+
+    const writtenDisable = written[0] as { removedAccounts: unknown }
+    expect(writtenDisable.removedAccounts).toEqual([tombstone])
+  })
+
+  it("clears the tombstone when the same account is re-added via fresh OAuth", async () => {
+    loadAccounts.mockResolvedValue({
+      ...storage([account({ id: "acc-two", email: "two@example.com", refreshToken: "token-two" })], 0),
+      removedAccounts: [{ id: "acc-one", email: "one@example.com", removedAt: 1 }],
+    })
+
+    const outcome = await persistOAuthAccount(
+      { refresh: "token-one-fresh", email: "one@example.com", projectId: "p1" },
+      "add",
+    )
+
+    expect(outcome).toMatchObject({ accountCount: 2, isNew: true })
+    const writtenReadd = written[0] as { accounts: Array<{ email: string }>; removedAccounts?: unknown }
+    expect(writtenReadd.accounts.map((entry) => entry.email)).toEqual(["two@example.com", "one@example.com"])
+    expect(writtenReadd.removedAccounts).toBeUndefined()
+  })
+})
+
 describe("deleteAllAccounts", () => {
-  it("replaces storage with an empty pool", async () => {
+  it("replaces storage with an empty pool and tombstones every identity", async () => {
     vi.clearAllMocks()
 
     const outcome = await deleteAllAccounts()
@@ -583,7 +634,12 @@ describe("deleteAllAccounts", () => {
       accounts: [],
       activeIndex: 0,
       activeIndexByFamily: { claude: 0, gemini: 0 },
+      removedAccounts: [
+        expect.objectContaining({ id: "acc-one" }),
+        expect.objectContaining({ id: "acc-two" }),
+      ],
     })
+    expect(JSON.stringify(written[0])).not.toContain("token-one")
   })
 })
 
@@ -831,6 +887,10 @@ describe("legacy tool adapter parity (check_quota, verify, delete_all)", () => {
       accounts: [],
       activeIndex: 0,
       activeIndexByFamily: { claude: 0, gemini: 0 },
+      removedAccounts: [
+        expect.objectContaining({ id: "acc-one" }),
+        expect.objectContaining({ id: "acc-two" }),
+      ],
     })
     expect(setAuth).toHaveBeenCalledWith({ type: "oauth", refresh: "", access: "", expires: 0 })
     expect(invalidateFetch).toHaveBeenCalledOnce()

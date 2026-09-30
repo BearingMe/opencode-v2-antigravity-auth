@@ -1,10 +1,14 @@
-import { createHash, randomUUID } from "node:crypto"
+import { randomUUID } from "node:crypto"
 import { z } from "zod"
 import { ANTIGRAVITY_PROVIDER_ID } from "../constants.js"
 import { formatRefreshParts } from "./auth.js"
 import { checkAccountsQuota, type AccountQuotaResult } from "./quota.js"
 import {
+  addTombstones,
+  clearTombstonesForAccount,
+  fingerprintRefreshToken,
   loadAccounts,
+  tombstoneForAccount,
   updateAccounts,
   type AccountMetadataV3,
   type AccountStorageV4,
@@ -20,10 +24,16 @@ import type { PluginClient, RefreshParts } from "./types.js"
  * plus the redacted, credential-free view models consumed by the
  * `antigravity_accounts` tool and (later) the `/antigravity` TUI RPC.
  *
- * Deliberately out of scope (Task 1 gate): host credential-store removal,
- * tombstones, and any host-store mutation. This service only touches the
- * plugin disk store and returns outcomes; `src/v2-plugin.ts` applies
- * in-memory effects (currentAuth, manager invalidation) from those outcomes.
+ * Deletions tombstone the removed identity (durable id plus a token
+ * fingerprint and normalized email for pre-id accounts) in the same
+ * `updateAccounts` transaction, and every load/persist path filters
+ * tombstoned entries — so a stale in-memory manager or a background save
+ * can never resurrect a removed account. Re-adding the same account via
+ * fresh OAuth clears its tombstone through the dedupe-by-email/token path.
+ * No host credential-store changes: the host connection remains
+ * authoritative for request routing while it resolves (Task 1 gate).
+ * `src/v2-plugin.ts` applies in-memory effects (currentAuth, manager
+ * invalidation) from service outcomes.
  *
  * Known limitation (pre-existing, unchanged): `getAuth()` in
  * `src/v2-plugin.ts` resolves the active host connection first, so while a
@@ -192,9 +202,7 @@ function clampCursor(value: number | undefined, fallback: number, length: number
 }
 
 /** Deterministic fallback identity for accounts predating durable ids. */
-export function fingerprintRefreshToken(refreshToken: string): string {
-  return createHash("sha256").update(refreshToken, "utf8").digest("hex")
-}
+export { fingerprintRefreshToken } from "./storage.js"
 
 /**
  * Backfill durable ids for accounts that predate them. Returns true when any
@@ -599,9 +607,17 @@ export async function mutateAccount(
     const index = resolution.index
     ensureAccountIds(accounts)
     const previous = familyCursors(current, accounts.length)
+    let removedTombstone: ReturnType<typeof tombstoneForAccount> | undefined
 
     if (op === "delete") {
-      accounts.splice(index, 1)
+      const [removed] = accounts.splice(index, 1)
+      if (removed) {
+        removedTombstone = tombstoneForAccount({
+          id: removed.id,
+          refreshToken: removed.refreshToken,
+          email: removed.email,
+        })
+      }
     } else if (op === "enable" || op === "disable") {
       const account = accounts[index]
       if (account) account.enabled = op === "enable"
@@ -638,6 +654,11 @@ export async function mutateAccount(
       accounts,
       activeIndex: nextActiveIndex,
       activeIndexByFamily: nextFamily,
+      // Non-delete ops preserve tombstones; delete appends the removed
+      // identity in the same transaction.
+      removedAccounts: removedTombstone
+        ? addTombstones(current.removedAccounts, [removedTombstone])
+        : current.removedAccounts,
     }
     return {
       storage,
@@ -655,7 +676,20 @@ export async function mutateAccount(
 
 export async function deleteAllAccounts(): Promise<{ remaining: 0 }> {
   await updateAccounts((current) => ({
-    storage: { version: 4, accounts: [], activeIndex: 0, activeIndexByFamily: { claude: 0, gemini: 0 } },
+    storage: {
+      version: 4,
+      accounts: [],
+      activeIndex: 0,
+      activeIndexByFamily: { claude: 0, gemini: 0 },
+      removedAccounts: addTombstones(
+        current.removedAccounts,
+        current.accounts.map((account) => tombstoneForAccount({
+          id: account.id,
+          refreshToken: account.refreshToken,
+          email: account.email,
+        })),
+      ),
+    },
     result: { remaining: 0 as const },
   }))
   return { remaining: 0 }
@@ -710,12 +744,19 @@ export async function persistOAuthAccount(
     const activeIndex = accounts.findIndex((entry) => entry.refreshToken === account.refreshToken)
     const selectedIndex = activeIndex >= 0 ? activeIndex : 0
     const selected = accounts[selectedIndex]
+    // Fresh OAuth for a previously deleted identity clears its tombstone
+    // through the same dedupe keys (email, then token).
+    const removedAccounts = clearTombstonesForAccount(current.removedAccounts, {
+      refreshToken: account.refreshToken,
+      email: account.email,
+    })
     return {
       storage: {
         version: 4,
         accounts,
         activeIndex: selectedIndex,
         activeIndexByFamily: { claude: selectedIndex, gemini: selectedIndex },
+        removedAccounts,
       },
       result: {
         selectedIndex,

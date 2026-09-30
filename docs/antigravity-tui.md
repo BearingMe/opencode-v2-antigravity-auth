@@ -55,6 +55,18 @@ installed. The TUI maps only that host-known shape to the invalid-response
 toast; every other RPC failure gets the generic server-unavailable toast with
 no error detail (diagnostics stay in the host log).
 
+## Tombstone retention
+
+Removed accounts leave credential-free tombstones (`removedAccounts`) so
+stale snapshots and merging saves cannot resurrect them. Retention is
+bounded at `MAX_TOMBSTONES` (50): protection covers the 50 most recent
+deletions, realistic given the 10-account cap — it takes 50+ distinct
+delete events before the oldest tombstone drops and that identity could
+resurrect via a stale snapshot. Unbounded retention was rejected to keep
+the accounts file small. No cheap strengthening exists: every dropped
+tombstone identity can still reappear in a stale snapshot, so there is no
+subset of "unreappearable" tombstones that could be pruned preferentially.
+
 ## Testing / limitations
 
 Unit coverage for the TUI targets the pure gates in `src/tui.ts`

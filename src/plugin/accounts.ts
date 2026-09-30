@@ -1,5 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { formatRefreshParts, parseRefreshParts } from "./auth";
-import { loadAccounts, saveAccounts, type AccountStorageV4, type AccountMetadataV3, type RateLimitStateV3, type ModelFamily, type HeaderStyle, type CooldownReason } from "./storage";
+import { loadAccounts, updateAccounts, addTombstones, tombstoneForAccount, filterTombstonedAccounts, reconcilePendingTombstones, type AccountMetadataV3, type AccountStorageV4, type RateLimitStateV3, type ModelFamily, type HeaderStyle, type CooldownReason, type RemovedAccountTombstone } from "./storage";
 import type { OAuthAuthDetails, RefreshParts } from "./types";
 import type { AccountSelectionStrategy } from "./config/schema";
 import { getHealthTracker, getTokenTracker, selectHybridAccount, type AccountWithMetrics } from "./rotation";
@@ -127,10 +128,18 @@ export type QuotaKey = BaseQuotaKey | `${BaseQuotaKey}:${string}`;
 
 export interface ManagedAccount {
   index: number;
+  /** Durable account id carried through from disk; backfilled on save. */
+  id?: string;
   email?: string;
   addedAt: number;
   lastUsed: number;
   parts: RefreshParts;
+  /**
+   * Refresh token as loaded from disk. Compared at save time so a stale
+   * manager never clobbers a token rotated by a newer service write:
+   * only tokens this manager refreshed itself are written back.
+   */
+  loadedRefreshToken?: string;
   access?: string;
   expires?: number;
   enabled: boolean;
@@ -314,6 +323,13 @@ export class AccountManager {
   private savePending = false;
   private saveTimeout: ReturnType<typeof setTimeout> | null = null;
   private savePromiseResolvers: Array<() => void> = [];
+  /**
+   * Tombstones for accounts removed from this manager (delete tool,
+   * invalid_grant eviction). Flushed into the store tombstones on the
+   * next saveToDisk transaction so the removal survives restarts even if
+   * this manager instance is stale.
+   */
+  private pendingTombstones: RemovedAccountTombstone[] = [];
 
   static async loadFromDisk(authFallback?: OAuthAuthDetails): Promise<AccountManager> {
     const stored = await loadAccounts();
@@ -345,6 +361,7 @@ export class AccountManager {
 
           return {
             index,
+            id: acc.id,
             email: acc.email,
             addedAt: clampNonNegativeInt(acc.addedAt, baseNow),
             lastUsed: clampNonNegativeInt(acc.lastUsed, 0),
@@ -353,6 +370,7 @@ export class AccountManager {
               projectId: acc.projectId,
               managedProjectId: acc.managedProjectId,
             },
+            loadedRefreshToken: acc.refreshToken,
             access: matchesFallback ? authFallback?.access : undefined,
             expires: matchesFallback ? authFallback?.expires : undefined,
             enabled: acc.enabled !== false,
@@ -419,6 +437,7 @@ export class AccountManager {
           addedAt: now,
           lastUsed: 0,
           parts: authParts,
+          loadedRefreshToken: authParts.refreshToken,
           access: authFallback.access,
           expires: authFallback.expires,
           enabled: true,
@@ -443,6 +462,7 @@ export class AccountManager {
             addedAt: now,
             lastUsed: 0,
             parts,
+            loadedRefreshToken: parts.refreshToken,
             access: authFallback.access,
             expires: authFallback.expires,
             enabled: true,
@@ -894,7 +914,18 @@ export class AccountManager {
       return false;
     }
 
-    this.accounts.splice(idx, 1);
+    const [removed] = this.accounts.splice(idx, 1);
+    // Tombstone the removal so a later background save (this manager may
+    // be stale by then) can never resurrect the account from its snapshot.
+    if (removed) {
+      this.pendingTombstones.push(
+        tombstoneForAccount({
+          id: removed.id,
+          refreshToken: removed.parts.refreshToken,
+          email: removed.email,
+        }),
+      );
+    }
     this.accounts.forEach((acc, index) => {
       acc.index = index;
     });
@@ -993,42 +1024,182 @@ export class AccountManager {
   }
 
   async saveToDisk(): Promise<void> {
-    const claudeIndex = Math.max(0, this.currentAccountIndexByFamily.claude);
-    const geminiIndex = Math.max(0, this.currentAccountIndexByFamily.gemini);
-    
-    const storage: AccountStorageV4 = {
-      version: 4,
-      accounts: this.accounts.map((a) => ({
-        email: a.email,
-        refreshToken: a.parts.refreshToken,
-        projectId: a.parts.projectId,
-        managedProjectId: a.parts.managedProjectId,
-        addedAt: a.addedAt,
-        lastUsed: a.lastUsed,
-        enabled: a.enabled,
-        lastSwitchReason: a.lastSwitchReason,
-        rateLimitResetTimes: Object.keys(a.rateLimitResetTimes).length > 0 ? a.rateLimitResetTimes : undefined,
-        coolingDownUntil: a.coolingDownUntil,
-        cooldownReason: a.cooldownReason,
-        fingerprint: a.fingerprint,
-        fingerprintHistory: a.fingerprintHistory?.length ? a.fingerprintHistory : undefined,
-        cachedQuota: a.cachedQuota && Object.keys(a.cachedQuota).length > 0 ? a.cachedQuota : undefined,
-        cachedQuotaUpdatedAt: a.cachedQuotaUpdatedAt,
-        verificationRequired: a.verificationRequired,
-        verificationRequiredAt: a.verificationRequiredAt,
-        verificationRequiredReason: a.verificationRequiredReason,
-        verificationUrl: a.verificationUrl,
-        lastVerificationAt: a.lastVerificationAt,
-        lastVerificationStatus: a.lastVerificationStatus,
-      })),
-      activeIndex: claudeIndex,
-      activeIndexByFamily: {
-        claude: claudeIndex,
-        gemini: geminiIndex,
-      },
-    };
+    // Backfill stable ids in memory first so the transaction below and
+    // future tombstones reference the same identity.
+    for (const account of this.accounts) {
+      if (!account.id) {
+        account.id = randomUUID();
+      }
+    }
+    const snapshot = this.accounts.map((account) => ({
+      id: account.id as string,
+      email: account.email,
+      refreshToken: account.parts.refreshToken,
+      projectId: account.parts.projectId,
+      managedProjectId: account.parts.managedProjectId,
+      tokenChanged:
+        account.loadedRefreshToken !== undefined &&
+        account.parts.refreshToken !== account.loadedRefreshToken,
+      loadedRefreshToken: account.loadedRefreshToken,
+      addedAt: account.addedAt,
+      lastUsed: account.lastUsed,
+      enabled: account.enabled,
+      lastSwitchReason: account.lastSwitchReason,
+      rateLimitResetTimes: { ...account.rateLimitResetTimes },
+      coolingDownUntil: account.coolingDownUntil,
+      cooldownReason: account.cooldownReason,
+      fingerprint: account.fingerprint,
+      fingerprintHistory: account.fingerprintHistory,
+      cachedQuota: account.cachedQuota,
+      cachedQuotaUpdatedAt: account.cachedQuotaUpdatedAt,
+      verificationRequired: account.verificationRequired,
+      verificationRequiredAt: account.verificationRequiredAt,
+      verificationRequiredReason: account.verificationRequiredReason,
+      verificationUrl: account.verificationUrl,
+      lastVerificationAt: account.lastVerificationAt,
+      lastVerificationStatus: account.lastVerificationStatus,
+    }));
+    const pending = [...this.pendingTombstones];
 
-    await saveAccounts(storage);
+    await updateAccounts((current) => {
+      // Reconcile stale deletions against fresh disk membership: a pending
+      // tombstone only applies when a disk account still matches it under
+      // strict generation rules (durable id with token/email corroboration,
+      // or an identical token fingerprint). A re-added account (fresh id and
+      // fresh token, same email) is a new generation, so the stale entry is
+      // dropped and can neither re-tombstone disk nor filter the re-added
+      // account.
+      const reconciled = reconcilePendingTombstones(pending, current.accounts);
+      const tombstones = addTombstones(current.removedAccounts, reconciled);
+      const memById = new Map(snapshot.map((entry) => [entry.id, entry]));
+      const memByToken = new Map<string, (typeof snapshot)[number]>();
+      const memByLoadedToken = new Map<string, (typeof snapshot)[number]>();
+      for (const entry of snapshot) {
+        memByToken.set(entry.refreshToken, entry);
+        if (entry.loadedRefreshToken) {
+          memByLoadedToken.set(entry.loadedRefreshToken, entry);
+        }
+      }
+
+      // Disk is the source of truth for membership; memory only refreshes
+      // fields of accounts still present. Tombstoned entries are never
+      // re-added, which is what stops a stale manager from resurrecting
+      // a deleted account.
+      const merged: AccountMetadataV3[] = [];
+      for (const disk of current.accounts) {
+        const mem =
+          (disk.id !== undefined ? memById.get(disk.id) : undefined) ??
+          memByToken.get(disk.refreshToken) ??
+          memByLoadedToken.get(disk.refreshToken);
+        if (!mem) {
+          merged.push(disk);
+          continue;
+        }
+        const next: AccountMetadataV3 = {
+          ...disk,
+          id: disk.id ?? mem.id,
+          email: disk.email ?? mem.email,
+          // Only tokens this manager refreshed itself are written back; a
+          // stale untouched token never clobbers a newer service rotation.
+          refreshToken: mem.tokenChanged ? mem.refreshToken : disk.refreshToken,
+          projectId: mem.tokenChanged ? (mem.projectId ?? disk.projectId) : disk.projectId,
+          managedProjectId: mem.tokenChanged
+            ? (mem.managedProjectId ?? disk.managedProjectId)
+            : disk.managedProjectId,
+          addedAt: disk.addedAt,
+          lastUsed: Math.max(disk.lastUsed ?? 0, mem.lastUsed ?? 0),
+          enabled: mem.enabled,
+          lastSwitchReason: mem.lastSwitchReason ?? disk.lastSwitchReason,
+          rateLimitResetTimes: { ...mem.rateLimitResetTimes },
+          coolingDownUntil: mem.coolingDownUntil,
+          cooldownReason: mem.cooldownReason,
+          fingerprint: mem.fingerprint ?? disk.fingerprint,
+          fingerprintHistory: mem.fingerprintHistory ?? disk.fingerprintHistory,
+          verificationRequired: mem.verificationRequired,
+          verificationRequiredAt: mem.verificationRequiredAt,
+          verificationRequiredReason: mem.verificationRequiredReason,
+          verificationUrl: mem.verificationUrl,
+          lastVerificationAt: mem.lastVerificationAt,
+          lastVerificationStatus: mem.lastVerificationStatus,
+        };
+        if (
+          mem.cachedQuotaUpdatedAt !== undefined &&
+          (disk.cachedQuotaUpdatedAt === undefined || mem.cachedQuotaUpdatedAt >= disk.cachedQuotaUpdatedAt)
+        ) {
+          next.cachedQuota = mem.cachedQuota;
+          next.cachedQuotaUpdatedAt = mem.cachedQuotaUpdatedAt;
+        }
+        merged.push(next);
+      }
+
+      // Memory-only accounts (first-run auth fallback) are appended unless
+      // tombstoned. Stale deleted accounts are blocked here by the filter.
+      for (const mem of snapshot) {
+        const known =
+          current.accounts.some((disk) =>
+            (disk.id !== undefined && disk.id === mem.id) ||
+            disk.refreshToken === mem.refreshToken ||
+            (mem.loadedRefreshToken !== undefined && disk.refreshToken === mem.loadedRefreshToken),
+          );
+        if (known) {
+          continue;
+        }
+        const candidate: AccountMetadataV3 = {
+          id: mem.id,
+          email: mem.email,
+          refreshToken: mem.refreshToken,
+          projectId: mem.projectId,
+          managedProjectId: mem.managedProjectId,
+          addedAt: mem.addedAt,
+          lastUsed: mem.lastUsed,
+          enabled: mem.enabled,
+          lastSwitchReason: mem.lastSwitchReason,
+          rateLimitResetTimes: { ...mem.rateLimitResetTimes },
+          coolingDownUntil: mem.coolingDownUntil,
+          cooldownReason: mem.cooldownReason,
+          fingerprint: mem.fingerprint,
+          fingerprintHistory: mem.fingerprintHistory,
+          cachedQuota: mem.cachedQuota,
+          cachedQuotaUpdatedAt: mem.cachedQuotaUpdatedAt,
+          verificationRequired: mem.verificationRequired,
+          verificationRequiredAt: mem.verificationRequiredAt,
+          verificationRequiredReason: mem.verificationRequiredReason,
+          verificationUrl: mem.verificationUrl,
+          lastVerificationAt: mem.lastVerificationAt,
+          lastVerificationStatus: mem.lastVerificationStatus,
+        };
+        if (filterTombstonedAccounts([candidate], tombstones).length === 0) {
+          continue;
+        }
+        merged.push(candidate);
+      }
+
+      // Selection cursors stay service-owned; only clamp them to the
+      // merged membership.
+      const activeIndex = merged.length > 0
+        ? Math.min(Math.max(current.activeIndex, 0), merged.length - 1)
+        : 0;
+      const clampFamily = (value: number | undefined): number =>
+        merged.length > 0 ? Math.min(Math.max(value ?? activeIndex, 0), merged.length - 1) : 0;
+      const storage: AccountStorageV4 = {
+        version: 4,
+        accounts: merged,
+        activeIndex,
+        activeIndexByFamily: {
+          claude: clampFamily(current.activeIndexByFamily?.claude),
+          gemini: clampFamily(current.activeIndexByFamily?.gemini),
+        },
+        removedAccounts: tombstones,
+      };
+      return { storage, result: undefined };
+    });
+
+    // The flush succeeded: freshly written tokens become the new baseline
+    // and flushed tombstones are dropped from the pending list.
+    for (const account of this.accounts) {
+      account.loadedRefreshToken = account.parts.refreshToken;
+    }
+    this.pendingTombstones = this.pendingTombstones.slice(pending.length);
   }
 
   requestSaveToDisk(): void {

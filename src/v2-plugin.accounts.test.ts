@@ -12,7 +12,10 @@ const { loadAccounts, updateAccounts, verifyAccountAccess, written, memory } = v
   memory: { store: null as unknown },
 }))
 
-vi.mock("./plugin/storage.js", () => ({ loadAccounts, updateAccounts }))
+vi.mock("./plugin/storage.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./plugin/storage.js")>()
+  return { ...actual, loadAccounts, updateAccounts }
+})
 vi.mock("./plugin/verify.js", () => ({
   verifyAccountAccess,
 }))

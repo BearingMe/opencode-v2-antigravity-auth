@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AccountManager, type ModelFamily, type HeaderStyle, parseRateLimitReason, calculateBackoffMs, type RateLimitReason, resolveQuotaGroup } from "./accounts";
-import { saveAccounts } from "./storage";
+import { updateAccounts } from "./storage";
 import type { AccountStorageV4 } from "./storage";
 import type { OAuthAuthDetails } from "./types";
+
+const { writtenStores } = vi.hoisted(() => ({ writtenStores: [] as AccountStorageV4[] }));
 
 // Mock storage to prevent test data from leaking to real config files
 vi.mock("./storage", async (importOriginal) => {
@@ -12,6 +14,14 @@ vi.mock("./storage", async (importOriginal) => {
     ...original,
     saveAccounts: vi.fn().mockResolvedValue(undefined),
     saveAccountsReplace: vi.fn().mockResolvedValue(undefined),
+    // Transactional capture: runs the updater against an empty store and
+    // records the replacement, mirroring updateAccounts write semantics.
+    updateAccounts: vi.fn(async (updater: (current: AccountStorageV4) => Promise<{ storage: AccountStorageV4 }>) => {
+      const current: AccountStorageV4 = { version: 4, accounts: [], activeIndex: 0 };
+      const { storage } = await updater(current);
+      writtenStores.push(storage);
+      return undefined;
+    }),
   };
 });
 
@@ -19,6 +29,7 @@ describe("AccountManager", () => {
   beforeEach(() => {
     vi.useRealTimers();
     vi.stubGlobal("process", { ...process, pid: 0 });
+    writtenStores.length = 0;
   });
 
   it("preserves verification result metadata across account-manager persistence", async () => {
@@ -41,12 +52,18 @@ describe("AccountManager", () => {
     });
     await manager.saveToDisk();
 
-    expect(saveAccounts).toHaveBeenCalledWith(expect.objectContaining({
+    // The transactional save appends the memory-only account to the empty
+    // locked store; verification metadata must survive the round trip.
+    expect(updateAccounts).toHaveBeenCalledOnce();
+    expect(writtenStores).toHaveLength(1);
+    expect(writtenStores[0]).toMatchObject({
       accounts: [expect.objectContaining({
         lastVerificationAt: 1234,
         lastVerificationStatus: "ok",
       })],
-    }));
+    });
+    // Durable ids are backfilled on save for tombstone matching.
+    expect(writtenStores[0]?.accounts[0]?.id).toEqual(expect.any(String));
   });
 
   it("treats on-disk storage as source of truth, even when empty", () => {
