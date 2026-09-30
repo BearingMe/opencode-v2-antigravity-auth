@@ -3,7 +3,7 @@ import plugin, { getFetchDestination, isGenerativeLanguageModelPath, normalizeFe
 
 describe("OpenCode V2 plugin entrypoint", () => {
   it("exports a stable V2 plugin definition", () => {
-    expect(plugin.id).toBe("opencode-antigravity-auth")
+    expect(plugin.id).toBe("opencode-v2-antigravity-auth")
     expect(plugin.setup).toEqual(expect.any(Function))
   })
 })

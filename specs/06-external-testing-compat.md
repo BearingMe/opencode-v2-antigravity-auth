@@ -76,7 +76,8 @@
 - `plugin/*` + subdirs: 20+ colocated Vitest files covering model
   resolution, schema sanitization, cross-model sanitizer, quota fallback
   (antigravity-first), rotation/hybrid selection, recovery,
-  thinking-recovery, token, storage, cache, search, debug/logger —
+  thinking-recovery, token, storage (v1–v4, tombstones, replace semantics),
+  account-service presentation, account-ui-format, cache, debug/logger —
   see `02-subsystems` and code refs (`request.test.ts`,
   `model-resolver.test.ts`, `rotation.test.ts`, `quota-fallback.test.ts`,
   `antigravity-first-fallback.test.ts`, `cross-model-integration.test.ts`).
@@ -100,9 +101,12 @@
   forms), `index.test.ts` (prerelease skip, toast-only mode,
   once-per-instance, child ignore, local-dev warning; fake timers).
 - Gaps: NO tests in `src/antigravity/`; `script/` E2E is excluded from
-  typecheck and live-endpoint E2E needs real quota. `src/tui.ts` / `rpc.ts`
-  are smoke-only (no colocated tests). `src/plugin/account-service.ts`
-  quota-presentation semantics are specified in `docs/task4-quota-notes.md`
+  typecheck and live-endpoint E2E needs real quota. `src/tui.ts` pure gates
+  (`isInvalidRpcResponse`, `isStaleMutate`) and the `rpc.ts` transport codec
+  mirror are unit-covered (`tui-behavior.test.ts`,
+  `rpc-transport.test.ts`); the full dialog/toast flow has no automated
+  coverage by design. `src/plugin/account-service.ts`
+  quota-presentation semantics are specified in `docs/dev/quota-contract.md`
   (null-vs-0, failed-refresh-keeps-cache, timeout-partial).
 
 ## Compatibility
@@ -192,40 +196,14 @@
 - U6: `switch_on_first` + `pid_offset` interaction semantics (flags exist;
   detailed behavior not in context).
 
-## Task 2 deferred follow-ups (for Task 3, per 2026-09-28 reviews)
+## Task follow-ups (all CLOSED 2026-09-28; one-line history)
 
-- F-UP-1 (style): strip trailing semicolons in `src/plugin/verify.ts`
-  (AGENTS.md no-semicolon rule; ~67 lines).
-- F-UP-2 (hygiene): extract the 4 duplicated verification helpers
-  (`decodeEscapedText`, `normalizeGoogleVerificationUrl`,
-  `selectBestVerificationUrl`, `extractVerificationErrorDetails`) shared
-  by `src/plugin/verify.ts` and `src/plugin/engine.ts` into one module.
-- F-UP-3 (lifecycle): `isChildSession` is a single setup-closure scalar in
-  `src/v2-plugin.ts`; once any child session appears, root-session toasts
-  stay suppressed while `toast_scope=root_only`. Track per-session
-  (bounded Map/Set keyed by session) without weakening
-  R-LIFECYCLE-ROOT-ONLY-CHILD.
-- F-UP-4 (CLOSED 2026-09-28, Task 4): tracker fails open — unknown or
-  unresolvable session classifies as ROOT (toasts on) with a documented
-  no-inference limitation; recovery passes its explicit event sessionID.
-  Accepted limitation (Oracle-verified): the request's session ID is NOT
-  available at the `antigravityFetch` call site (fetch signature is
-  input+init, no hook context), so fetch-path toasts cannot be suppressed
-  for child sessions under `toast_scope=root_only`. See the R-LIFECYCLE
-  exception in §07.
-- F-UP-5 (CLOSED 2026-09-28, Task 4): `docs/CONFIGURATION.md` and
-  `docs/ANTIGRAVITY_API_SPEC.md` mark the removed `google_search` tool
-  historical.
-- F-UP-6 (FIXED 2026-09-28, coordinator): recovery-success toast in
-  `src/v2-plugin.ts :: handlePluginEvent` now honors `quiet_mode`,
-  matching the engine-wide toast gate (`engine.ts :: showToast`).
-- F-UP-7 (CLOSED 2026-09-28, coordinator, final-review follow-up):
-  `createChildSessionTracker :: remember` skips eviction when the id is
-  already tracked, so a duplicate `session.created` at capacity no longer
-  forgets a different child; regression test
-  (`v2-plugin.setup.test.ts` :: duplicate-at-capacity) added;
-  `docs/ARCHITECTURE.md` legacy module map refreshed (V2 entry, current
-  modules, daily→prod fallback, fail-open note).
+- F-UP-1 (style) through F-UP-7 (duplicate-safe child tracker) were
+  completed and verified in their respective task reviews (semicolon strip,
+  verification-helper extraction, per-session child tracker with fail-open
+  fetch-path exception, `google_search` historical marking, `quiet_mode`
+  recovery-toast gate). See git history for the original list; do not
+  reopen.
 
 ## References (repository evidence)
 
@@ -245,5 +223,6 @@
 - Tests: `src/constants.test.ts`, `src/v2-plugin.test.ts`,
   `src/v2-plugin.accounts.test.ts`, `src/v2-plugin.setup.test.ts` + 20+
   colocated `src/plugin/**/*.test.ts`
-- Docs in repo: `README.md`, `docs/ARCHITECTURE.md`,
-  `docs/ANTIGRAVITY_API_SPEC.md`, `CHANGELOG.md`, `AGENTS.md`
+- Docs in repo: `README.md`, `docs/README.md` (index), `docs/user/`,
+  `docs/dev/` (architecture, storage, RPC/TUI, quota contract, API,
+  testing, manual checklist, maintainer ops), `CHANGELOG.md`, `AGENTS.md`

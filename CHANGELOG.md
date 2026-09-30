@@ -1,5 +1,38 @@
 # Changelog
 
+## [Unreleased]
+
+### Fork
+
+- Renamed to `opencode-v2-antigravity-auth` (`0.1.0`, unpublished) as the
+  maintained OpenCode V2 port of the archived
+  `NoeFabris/opencode-antigravity-auth` (upstream history below is
+  preserved for lineage). Package id, `PLUGIN_ID`, updater pin, and
+  auto-update package name follow the new name. Until the first npm
+  release, install from a local path — registry pins will not resolve
+  and the auto-update checker stays silent by design.
+
+### Added
+
+- `/antigravity` dialog + `AntigravityAccounts` RPC (`list`, `quota`,
+  `verify`, `mutate`, `deleteAll`, `ping`) for interactive account
+  management; login (`opencode auth login`, one account per run, max 10)
+  only adds/reconnects.
+- Credential-free tombstones (`removedAccounts`, bounded at 50) so deleted
+  accounts survive reloads and racing background saves; fresh OAuth for the
+  same identity clears its tombstone.
+- Single-lock replace transactions for all account-service writes;
+  `debug`/`debug_tui` independent logging sinks.
+
+### Changed
+
+- V2 native engine is the sole router; V1 harness (`plugin.ts`, `cli.ts`,
+  `server.ts`, `ui/`) and the `google_search` tool were removed
+  (model-declared web search is still sanitized via D-SEARCH-MUTEX).
+- Documentation split: user guides (`docs/user/`), developer guides
+  (`docs/dev/`), normative `specs/00-07`. The `google` provider models
+  register automatically; `plugins` (plural) is the V2 config key.
+
 ## [1.6.0] - 2026-02-20
 
 ### Fixed
