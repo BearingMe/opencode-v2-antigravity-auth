@@ -354,6 +354,50 @@ describe("getQuotaPresentation", () => {
     expect(dto.accounts[0]?.groups.claude?.remainingFraction).toBe(0.4)
     expect(JSON.stringify(dto)).not.toContain("cached-secret")
   })
+
+  it("treats empty and non-string reset windows as unknown, never as a date", async () => {
+    checkAccountsQuota.mockResolvedValue([{
+      index: 0,
+      status: "ok",
+      quota: {
+        groups: {
+          claude: { remainingFraction: 0.5, resetTime: "" },
+          "gemini-pro": { remainingFraction: 0.5, resetTime: "   " },
+          "gemini-flash": { remainingFraction: 0.5, resetTime: 20300102 },
+        },
+        modelCount: 3,
+      },
+      geminiCliQuota: { models: [] },
+    }])
+
+    const dto = await getQuotaPresentation({} as never)
+
+    expect(dto.accounts[0]?.groups.claude?.resetTime).toBeNull()
+    expect(dto.accounts[0]?.groups["gemini-pro"]?.resetTime).toBeNull()
+    expect(dto.accounts[0]?.groups["gemini-flash"]?.resetTime).toBeNull()
+    // Fractions stay known: only the reset window is unknown.
+    expect(dto.accounts[0]?.status).toBe("ok")
+
+    // Contrast: a non-OK result carrying the same malformed windows still
+    // nulls resets while status stays error — status derivation never
+    // depends on reset parsing.
+    checkAccountsQuota.mockResolvedValue([{
+      index: 0,
+      status: "error",
+      error: "quota fetch failed",
+      quota: {
+        groups: {
+          claude: { remainingFraction: 0.5, resetTime: "" },
+        },
+        modelCount: 1,
+      },
+    }])
+
+    const failed = await getQuotaPresentation({} as never)
+
+    expect(failed.accounts[0]?.status).toBe("error")
+    expect(failed.accounts[0]?.groups.claude?.resetTime).toBeNull()
+  })
 })
 
 describe("verifyAccount", () => {
@@ -518,6 +562,13 @@ describe("mutateAccount", () => {
     // updater returns its input unchanged and records no replacement store.
     expect(written).toHaveLength(0)
   })
+
+  it("fails closed without writing for stale delete targets", async () => {
+    const staleDelete = await mutateAccount({ id: "acc-missing" }, "delete")
+
+    expect(staleDelete).toMatchObject({ ok: false, kind: "not-found", accountCount: 2 })
+    expect(written).toHaveLength(0)
+  })
 })
 
 describe("deleteAllAccounts", () => {
@@ -576,6 +627,21 @@ describe("persistOAuthAccount", () => {
     expect(writtenReconnect.accounts[1]?.refreshToken).toBe("token-two-rotated")
     // Reconnect preserves the durable id instead of minting a new one.
     expect(writtenReconnect.accounts[1]?.id).toBe("acc-two")
+  })
+
+  it("reconnects by refresh token even when the email changed", async () => {
+    const outcome = await persistOAuthAccount(
+      { refresh: "token-one", email: "renamed@example.com", projectId: "p1" },
+      "add",
+    )
+
+    expect(outcome).toMatchObject({ selectedIndex: 0, accountCount: 2, isNew: false })
+    expect(outcome.selectedId).toBe("acc-one")
+    const writtenTokenMatch = written[0] as {
+      accounts: Array<{ email: string; refreshToken: string; id?: string }>
+    }
+    expect(writtenTokenMatch.accounts).toHaveLength(2)
+    expect(writtenTokenMatch.accounts[0]).toMatchObject({ id: "acc-one", email: "renamed@example.com", refreshToken: "token-one" })
   })
 
   it("backfills durable ids for pre-existing accounts on persist", async () => {

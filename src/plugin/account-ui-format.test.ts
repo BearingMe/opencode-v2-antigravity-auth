@@ -44,6 +44,11 @@ describe("formatResetCountdown", () => {
     expect(formatResetCountdown(now + 5 * 60_000, now)).toBe("resets in 5m")
   })
 
+  it("formats sub-minute countdowns without rounding to zero minutes", () => {
+    const now = 1_000_000
+    expect(formatResetCountdown(now + 30_000, now)).toBe("resets in <1m")
+  })
+
   it("marks past reset times as resetting now", () => {
     const now = 1_000_000
     expect(formatResetCountdown(now - 1, now)).toBe("resetting now")

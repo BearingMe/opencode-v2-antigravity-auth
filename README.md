@@ -8,7 +8,7 @@
 
 Enable Opencode to authenticate against **Antigravity** (Google's IDE) via OAuth so you can use Antigravity rate limits and access models like `gemini-3.1-pro` and `claude-opus-4-6-thinking` with your Google credentials.
 
-> **V2 migration status:** model requests reuse the existing Antigravity transformation, streaming, quota, rotation, and recovery engine through OpenCode V2's AI SDK custom-fetch path. Existing account-pool files remain in use. V2 replaces the old interactive terminal account menu with the `antigravity_accounts` tool and Google OAuth integration form; TUI toasts are emitted as plugin logs because server plugins have no equivalent toast API. Validate against your V2 provider/model configuration before relying on it in production.
+> **V2 migration status:** model requests reuse the existing Antigravity transformation, streaming, quota, rotation, and recovery engine through OpenCode V2's AI SDK custom-fetch path. Existing account-pool files remain in use. Account onboarding stays in `opencode auth login` (each login adds or reconnects an account, up to 10); account management lives in the `/antigravity` dialog UI (also `Antigravity accounts` in the command palette), backed by the credential-free `AntigravityAccounts` RPC (`list`, `quota`, `verify`, `mutate`, `deleteAll`, `ping`). TUI toasts are emitted as plugin logs because server plugins have no equivalent toast API. Validate against your V2 provider/model configuration before relying on it in production.
 
 ## What You Get
 
@@ -245,10 +245,16 @@ Add this to your `~/.config/opencode/opencode.json`:
 Add multiple Google accounts for a higher combined quota. The plugin automatically rotates between accounts when one is rate-limited.
 
 ```bash
-opencode auth login  # Run again to add more accounts
+opencode auth login  # Run again to add more accounts (login only adds; it never manages)
 ```
 
-**Account management options (via `opencode auth login`):**
+Manage saved accounts from inside OpenCode with the `/antigravity` dialog
+(or `Antigravity accounts` in the command palette): cached/fresh quota bars,
+rotation hint (`Use next` — never permanent pinning), enable/disable, verify
+with reconnect guidance, and confirm-guarded removal. The list footer always
+points back to `opencode auth login` for adding accounts.
+
+**Account management options (all via the `/antigravity` dialog — `opencode auth login` only adds/reconnects accounts):**
 - **Configure models** — Auto-configure all plugin models in opencode.json
 - **Check quotas** — View remaining API quota for each account
 - **Manage accounts** — Enable/disable specific accounts for rotation

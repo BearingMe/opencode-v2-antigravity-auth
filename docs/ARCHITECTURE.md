@@ -29,11 +29,15 @@ The plugin intercepts requests to `generativelanguage.googleapis.com`, transform
 src/
 ├── v2-plugin.ts               # V2 plugin entry, SDK hook + fetch bridge
 ├── google-sdk.ts              # Distinct AISDK module so the SDK hook applies
+├── rpc.ts                     # AntigravityAccounts RPC contract (credential-free)
+├── tui.ts                     # /antigravity dialog UI (host-rendered dialogs)
 ├── constants.ts             # Endpoints, headers, config
 ├── antigravity/
 │   └── oauth.ts             # OAuth token exchange
 └── plugin/
     ├── engine.ts            # Native request/rotation engine (sole router)
+    ├── account-service.ts   # Shared account store service (reads/writes/mutations)
+    ├── account-ui-format.ts # Quota text bars, reset countdowns, one-liners
     ├── verify.ts            # Account access verification
     ├── verification.ts      # Shared verification-error helpers
     ├── auth.ts              # Token validation & refresh
@@ -210,6 +214,43 @@ Claude rejects unsupported JSON Schema features. The plugin uses an **allowlist 
 Location: `~/.config/opencode/antigravity-accounts.json`
 
 Contains OAuth refresh tokens - treat as sensitive.
+
+---
+
+## Account Management (`/antigravity` + RPC)
+
+Adding and managing accounts are separate surfaces:
+
+- **Add:** `opencode auth login` only. Each login appends or reconnects an
+  account (dedupe by refresh token, then case-insensitive email; cap of 10
+  enforced inside the store transaction). Cancelling or denying the OAuth
+  flow writes nothing.
+- **Manage:** the `/antigravity` dialog UI (also `Antigravity accounts` in
+  the command palette). Dialog-only: every screen is a host-rendered dialog,
+  select, confirm, alert, or toast — no custom JSX pages. Per-account
+  actions: `show-quota` (cached text bars), `refresh-quota` (fresh fetch),
+  `use-next` (rotation hint, never permanent pinning), enable/disable,
+  `verify` (blocked results show the `verifyUrl` plus `opencode auth login`
+  reconnect guidance), `remove` (confirm dialog), `back` (re-opens the list).
+  Empty state and list footers carry the `Add accounts: opencode auth login`
+  hint. Stale targets (account removed elsewhere) fail closed with a warning
+  toast and a list refresh, never a success toast.
+
+The UI talks to the server plugin through the `AntigravityAccounts` RPC
+(`src/rpc.ts`, handlers in `src/v2-plugin.ts`): `list`, `quota`
+(`{ refresh? }`), `verify` (`{ id }`), `mutate`
+(`{ id, op: select|enable|disable|delete, family? }`), `deleteAll`, `ping`.
+Mutations address durable ids only, never indices. Every method output is
+credential-free (no `refreshParts`, refresh tokens, or access tokens) and
+omits absent optionals rather than sending explicit `undefined`, which the
+host JSON transport rejects. See `docs/antigravity-tui.md` for the full
+contract.
+
+Known limitations: host credential-store tombstone/sync behavior is an open
+decision (needs user approval; not implemented). The full dialog/toast flow
+is not driven in automated tests — mocking the host TUI context is
+disproportionate to the value, so that path stays manually verified
+(`docs/task6-manual-checklist.md`).
 
 ---
 
