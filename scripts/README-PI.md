@@ -1,5 +1,9 @@
 # Raspberry Pi Runner Setup
 
+> Stale reference: the `issue-triage.yml` workflow this supported was
+> removed. The scripts below are retained for reference; only `test.yml`
+> runs in CI.
+
 Use your Raspberry Pi as a persistent, self-hosted runner for Opencode Triage. This enables the use of `gh copilot` and other tools without re-authenticating on every run.
 
 ## Prerequisites
@@ -38,8 +42,10 @@ chmod +x auth-pi-tools.sh
 ```
 Follow the interactive login flows.
 
-## Step 4: Update Workflow
-Once your runner is "Idle" (green) in GitHub Settings, update your `.github/workflows/issue-triage.yml`:
+## Step 4: Point a Workflow at the Runner (removed)
+
+The triage workflow this step configured no longer exists. If you revive
+self-hosted automation, point its job at the runner with:
 
 ```yaml
 runs-on: self-hosted

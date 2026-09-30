@@ -10,9 +10,13 @@ Until the first `npm publish`:
 - The auto-update checker stays silent: it queries npm dist-tags for a
   package that does not exist there, and all checker failures are
   no-throw by design.
-- `release.yml` publishes on `main` when `package.json` `version` changes;
-  `release-beta.yml` (dev branch, manual dispatch) publishes `-beta.N`
-  tags. Both still need `NPM_TOKEN` configured for this repo.
+- Releases are manual for now: the release/beta/republish/dist-tag
+  workflows were removed (the package is unpublished and the triage bot
+  needed a provisioned self-hosted runner). Only `test.yml` runs in CI
+  (typecheck + tests + build on `main` pushes and PRs). To cut a release:
+  bump `version` in `package.json`, add the `CHANGELOG.md` entry, push,
+  tag `v<version>`, and run `npm publish --access public --provenance`
+  with `NPM_TOKEN` configured.
 
 ## Packaging
 
@@ -55,13 +59,11 @@ until a clean rebuild. `bun run build` does not clean by itself, so:
 - The auto-update checker only rewrites the plugin pin and invalidates the
   install cache — it never installs packages.
 
-## Triage runner (maintainer infrastructure)
+## Triage runner (removed)
 
-`scripts/` + `.github/workflows/issue-triage.yml` run a self-hosted OpenCode
-triage bot (see `scripts/README-PI.md`). Notes for maintainers:
-
-- The workflow pins `runs-on: self-hosted` with a hardcoded checkout path —
-  it only works on the provisioned runner.
-- Runner setup scripts are outside the plugin's runtime and outside the
-  user/dev doc split; leave them alone unless the triage flow changes.
-- Do not treat triage automation as plugin behavior in user docs.
+The self-hosted triage workflow (`.github/workflows/issue-triage.yml`) was
+removed — it required a provisioned runner with a hardcoded checkout path.
+`scripts/` (Pi-runner setup, auth helpers, quota checker) is retained but
+currently unreferenced by CI; `scripts/check-quota.mjs` remains useful
+standalone for debugging quota outside OpenCode. Do not treat triage
+automation as plugin behavior in user docs.
