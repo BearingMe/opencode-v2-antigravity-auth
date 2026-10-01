@@ -36,7 +36,10 @@ updateAccounts.mockImplementation(async (updater: (current: unknown) => Promise<
   const current = (await loadAccounts()) ?? { version: 4, accounts: [], activeIndex: 0 }
   const input = structuredClone(current)
   const { storage, result } = await updater(input)
-  if (storage !== input) written.push(storage)
+  if (storage !== input) {
+    written.push(storage)
+    loadAccounts.mockResolvedValue(storage)
+  }
   return result
 })
 
@@ -110,17 +113,22 @@ describe("V2 Antigravity runtime bridge", () => {
       expires: Date.now() + 60_000,
     }
     const accountsDispose = vi.fn()
+    let replayIntegration: (() => void) | undefined
     const ctx = {
       location: { directory: "C:/test-project" },
       integration: {
-        transform: async (callback: (editor: unknown) => void) => callback({
-          update: vi.fn(),
-          method: {
-            list: listMethods,
-            remove: removeMethod,
-            update: (value: Record<string, unknown>) => { integrationMethod = value },
-          },
-        }),
+        reload: vi.fn(async () => { replayIntegration?.() }),
+        transform: async (callback: (editor: unknown) => void) => {
+          replayIntegration = () => callback({
+            update: vi.fn(),
+            method: {
+              list: listMethods,
+              remove: removeMethod,
+              update: (value: Record<string, unknown>) => { integrationMethod = value },
+            },
+          })
+          replayIntegration()
+        },
         connection: {
           active: vi.fn(async () => activeConnection),
           resolve: vi.fn(async () => credential),
@@ -193,7 +201,13 @@ describe("V2 Antigravity runtime bridge", () => {
     expect(listMethods).toHaveBeenCalledWith("google")
     expect(removeMethod).toHaveBeenCalledExactlyOnceWith("google", inheritedKey)
     expect(removeMethod.mock.calls[0]?.[1]).toBe(inheritedKey)
-    expect(integrationMethod?.method).not.toHaveProperty("form")
+    expect(integrationMethod?.method).toMatchObject({ form: [{
+      key: "accountAction", required: true,
+      description: expect.stringContaining("old@example.com"),
+      options: [{ value: "add" }],
+    }] })
+    expect(integrationMethod?.method).not.toHaveProperty("login")
+    expect(integrationMethod?.method).toHaveProperty("form.0.options", [expect.objectContaining({ value: "add" })])
 
     const sdkOptions: Record<string, unknown> = {}
     const unnormalizedSdkEvent: {
@@ -253,16 +267,21 @@ describe("V2 Antigravity runtime bridge", () => {
       instructions: string
       callback: (code: string) => Promise<{ refresh: string; access: string }>
     }>
-    // Legacy answers cannot replace the pool or override automatic detection.
-    const authorization = await authorize({ accountAction: "replace", projectId: "ignored-project" })
+    // Missing/legacy answers (including the removed Exit) may not generate an OAuth URL.
+    authorizeAntigravity.mockClear()
+    await expect(authorize({ accountAction: "exit" })).rejects.toThrow("Choose Add")
+    await expect(authorize({})).rejects.toThrow("Choose Add")
+    await expect(authorize({ accountAction: "replace" })).rejects.toThrow("Choose Add")
+    expect(authorizeAntigravity).not.toHaveBeenCalled()
+    const authorization = await authorize({ accountAction: "add", projectId: "ignored-project" })
     expect(authorizeAntigravity).toHaveBeenCalledWith("")
     expect(authorization.mode).toBe("code")
-    expect(authorization.instructions).toContain("1/10")
-    expect(authorization.instructions).toContain("old@example.com")
-    expect(authorization.instructions).toContain("/antigravity")
+    expect(authorization.instructions).toContain("authorization code")
+    expect(authorization.instructions).not.toContain("Menu:")
     // Cancelling before callback has no persistence side effect.
     expect(updateAccounts).not.toHaveBeenCalled()
     const login = await authorization.callback("oauth-code")
+    expect(integrationMethod?.method).toMatchObject({ form: [{ description: expect.stringContaining("2/10") }] })
     expect(login.refresh).toBe("new-refresh-token|new-project")
     expect(written[0]).toMatchObject({
       accounts: expect.arrayContaining([
@@ -286,8 +305,7 @@ describe("V2 Antigravity runtime bridge", () => {
       lastUsed: 2,
     }))
     loadAccounts.mockResolvedValue({ version: 4, accounts: fullPool, activeIndex: 0 })
-    const atCap = await authorize({})
-    expect(atCap.instructions).toContain("10/10")
+    const atCap = await authorize({ accountAction: "add" })
     expect(atCap.instructions).toContain("Maximum of 10 Antigravity accounts reached")
     await expect(atCap.callback("new-account-code")).rejects.toThrow("Maximum of 10 Antigravity accounts reached")
     // The throwing updater aborts the transaction without recording a store.
@@ -331,6 +349,7 @@ describe("V2 Antigravity runtime bridge", () => {
     scanSecrets(await call("quota", { refresh: false }))
     scanSecrets(await call("verify", { id: "acc-one" }))
     scanSecrets(await call("mutate", { id: "acc-one", op: "disable" }))
+    expect(integrationMethod?.method).toMatchObject({ form: [{ description: expect.stringContaining("one@example.com (disabled)") }] })
     // Stale ids fail closed without writing.
     const staleWrites = written.length
     const stale = await call("mutate", { id: "acc-missing", op: "select" })
@@ -338,6 +357,7 @@ describe("V2 Antigravity runtime bridge", () => {
     scanSecrets(stale)
     expect(written.length).toBe(staleWrites)
     scanSecrets(await call("deleteAll", {}))
+    expect(integrationMethod?.method).toMatchObject({ form: [{ description: expect.stringContaining("0/10") }] })
 
     const sdkEvent: {
       package: string

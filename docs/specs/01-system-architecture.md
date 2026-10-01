@@ -89,9 +89,10 @@ in `request.ts`, `accounts.ts`, `storage.ts`, `quota.ts`, `project.ts`.
   deleteAll/ping`) — the interactive management surface sharing the
   `account-service.ts` backend with the legacy tool. `ping` returns
   `ANTIGRAVITY_RPC_ACCOUNTS_OK`.
-- V2 login surface: form-less `google-oauth` integration
-  method (no declared fields, prompt-free and Skip-free; one account per
-  login run) + `antigravity_accounts` tool + `/antigravity` dialog +
+- V2 login surface: `google-oauth` integration with a required
+   pre-authorization Add/reconnect selection (one account per command;
+   native Ctrl+C cancellation) +
+   `antigravity_accounts` tool + `/antigravity` dialog +
   manual code/URL paste callback.
 
 ## Forbidden relationships

@@ -11,13 +11,26 @@ source renders as unknown.
 | `groups.<claude\|gemini-pro\|gemini-flash>.remainingFraction` | `fetchAvailableModels` → `quotaInfo.remainingFraction`, aggregated per group in `src/plugin/quota.ts` (`aggregateQuota`) | Finite `0..1` only. Valid `0` (exhausted) and `1` (full) preserved. |
 | `groups.*.consumedPercent` | Derived: `(1 - remainingFraction) * 100`, rounded to 0.1 | `null` whenever the fraction is unknown. |
 | `groups.*.resetTime` | `fetchAvailableModels` → `quotaInfo.resetTime`, earliest timestamp per group | Parsed to epoch ms; unparseable/missing → `null`. |
-| `checkedAt` | `Date.now()` at presentation build when the fresh check was usable; otherwise `cachedQuotaUpdatedAt` | A failed refresh over cached data keeps `checkedAt == cachedQuotaUpdatedAt`: the DTO shows the last good reading, timestamped as such. |
+| `checkedAt` | `Date.now()` at check start when the fresh check was usable; otherwise `cachedQuotaUpdatedAt` | The start timestamp orders concurrent checks; failed refreshes retain the last good reading's timestamp. |
 | `freshness` | `staleAfterMs` (default 15 min) vs `cachedQuotaUpdatedAt` | `fresh` \| `stale` \| `unchecked`. |
 | `status` | DTO-level rollup | `ok` \| `error` \| `unknown`. `error` when the attempted check failed (missing result, `status === "error"`, or `quota.error` set); else `ok` when at least one group has a known fraction; else `unknown`. A failed refresh still shows cached values (with `status: "error"`) so partial results survive individual account failures. |
 | `verificationRequired`, `cooldownUntil`, `coolingDown` | Plugin store | Orthogonal to quota; shown alongside it. |
 | `selectedByFamily` | Plugin store family cursors | Which account routes `claude` / `gemini` traffic. |
 
 ## Unknown semantics
+
+Successful presentation checks with usable fractions save a snapshot via
+`updateAccounts`, matched by identity, original refresh token, and `addedAt`.
+Concurrent deletes/reconnects are skipped; newer saved readings win. Failed
+or entirely unknown results do not erase usable disk cache. Cache-only reads
+perform no checks or writes. The TUI refreshes on mount and on request, not
+on a polling timer.
+
+Snapshot writes are best-effort. On persistence failure, the service logs a
+credential-free warning and reloads the store before projecting quota. Fresh
+readings survive when the checked identity/generation still matches; deletes,
+reconnects, enabled state, and newer cache remain authoritative. An unavailable
+store does not fall back to the pre-check account pool.
 
 - Missing, non-finite (`NaN`, `Infinity`), or out-of-range (`< 0`, `> 1`)
   fractions are **unknown (`null`)**, never `0` or clamped. `0` means

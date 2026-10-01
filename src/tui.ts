@@ -1,8 +1,12 @@
 import { Plugin } from "@opencode/plugin/tui"
 import { AntigravityAccounts } from "./rpc.js"
-import { formatAccountOneLiner, formatResetCountdown, renderQuotaBar } from "./plugin/account-ui-format.js"
+import { formatAccountOneLiner } from "./plugin/account-ui-format.js"
+import type { QuotaRefreshOutcome } from "./plugin/account-ui-format.js"
+import { MissingAccountDialogView, QuotaDialogView } from "./tui-quota-dialog.js"
+import { createQuotaDialogController } from "./tui-quota-controller.js"
+import { AccountListDialogView } from "./tui-account-list-dialog.js"
 
-type AccountAction = "show-quota" | "refresh-quota" | "use-next" | "toggle-enabled" | "verify" | "remove" | "back"
+type AccountAction = "show-quota" | "toggle-enabled" | "verify" | "remove" | "back"
 
 interface ListAccount {
   id: string
@@ -60,31 +64,31 @@ function rpcLocation(context: Parameters<Parameters<typeof Plugin.define>[0]["se
   return context.location ?? context.data.location.default()
 }
 
-function quotaLines(account: QuotaAccount): string {
-  const groups = ["claude", "gemini-pro", "gemini-flash"]
-  const lines = groups.map((group) => {
-    const entry = account.groups[group] ?? { remainingFraction: null, resetTime: null }
-    const bar = renderQuotaBar(entry.remainingFraction)
-    const reset = formatResetCountdown(entry.resetTime)
-    return `${group}: ${bar} (${reset})`
-  })
-  const checked = account.checkedAt === null ? "never checked" : new Date(account.checkedAt).toLocaleString()
-  return [...lines, `status: ${account.status} (${account.freshness}, checked: ${checked})`].join("\n")
-}
+type QuotaFetch =
+  | { ok: true; entry: QuotaAccount }
+  | { ok: false; reason: "missing" }
+  | { ok: false; reason: "failed"; invalidResponse: boolean }
 
 export default Plugin.define({
   id: "antigravity-accounts-tui",
   setup(context) {
-    const toastRpcFailure = (detail: unknown) => {
+    let disposed = false
+    let closeQuota: (() => void) | undefined
+    let closeAccountList: (() => void) | undefined
+    let closeMissingAccount: (() => void) | undefined
+    const toastFailure = (invalidResponse: boolean) => {
       // Keep the user-visible toast generic: server-side diagnostics
       // (schema rejections) already land in the host log.
       context.ui.toast.show({
         title: "Antigravity accounts",
-        message: isInvalidRpcResponse(detail)
+        message: invalidResponse
           ? INVALID_RPC_RESPONSE
           : SERVER_UNAVAILABLE,
         variant: "error",
       })
+    }
+    const toastRpcFailure = (detail: unknown) => {
+      toastFailure(isInvalidRpcResponse(detail))
     }
     const toastStaleAccount = async () => {
       context.ui.toast.show({
@@ -95,15 +99,17 @@ export default Plugin.define({
     }
 
     const openList = async (): Promise<void> => {
+      if (disposed) return
       let listing: { accounts: Array<ListAccount> }
       try {
         listing = await context.client.rpc(AntigravityAccounts).list({}, {
           location: rpcLocation(context),
         }) as { accounts: Array<ListAccount> }
       } catch (error: unknown) {
-        toastRpcFailure(error)
+        if (!disposed) toastRpcFailure(error)
         return
       }
+      if (disposed) return
       if (listing.accounts.length === 0) {
         await context.ui.dialog.alert({
           title: "Antigravity accounts",
@@ -120,29 +126,56 @@ export default Plugin.define({
       } catch {
         quotaById = new Map()
       }
-      const picked = await context.ui.dialog.select<string>({
-        title: "Antigravity accounts",
-        placeholder: ADD_ACCOUNTS_HINT,
-        options: listing.accounts.map((account) => {
-          const quota = quotaById.get(account.id)
-          const description = formatAccountOneLiner({
-            email: account.email,
-            enabled: account.enabled,
-            active: account.active,
-            verificationRequired: account.verificationRequired,
-            coolingDown: quota?.coolingDown ?? false,
-            status: quota?.status,
-            selectedByFamily: quota?.selectedByFamily,
-          })
-          return {
-            title: account.email,
-            value: account.id,
-            description,
-            footer: ADD_ACCOUNTS_HINT,
-          }
-        }),
+      if (disposed) return
+      const items = listing.accounts.map((account) => {
+        const quota = quotaById.get(account.id)
+        const summary = formatAccountOneLiner({
+          email: account.email,
+          enabled: account.enabled,
+          active: account.active,
+          verificationRequired: account.verificationRequired,
+          coolingDown: quota?.coolingDown ?? false,
+          status: quota?.status,
+          selectedByFamily: quota?.selectedByFamily,
+        })
+        return {
+          id: account.id,
+          email: account.email,
+          enabled: account.enabled,
+          description: summary.slice(formatAccountOneLiner({ email: account.email }).length).trim(),
+        }
       })
-      if (picked === undefined) return
+      const picked = await new Promise<string | undefined>((resolve) => {
+        let settled = false
+        const settle = (id: string | undefined) => {
+          if (settled) return
+          settled = true
+          closeAccountList = undefined
+          resolve(id)
+        }
+        const choose = (id: string | undefined) => {
+          if (settled) return
+          settle(id)
+          context.ui.dialog.clear()
+        }
+        context.ui.dialog.show(() => AccountListDialogView({
+          accounts: items,
+          choose,
+          layer: (input) => context.keymap.layer(input),
+          colors: {
+            base: context.theme.text.base,
+            muted: context.theme.text.muted,
+            success: context.theme.text.feedback.success.base,
+            error: context.theme.text.feedback.error.base,
+            selected: context.theme.background.raised.high,
+            inputText: context.theme.text.formfield.focused,
+            inputBackground: context.theme.background.formfield.focused,
+          },
+        }), () => settle(undefined))
+        if (!settled) closeAccountList = () => choose(undefined)
+        context.ui.dialog.set({ size: "large" })
+      })
+      if (disposed || picked === undefined) return
       const selected = listing.accounts.find((entry) => entry.id === picked)
       if (!selected) {
         context.ui.toast.show({
@@ -156,92 +189,148 @@ export default Plugin.define({
       await openActions(selected)
     }
 
+    const fetchQuotaEntry = async (account: ListAccount, refresh: boolean): Promise<QuotaFetch> => {
+      try {
+        const presentation = await context.client.rpc(AntigravityAccounts).quota({ refresh }, {
+          location: rpcLocation(context),
+        }) as { accounts: Array<QuotaAccount> }
+        const entry = presentation.accounts.find((item) => item.id === account.id)
+        if (!entry) return { ok: false, reason: "missing" }
+        return { ok: true, entry }
+      } catch (error: unknown) {
+        return { ok: false, reason: "failed", invalidResponse: isInvalidRpcResponse(error) }
+      }
+    }
+
+    const showMissingThenList = async (account: ListAccount): Promise<void> => {
+      if (disposed) return
+      const acknowledged = await new Promise<boolean>((resolve) => {
+        let settled = false
+        const settle = (value: boolean) => {
+          if (settled) return
+          settled = true
+          closeMissingAccount = undefined
+          resolve(value)
+        }
+        const acknowledge = () => {
+          if (settled || disposed) return
+          settle(true)
+          context.ui.dialog.clear()
+        }
+        context.ui.dialog.show(() => MissingAccountDialogView({
+          email: account.email,
+          acknowledge,
+          layer: (input) => context.keymap.layer(input),
+          colors: { base: context.theme.text.base, muted: context.theme.text.muted },
+        }), () => settle(false))
+        if (!settled) closeMissingAccount = () => {
+          settle(false)
+          context.ui.dialog.clear()
+        }
+        context.ui.dialog.set({ size: "medium" })
+      })
+      if (acknowledged && !disposed) await openList()
+    }
+
+    const openQuota = async (account: ListAccount): Promise<void> => {
+      const initial = await fetchQuotaEntry(account, false)
+      if (disposed) return
+      if (!initial.ok) {
+        if (initial.reason === "missing") {
+          await showMissingThenList(account)
+        } else {
+          toastFailure(initial.invalidResponse)
+          await openActions(account)
+        }
+        return
+      }
+      let navigated = false
+      const goListOnce = async (missing = false): Promise<void> => {
+        if (navigated || disposed) return
+        navigated = true
+        controller.dispose()
+        closeQuota = undefined
+        context.ui.dialog.clear()
+        if (missing) {
+          await showMissingThenList(account)
+        } else await openList()
+      }
+      const controller = createQuotaDialogController({
+        initial: initial.entry,
+        refreshQuota: async (): Promise<QuotaRefreshOutcome> => {
+          const refreshed = await fetchQuotaEntry(account, true)
+          if (!refreshed.ok) {
+            return refreshed.reason === "missing"
+              ? { ok: false, reason: "missing", invalidResponse: false }
+              : { ok: false, reason: "failed", invalidResponse: refreshed.invalidResponse }
+          }
+          return { ok: true, entry: refreshed.entry }
+        },
+        notifyRefreshFailed: (invalidResponse, quotaError) => {
+          if (quotaError) {
+            context.ui.toast.show({ title: "Antigravity quota", message: "Quota refresh failed. Showing last saved values.", variant: "error" })
+          } else toastFailure(invalidResponse)
+        },
+        showMissingThenList: () => goListOnce(true),
+        goList: goListOnce,
+      })
+      // Each quota dialog owns its closer by identity. Assign only after the
+      // replacement completes: the replaced dialog's onClose runs during show
+      // and must clear its own closer without clobbering the replacement.
+      // Otherwise overlapping opens lose the cleanup callback and unload
+      // leaves the replacement dialog active.
+      let quotaCloser: (() => void) | undefined
+      quotaCloser = () => {
+        navigated = true
+        controller.dispose()
+        if (closeQuota === quotaCloser) closeQuota = undefined
+        context.ui.dialog.clear()
+      }
+      context.ui.dialog.show(() => QuotaDialogView({
+        email: account.email,
+        enabled: initial.entry.enabled,
+        controller,
+        colors: {
+          base: context.theme.text.base,
+          muted: context.theme.text.muted,
+          success: context.theme.text.feedback.success.base,
+          warning: context.theme.text.feedback.warning.base,
+          error: context.theme.text.feedback.error.base,
+        },
+        shortcuts: (id) => context.keymap.shortcuts(id)[0],
+        layer: (input) => context.keymap.layer(input),
+      }), () => {
+        navigated = true
+        controller.dispose()
+        if (closeQuota === quotaCloser) closeQuota = undefined
+        // onClose also runs when another dialog replaces this one. Only the
+        // component's explicit Back/Esc commands may reopen our account list.
+      })
+      closeQuota = quotaCloser
+      context.ui.dialog.set({ size: "large" })
+    }
+
     const openActions = async (account: ListAccount): Promise<void> => {
+      if (disposed) return
       const toggleLabel = account.enabled ? "Disable" : "Enable"
       const action = await context.ui.dialog.select<AccountAction>({
         title: account.email,
         placeholder: ADD_ACCOUNTS_HINT,
         options: [
-          { title: "Show quota", value: "show-quota", description: "Cached quota bars as text" },
-          { title: "Refresh quota", value: "refresh-quota", description: "Fetch fresh quota, then show text bars" },
-          { title: "Use next", value: "use-next", description: "Rotation hint, not permanent pinning" },
+          { title: "Show quota", value: "show-quota", description: "Refresh on open; ctrl+r to update again" },
           { title: toggleLabel, value: "toggle-enabled", description: account.enabled ? "Disable this account" : "Enable this account" },
           { title: "Verify", value: "verify", description: "Check access, show reconnect guidance when blocked" },
           { title: "Remove", value: "remove", description: "Delete this account after confirmation" },
           { title: "Back", value: "back", description: "Return to the account list" },
         ],
       })
+      if (disposed) return
       if (action === undefined || action === "back") {
         if (action === "back") await openList()
         return
       }
       if (action === "show-quota") {
-        try {
-          const presentation = await context.client.rpc(AntigravityAccounts).quota({ refresh: false }, {
-            location: rpcLocation(context),
-          }) as { accounts: Array<QuotaAccount> }
-          const entry = presentation.accounts.find((item) => item.id === account.id)
-          if (!entry) {
-            await context.ui.dialog.alert({
-              title: account.email,
-              message: "That account is no longer saved.",
-            })
-            await openList()
-            return
-          }
-          await context.ui.dialog.alert({
-            title: account.email,
-            message: quotaLines(entry),
-          })
-        } catch (error: unknown) {
-          toastRpcFailure(error)
-        }
-        await openActions(account)
-        return
-      }
-      if (action === "refresh-quota") {
-        try {
-          const presentation = await context.client.rpc(AntigravityAccounts).quota({ refresh: true }, {
-            location: rpcLocation(context),
-          }) as { accounts: Array<QuotaAccount> }
-          const entry = presentation.accounts.find((item) => item.id === account.id)
-          if (!entry) {
-            await context.ui.dialog.alert({
-              title: account.email,
-              message: "That account is no longer saved.",
-            })
-            await openList()
-            return
-          }
-          await context.ui.dialog.alert({
-            title: account.email,
-            message: quotaLines(entry),
-          })
-        } catch (error: unknown) {
-          toastRpcFailure(error)
-        }
-        await openActions(account)
-        return
-      }
-      if (action === "use-next") {
-        try {
-          const outcome = await context.client.rpc(AntigravityAccounts).mutate({ id: account.id, op: "select" }, {
-            location: rpcLocation(context),
-          }) as MutateOutcome
-          if (isStaleMutate(outcome)) {
-            await toastStaleAccount()
-            await openList()
-            return
-          }
-          context.ui.toast.show({
-            title: "Antigravity accounts",
-            message: `${account.email} will be tried next (rotation hint, not permanent pinning).`,
-            variant: "success",
-          })
-        } catch (error: unknown) {
-          toastRpcFailure(error)
-        }
-        await openList()
+        await openQuota(account)
         return
       }
       if (action === "toggle-enabled") {
@@ -304,6 +393,7 @@ export default Plugin.define({
           message: "Saved tokens for this account will be deleted.",
           label: { confirm: "Remove", cancel: "Cancel" },
         })
+        if (disposed) return
         if (!confirmed) {
           await openActions(account)
           return
@@ -330,10 +420,8 @@ export default Plugin.define({
       }
     }
 
-    // Keymap layers are owned by the calling component, so registration
-    // happens inside an app slot render. Interaction uses host-rendered
-    // dialogs on purpose: custom JSX pages crashed against the host
-    // renderer ("No renderer found"), dialogs and toasts are host-owned.
+    // App-wide commands need a component owner. Quota shortcuts are owned
+    // separately by the mounted modal, not this app-wide layer.
     const unregisterCommands = context.ui.slot({
       append: "app",
       render: () => {
@@ -345,6 +433,9 @@ export default Plugin.define({
             palette: true,
             slash: { name: "antigravity" },
             run: async () => {
+              closeQuota?.()
+              closeAccountList?.()
+              closeMissingAccount?.()
               await openList()
             },
           }],
@@ -352,6 +443,12 @@ export default Plugin.define({
         return null
       },
     })
-    return unregisterCommands
+    return () => {
+      disposed = true
+      closeQuota?.()
+      closeAccountList?.()
+      closeMissingAccount?.()
+      unregisterCommands()
+    }
   },
 })

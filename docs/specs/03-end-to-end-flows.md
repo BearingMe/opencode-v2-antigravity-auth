@@ -2,15 +2,17 @@
 
 ## F1 — First login (OAuth)
 
-Trigger: `opencode auth login` (one account per run; repeat to grow the
-pool to the 10-account cap).
-Participants: V2 form-less `google-oauth` method → `antigravity/oauth.ts` →
+Trigger: `opencode auth login` (one account per command, up to 10 saved
+accounts; rerun the command to add another).
+Participants: V2 `google-oauth` pre-authorization form → `antigravity/oauth.ts` →
 `storage.ts` (via `account-service.ts`) → `project.ts` → `quota.ts`.
-The method declares zero fields and renders prompt-free and Skip-free.
+The method declares one required selection field (no Skip option).
 
-1. Login instructions show live pool state (`Saved accounts: N/10` with
-   disabled markers), the one-account-per-run note, and the `/antigravity`
-   management hint. No method picker, no form prompts, no Skip option.
+1. The form shows saved pool state (`N/10`, disabled markers) and the
+   `/antigravity` management hint before authorization starts. Add/reconnect
+   starts OAuth; native Ctrl+C cancels before authorization without account
+   writes. Missing/legacy answers cannot bypass selection. There is no Exit
+   option or host-specific login metadata; stock v2.0.18 performs one attempt.
 2. `authorizeAntigravity("")` → open consent URL (PKCE S256,
    `state=base64url({verifier,projectId:""})`, `prompt=consent`).
 3. Manual code/redirect-URL paste via the authorize `callback`

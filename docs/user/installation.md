@@ -36,8 +36,9 @@ opencode auth login
 Each run adds or reconnects **one** account (up to 10). To add another
 account, run the command again. Cancelling the browser flow writes nothing.
 
-The login step shows the current pool (`Saved accounts: N/10`), a
-one-account-per-login note, and a pointer to `/antigravity` for management.
+Before the browser opens, login shows saved accounts and a real
+Add/reconnect selection. Only Add starts consent; Ctrl+C cancels without
+changes. This uses standard OpenCode, with no custom host build required.
 Complete Google sign-in, then paste either the authorization code or the full
 `localhost` redirect URL when prompted.
 

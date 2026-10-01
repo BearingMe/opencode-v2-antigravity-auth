@@ -15,7 +15,10 @@ import {
   type ModelFamily,
 } from "./storage.js"
 import { verifyAccountAccess } from "./verify.js"
+import { createLogger } from "./logger.js"
 import type { PluginClient, RefreshParts } from "./types.js"
+
+const log = createLogger("account-service")
 
 /**
  * Shared account-management service.
@@ -356,6 +359,47 @@ export async function checkQuota(
 }
 
 const QUOTA_PRESENTATION_GROUPS: QuotaPresentationGroup[] = ["claude", "gemini-pro", "gemini-flash"]
+
+async function persistQuotaSnapshots(
+  accounts: Array<AccountMetadataV3>,
+  results: Array<AccountQuotaResult | undefined>,
+  checkedAt: number,
+): Promise<AccountStorageV4> {
+  if (!results.some((result) => result?.status === "ok" && result.quota && !result.quota.error)) {
+    return await loadAccounts() ?? emptyStorage()
+  }
+  return updateAccounts((current) => {
+    let dirty = false
+    const next = current.accounts.map((account) => {
+      // Reconnects change the token, deletions remove the identity. Never
+      // apply an in-flight check to a different generation of that account.
+      const index = accounts.findIndex((source) => source.id === account.id
+        && source.refreshToken === account.refreshToken && source.addedAt === account.addedAt)
+      const result = results[index]
+      if (!result || result.status !== "ok" || !result.quota || result.quota.error) return account
+      if ((account.cachedQuotaUpdatedAt ?? 0) > checkedAt) return account
+      const groups: NonNullable<AccountMetadataV3["cachedQuota"]> = {}
+      for (const key of QUOTA_PRESENTATION_GROUPS) {
+        const group = result.quota.groups[key]
+        const fraction = group?.remainingFraction
+        if (typeof fraction !== "number" || !Number.isFinite(fraction) || fraction < 0 || fraction > 1) continue
+        const reset = parseQuotaResetTime(group?.resetTime)
+        groups[key] = {
+          remainingFraction: fraction,
+          modelCount: group?.modelCount ?? 0,
+          ...(reset === null ? {} : { resetTime: new Date(reset).toISOString() }),
+        }
+      }
+      // An empty/invalid reading must not erase the last usable snapshot.
+      if (Object.keys(groups).length === 0) return account
+      dirty = true
+      return { ...account, cachedQuota: groups, cachedQuotaUpdatedAt: checkedAt }
+    })
+    const storage = dirty ? { ...current, accounts: next } : current
+    return { storage, result: storage }
+  })
+}
+
 const DEFAULT_QUOTA_STALE_AFTER_MS = 15 * 60 * 1000
 const DEFAULT_QUOTA_TIMEOUT_MS = 12_000
 
@@ -412,8 +456,9 @@ export async function getQuotaPresentation(
   options: QuotaPresentationOptions = {},
   providerId: string = ANTIGRAVITY_PROVIDER_ID,
 ): Promise<QuotaPresentation> {
-  const storage = await loadAccounts() ?? emptyStorage()
-  const familySelection = familyCursors(storage, storage.accounts.length)
+  let storage = await loadAccounts() ?? emptyStorage()
+  const sources = storage.accounts
+  const checkStartedAt = Date.now()
   const refresh = options.refresh !== false
   const timeoutMs = boundedTimeout(options.timeoutMs)
   const staleAfterMs = typeof options.staleAfterMs === "number" && Number.isFinite(options.staleAfterMs)
@@ -427,16 +472,35 @@ export async function getQuotaPresentation(
     }))
     : []
 
+  if (refresh) {
+    try {
+      storage = await persistQuotaSnapshots(sources, refreshed, checkStartedAt)
+    } catch {
+      // Cache persistence is best-effort. Reload authoritative identities and
+      // metadata rather than projecting the pre-check pool after a failed write.
+      // Do not log raw storage errors: they can contain credential material.
+      log.warn("Failed to persist quota snapshots; reloading account state")
+      storage = await loadAccounts() ?? emptyStorage()
+    }
+  }
+  const familySelection = familyCursors(storage, storage.accounts.length)
+
   const now = Date.now()
   const accounts = storage.accounts.map((account, index) => {
-    const result = refreshed[index]
+    const sourceIndex = sources.findIndex((source) => source.id === account.id
+      && source.refreshToken === account.refreshToken && source.addedAt === account.addedAt)
+    const result = refreshed[sourceIndex]
     const cachedAt = typeof account.cachedQuotaUpdatedAt === "number" && Number.isFinite(account.cachedQuotaUpdatedAt)
       ? account.cachedQuotaUpdatedAt
       : null
-    const checkAttempted = refresh && account.enabled !== false
+    const checkAttempted = refresh && sources[sourceIndex]?.enabled !== false && sourceIndex >= 0
     const resultHasError = checkAttempted && (!result || result.status === "error" || !!result.quota?.error)
-    const useFreshQuota = !!result && !resultHasError
-    const checkedAt = useFreshQuota ? now : cachedAt
+    const resultHasKnownQuota = Object.values(result?.quota?.groups ?? {}).some((group) => {
+      const value = group.remainingFraction
+      return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1
+    })
+    const useFreshQuota = !!result && !resultHasError && resultHasKnownQuota && (account.cachedQuotaUpdatedAt ?? 0) <= checkStartedAt
+    const checkedAt = useFreshQuota ? checkStartedAt : cachedAt
     const cacheIsStale = cachedAt === null || now - cachedAt > staleAfterMs || cachedAt > now
     const quotaGroups = useFreshQuota ? result.quota?.groups : account.cachedQuota
     const groups = Object.fromEntries(QUOTA_PRESENTATION_GROUPS.map((group) => {
@@ -454,9 +518,11 @@ export async function getQuotaPresentation(
     const hasKnownQuota = Object.values(groups).some((group) => group.remainingFraction !== null)
     const status: QuotaPresentation["accounts"][number]["status"] = resultHasError
       ? "error"
-      : hasKnownQuota
-        ? "ok"
-        : "unknown"
+      : checkAttempted && !resultHasKnownQuota
+        ? "unknown"
+        : hasKnownQuota
+          ? "ok"
+          : "unknown"
     const freshness: QuotaPresentation["accounts"][number]["freshness"] = useFreshQuota
       ? "fresh"
       : cachedAt === null

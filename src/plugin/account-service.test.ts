@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { loadAccounts, updateAccounts, checkAccountsQuota, verifyAccountAccess, written } = vi.hoisted(() => ({
+const { loadAccounts, updateAccounts, checkAccountsQuota, verifyAccountAccess, quotaCacheWarn, written } = vi.hoisted(() => ({
   loadAccounts: vi.fn(),
   updateAccounts: vi.fn(),
   checkAccountsQuota: vi.fn(),
+  quotaCacheWarn: vi.fn(),
   verifyAccountAccess: vi.fn(async (): Promise<{ status: "ok" | "blocked" | "error"; message: string; verifyUrl?: string }> => ({
     status: "ok",
     message: "Account verification check passed.",
@@ -19,6 +20,13 @@ vi.mock("./storage.js", async (importOriginal) => {
 })
 vi.mock("./quota.js", () => ({ checkAccountsQuota }))
 vi.mock("./verify.js", () => ({ verifyAccountAccess }))
+vi.mock("./logger.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./logger.js")>()
+  return { ...actual, createLogger: (module: string) => {
+    const logger = actual.createLogger(module)
+    return module === "account-service" ? { ...logger, warn: quotaCacheWarn } : logger
+  } }
+})
 
 import {
   MAX_SAVED_ACCOUNTS,
@@ -207,6 +215,92 @@ describe("getQuotaPresentation", () => {
     vi.clearAllMocks()
     loadAccounts.mockResolvedValue(storage(baseAccounts(), 0, { claude: 0, gemini: 1 }))
     checkAccountsQuota.mockResolvedValue([])
+  })
+
+  it.each(["EACCES", "ENOSPC", "ELOCKED"])("returns fresh quota despite a %s cache-write failure", async (code) => {
+    const cachedAt = Date.now() - 1000
+    const source = account({ id: "stable", cachedQuota: { claude: { remainingFraction: 0.9, modelCount: 1 } }, cachedQuotaUpdatedAt: cachedAt })
+    loadAccounts.mockResolvedValue(storage([source]))
+    checkAccountsQuota.mockResolvedValue([{ index: 0, status: "ok", quota: {
+      groups: { claude: { remainingFraction: 0.2, modelCount: 1 } }, modelCount: 1,
+    } }])
+    updateAccounts.mockRejectedValueOnce(Object.assign(new Error("write denied: secret-refresh-token"), { code }))
+    const dto = await getQuotaPresentation({} as never)
+    expect(dto.accounts[0]).toMatchObject({ status: "ok", freshness: "fresh", groups: { claude: { remainingFraction: 0.2 } } })
+    expect(dto.accounts[0]?.checkedAt).toBeGreaterThan(cachedAt)
+    expect(loadAccounts).toHaveBeenCalledTimes(2)
+    expect(written).toHaveLength(0)
+    expect(quotaCacheWarn).toHaveBeenCalledWith("Failed to persist quota snapshots; reloading account state")
+    expect(JSON.stringify(quotaCacheWarn.mock.calls)).not.toContain("secret-refresh-token")
+  })
+
+  it.each(["delete", "reconnect", "newer check", "disable", "unreadable"])("preserves concurrent %s after cache-write failure", async (change) => {
+    const source = account({ id: "stable", cachedQuota: { claude: { remainingFraction: 0.9, modelCount: 1 } }, cachedQuotaUpdatedAt: Date.now() - 1000 })
+    loadAccounts.mockResolvedValue(storage([source]))
+    checkAccountsQuota.mockImplementationOnce(async () => {
+      const current = change === "delete" ? [] : [{ ...source,
+        ...(change === "reconnect" ? { refreshToken: "new-login-token" } : {}),
+        ...(change === "newer check" ? { cachedQuotaUpdatedAt: Date.now() + 1000 } : {}),
+        ...(change === "disable" ? { enabled: false } : {}),
+      }]
+      loadAccounts.mockResolvedValue(change === "unreadable" ? null : storage(current))
+      return [{ index: 0, status: "ok", quota: { groups: { claude: { remainingFraction: 0.2, modelCount: 1 } }, modelCount: 1 } }]
+    })
+    updateAccounts.mockRejectedValueOnce(new Error("write denied"))
+    const dto = await getQuotaPresentation({} as never)
+    expect(written).toHaveLength(0)
+    if (change === "delete" || change === "unreadable") expect(dto.accounts).toHaveLength(0)
+    if (change === "reconnect" || change === "newer check") expect(dto.accounts[0]?.groups.claude?.remainingFraction).toBe(0.9)
+    if (change === "disable") expect(dto.accounts[0]).toMatchObject({ enabled: false, groups: { claude: { remainingFraction: 0.2 } } })
+    expect(JSON.stringify(dto)).not.toContain("new-login-token")
+  })
+
+  it("persists successful quota so a new cache-only read retains the bars", async () => {
+    loadAccounts.mockResolvedValue(storage([baseAccounts()[0]!]))
+    checkAccountsQuota.mockResolvedValue([{
+      index: 0, status: "ok", quota: { groups: {
+        claude: { remainingFraction: 0, modelCount: 1 },
+        "gemini-pro": { remainingFraction: 1, modelCount: 1, resetTime: "2030-01-02T03:04:05Z" },
+      }, modelCount: 2 },
+    }])
+    const fresh = await getQuotaPresentation({} as never)
+    const saved = written.at(-1)
+    expect(saved).toBeDefined()
+    loadAccounts.mockResolvedValue(saved)
+    checkAccountsQuota.mockClear()
+    const reopened = await getQuotaPresentation({} as never, { refresh: false })
+    expect(reopened.accounts[0]?.groups).toEqual(fresh.accounts[0]?.groups)
+    expect(reopened.accounts[0]?.checkedAt).toBe(fresh.accounts[0]?.checkedAt)
+    expect(checkAccountsQuota).not.toHaveBeenCalled()
+  })
+
+  it.each(["delete", "reconnect", "newer check", "disable"])("does not overwrite a concurrent %s", async (change) => {
+    const source = account({ id: "stable", cachedQuota: { claude: { remainingFraction: 0.9, modelCount: 1 } }, cachedQuotaUpdatedAt: Date.now() - 1000 })
+    loadAccounts.mockResolvedValue(storage([source]))
+    checkAccountsQuota.mockImplementation(async () => {
+      const current = change === "delete" ? [] : [{ ...source,
+        ...(change === "reconnect" ? { refreshToken: "new-login-token" } : {}),
+        ...(change === "newer check" ? { cachedQuotaUpdatedAt: Date.now() + 1000 } : {}),
+        ...(change === "disable" ? { enabled: false } : {}),
+      }]
+      loadAccounts.mockResolvedValue(storage(current))
+      return [{ index: 0, status: "ok", quota: { groups: { claude: { remainingFraction: 0.2, modelCount: 1 } }, modelCount: 1 } }]
+    })
+    const dto = await getQuotaPresentation({} as never)
+    if (change === "disable") {
+      expect(written.at(-1)).toMatchObject({ accounts: [{ enabled: false, cachedQuota: { claude: { remainingFraction: 0.2 } } }] })
+    } else expect(written).toHaveLength(0)
+    if (change === "delete") expect(dto.accounts).toHaveLength(0)
+    if (change === "reconnect" || change === "newer check") expect(dto.accounts[0]?.groups.claude?.remainingFraction).toBe(0.9)
+  })
+
+  it("does not erase usable saved values with failed or empty readings", async () => {
+    loadAccounts.mockResolvedValue(storage([account({ id: "stable", cachedQuota: { claude: { remainingFraction: 0.9, modelCount: 1 } } })]))
+    checkAccountsQuota.mockResolvedValue([{ index: 0, status: "error" }])
+    await getQuotaPresentation({} as never)
+    checkAccountsQuota.mockResolvedValue([{ index: 0, status: "ok", quota: { groups: {}, modelCount: 0 } }])
+    await getQuotaPresentation({} as never)
+    expect(written).toHaveLength(0)
   })
 
   it("keeps missing quota unknown while preserving a real zero fraction", async () => {

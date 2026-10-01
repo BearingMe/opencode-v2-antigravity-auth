@@ -100,6 +100,17 @@ export default Plugin.define({
   id: PLUGIN_ID,
   async setup(ctx) {
     let currentAuth: OAuthAuthDetails | null = null
+    let accountSummary = (await loadAccounts())?.accounts ?? []
+    const refreshAccountSummary = async (): Promise<void> => {
+      try {
+        accountSummary = (await loadAccounts())?.accounts ?? []
+        await ctx.integration.reload()
+      } catch (error: unknown) {
+        // Presentation failure must not turn an already-persisted mutation
+        // or login into a failed operation.
+        bridgeLog.warn("Unable to reload the login account summary", { error: String(error) })
+      }
+    }
     const bridgeClient = makeBridgeClient(ctx, (next) => {
       currentAuth = next
     })
@@ -123,6 +134,7 @@ export default Plugin.define({
           const outcome = await verifyAccount({ id: input.id }, bridgeClient, ANTIGRAVITY_PROVIDER_ID)
           if ("ok" in outcome) return outcome
           resetNativeManager()
+          await refreshAccountSummary()
           const projected: {
             index: number
             email?: string
@@ -155,6 +167,7 @@ export default Plugin.define({
             currentAuth = { type: "oauth", refresh: "", access: "", expires: 0 }
           }
           resetNativeManager()
+          await refreshAccountSummary()
           return {
             op: outcome.op,
             index: outcome.index,
@@ -172,6 +185,7 @@ export default Plugin.define({
           await deleteAllAccounts()
           currentAuth = { type: "oauth", refresh: "", access: "", expires: 0 }
           resetNativeManager()
+          await refreshAccountSummary()
           return { remaining: 0 as const }
         },
         ping: async () => "ANTIGRAVITY_RPC_ACCOUNTS_OK",
@@ -355,7 +369,6 @@ export default Plugin.define({
       })
     }
 
-    let accountSummary = (await loadAccounts())?.accounts ?? []
     await ctx.integration.transform((editor) => {
       editor.update(INTEGRATION_ID, (integration) => {
         integration.name = "Google Antigravity"
@@ -368,23 +381,27 @@ export default Plugin.define({
           id: "google-oauth",
           type: "oauth",
           label: "OAuth with Google (Antigravity)",
+          form: [{
+            key: "accountAction",
+            type: "string",
+            title: "Google Antigravity",
+            description: formatAuthSummary(accountSummary, MAX_SAVED_ACCOUNTS),
+            required: true,
+            options: [
+              { value: "add", label: accountSummary.length >= MAX_SAVED_ACCOUNTS ? "Reconnect a saved account" : "Add or reconnect an account" },
+            ],
+          }],
         },
-        authorize: async () => {
+        authorize: async (answer) => {
+          // The host answers method.form BEFORE starting OAuth/opening a URL.
+          // Refuse missing/legacy answers rather than bypassing consent.
+          if (answer.accountAction !== "add") throw new Error("Choose Add or reconnect an account before starting Google sign-in.")
           accountSummary = (await loadAccounts())?.accounts ?? []
-          const saved = accountSummary.map((account) => `${account.email ?? "Unnamed account"}${account.enabled === false ? " (disabled)" : ""}`).join(", ")
           const authorization = await authorizeAntigravity("")
           return {
             mode: "code" as const,
             url: authorization.url,
-            instructions: [
-              `Saved accounts: ${accountSummary.length}/${MAX_SAVED_ACCOUNTS}${saved ? ` — ${saved}` : ""}.`,
-              "One account per login. Run login again to add another account; signing in again refreshes an existing account.",
-              ...(accountSummary.length >= MAX_SAVED_ACCOUNTS
-                ? [`Maximum of ${MAX_SAVED_ACCOUNTS} Antigravity accounts reached. Sign in to an existing account or delete a saved account before adding another.`]
-                : []),
-              "Manage saved accounts: /antigravity.",
-              "Complete Google sign-in, then paste either the authorization code or the full localhost redirect URL.",
-            ].join("\n"),
+            instructions: formatAuthInstructions(accountSummary, MAX_SAVED_ACCOUNTS),
             callback: async (code: string) => {
               const params = parseOAuthCallbackInput(
                 code,
@@ -393,7 +410,7 @@ export default Plugin.define({
               const result = await exchangeAntigravity(params.code, params.state)
               if (result.type !== "success") throw new Error(result.error)
               await persistOAuthAccount(result, "add")
-              accountSummary = (await loadAccounts())?.accounts ?? []
+              await refreshAccountSummary()
               currentAuth = {
                 type: "oauth",
                 refresh: formatRefreshParts({ refreshToken: result.refresh, projectId: result.projectId }),
@@ -512,12 +529,19 @@ export default Plugin.define({
           required: ["action"],
           additionalProperties: false,
         },
-        execute: async (input) => manageAccounts(input as { action: string; index?: number }, bridgeClient, () => {
-          resetNativeManager()
-        }, (auth) => {
-          currentAuth = auth
-          resetNativeManager()
-        }),
+        execute: async (input) => {
+          const action = input as { action: string; index?: number }
+          const result = await manageAccounts(action, bridgeClient, () => {
+            resetNativeManager()
+          }, (auth) => {
+            currentAuth = auth
+            resetNativeManager()
+          })
+          if (["verify", "enable", "disable", "select", "delete", "delete_all"].includes(action.action)) {
+            await refreshAccountSummary()
+          }
+          return result
+        },
       })
     })
 
@@ -680,6 +704,37 @@ export function getFetchDestination(input: RequestInfo | URL): URL {
 
 export function isGenerativeLanguageModelPath(pathname: string): boolean {
   return /^\/v1(?:beta)?\/models\/[^/]+:(?:generateContent|streamGenerateContent|countTokens)$/.test(pathname)
+}
+
+export function formatAuthInstructions(
+  accounts: Array<{ email?: string | null; enabled?: boolean }>,
+  maxAccounts: number,
+): string {
+  return [
+    "Complete Google sign-in, then paste the authorization code or full localhost redirect URL.",
+    ...(accounts.length >= maxAccounts ? [`Maximum of ${maxAccounts} Antigravity accounts reached; reconnect a saved account.`] : []),
+  ].join("\n")
+}
+
+export function formatAuthSummary(
+  accounts: Array<{ email?: string | null; enabled?: boolean }>,
+  maxAccounts: number,
+): string {
+  const lines = accounts.map((account) => {
+    const email = account.email?.trim() ? account.email : "Unnamed account"
+    return `- ${email}${account.enabled === false ? " (disabled)" : ""}`
+  })
+  return [
+    `Google Antigravity — saved accounts (${accounts.length}/${maxAccounts})`,
+    "",
+    ...(lines.length > 0 ? lines : ["- (none yet)"]),
+    "",
+    "Signing in again reconnects a saved account. Manage accounts with /antigravity.",
+    "One account per command. Run opencode auth login again to add another. Ctrl+C cancels.",
+    ...(accounts.length >= maxAccounts
+      ? [`Maximum of ${maxAccounts} Antigravity accounts reached. Sign in to an existing account or delete a saved account before adding another.`]
+      : []),
+  ].join("\n")
 }
 
 export function parseOAuthCallbackInput(value: string, expectedState: string): { code: string; state: string } {

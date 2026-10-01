@@ -26,12 +26,36 @@
 
 ### Changed
 
+- Account lists use small green/red `●` enabled-state markers, with a shared
+  legend/login footer instead of repeating the login hint beside each email.
+  Disabled text fallback, search, keyboard/mouse selection, and Esc remain.
+
 - V2 native engine is the sole router; V1 harness (`plugin.ts`, `cli.ts`,
   `server.ts`, `ui/`) and the `google_search` tool were removed
   (model-declared web search is still sanitized via D-SEARCH-MUTEX).
 - Documentation split: user guides (`docs/user/`), developer guides
   (`docs/dev/`), normative `docs/specs/00-07`. The `google` provider models
   register automatically; `plugins` (plural) is the V2 config key.
+- Login now uses an interactive pre-authorization Add/reconnect form,
+  not a printed menu. Browser opening is gated on the Add selection; the
+  stock host supports one account per invocation, with native Ctrl+C cancellation.
+  No custom host build or repeated-login metadata is required.
+  Plugin summary refreshes follow account-management mutations as well as login.
+- Quota dismissal no longer replaces unrelated dialogs with the account list;
+  explicit Back/Esc navigates, replacement/unload only disposes. Fresh quota
+  account state controls refresh availability. Packed-plugin host keymap and
+  renderer tests cover these boundaries with fixture data.
+- Quota uses one padded, themed dialog with aligned bars and styled key
+  hints. Bars fill available width and adapt to resizing, with aligned metadata
+  and a stacked narrow layout. The footer retains only `refresh ctrl+r`;
+  header/keyboard Esc returns to the list. It refreshes on open and on `ctrl+r`,
+  shows loading/failures inline,
+  and returns directly to the account list. Successful readings persist in
+  the locked account store; failed checks retain the last saved snapshot.
+  The standalone `Refresh quota` and `Use next` UI actions are removed;
+  rotation and RPC/tool selection support are unchanged.
+- Published JSX is compiled with the Solid/OpenTUI transform to preserve
+  reactivity. Bun renderer tests exercise the actual built view.
 
 ## [1.6.0] - 2026-02-20
 

@@ -4,9 +4,10 @@
 
 ```bash
 bun install
-bun run build          # tsc -p tsconfig.build.json (emit; .ts-suffixed runtime imports fail here)
+bun run build          # tsc declarations/modules + Solid/OpenTUI view compilation
 bun run typecheck      # tsc --noEmit
 bun run test           # vitest run (full suite)
+bun run test:tui       # clean build + native Bun rendering of the published view
 bunx vitest run src/plugin/auth.test.ts   # single file
 bunx vitest run -t "name"                 # single test by name
 bun run test:coverage
@@ -32,8 +33,26 @@ No linter or formatter is configured; style is enforced by convention
 - `rpc-transport.test.ts`: Effect-codec mirror of handler returns (host has
   no `@opencode/protocol` here); guards the omit-`undefined` transport rule.
 - `tui-behavior.test.ts`: pure TUI gates (`isInvalidRpcResponse`,
-  `isStaleMutate` — stale `{ ok: false }` takes the stale path, never the
-  success toast).
+   `isStaleMutate` — stale `{ ok: false }` takes the stale path, never the
+   success toast), plus deferred missing-account notice acknowledgement,
+   replacement, and unload regressions.
+- `tui-quota-controller.test.ts`: overlap protection, returned error status,
+  unexpected rejection/retry, late-result disposal, and navigation outcomes.
+- `test/tui-quota-render.test.ts`: native Bun/OpenTUI rendering of the built
+  account list verifies single-cell dot colors, the shared legend/login hint,
+   disabled text fallback, search/no-match, readable light-theme input colors,
+   selection, and Esc. Missing-account notice rendering and Enter/Esc commands
+   are also checked. The built quota
+  view (not mocked JSX): auto-refresh, loading, bar changes, failed-check
+  retention, disabled accounts, full-width bars, aligned metadata, resizing,
+  narrow layout, refresh-only footer, Esc command, and cleanup. The browser
+  resolution condition selects Solid's reactive runtime under Bun.
+- Optional host fixture verification: `antigravity-package.test.tsx` is
+  opt-in in the separate test checkout. Set `ANTIGRAVITY_TUI_ENTRY`
+  to the packed/installed plugin's `dist/src/tui.js`, then run the test from
+  `packages/tui`. This exercises real host keymap input, dialog replacement,
+  and cleanup with fixture RPC data. It skips when the installed artifact
+  path is absent.
 - `plugin/*` + subdirs: 20+ colocated suites — model resolution, schema and
   cross-model sanitization, quota fallback (Antigravity-first), rotation and
   hybrid selection, recovery and thinking-recovery, token, storage (v1–v4,
@@ -48,9 +67,9 @@ No linter or formatter is configured; style is enforced by convention
 
 - No tests in `src/antigravity/`; `script/` E2E is excluded from typecheck
   and live-endpoint E2E needs real quota.
-- The full `/antigravity` dialog/toast flow is not driven in automation —
-  mocking the host TUI context is disproportionate to the value. It stays
-  manually verified via [manual-testing.md](manual-testing.md).
+- The full installed host dialog stack, keyboard dispatch, and browser
+  lifecycle still require [manual-testing.md](manual-testing.md). Native
+  renderer/controller tests do not establish those integration behaviors.
 - Live successful-OAuth completion, post-success login rendering, the
   at-cap login branch, and host credential-store state after login are
   covered by unit tests only, not live runs (user participation required).

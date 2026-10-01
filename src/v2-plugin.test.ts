@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import plugin, { getFetchDestination, isGenerativeLanguageModelPath, normalizeFetchBody, parseOAuthCallbackInput } from "./v2-plugin.js"
+import plugin, { formatAuthInstructions, formatAuthSummary, getFetchDestination, isGenerativeLanguageModelPath, normalizeFetchBody, parseOAuthCallbackInput } from "./v2-plugin.js"
 
 describe("OpenCode V2 plugin entrypoint", () => {
   it("exports a stable V2 plugin definition", () => {
@@ -79,6 +79,51 @@ describe("normalizeFetchBody", () => {
     expect(isGenerativeLanguageModelPath("/v1/models/gemini-3-pro:streamGenerateContent")).toBe(true)
     expect(isGenerativeLanguageModelPath("/upload/v1beta/files")).toBe(false)
     expect(() => getFetchDestination("not a URL")).toThrow("absolute HTTP(S) URL")
+  })
+})
+
+describe("formatAuthSummary", () => {
+  it("lists saved accounts before authorization without a printed fake menu", () => {
+    const instructions = formatAuthSummary(
+      [{ email: "one@example.com" }, { email: "two@example.com", enabled: false }],
+      10,
+    )
+    expect(instructions).toContain("2/10")
+    expect(instructions).toContain("- one@example.com")
+    expect(instructions).toContain("- two@example.com (disabled)")
+    expect(instructions).toContain("/antigravity")
+    expect(instructions).toContain("One account per command")
+    expect(instructions).toContain("Run opencode auth login again")
+    expect(instructions).toContain("Ctrl+C cancels")
+    expect(instructions).not.toContain("Menu:")
+    expect(instructions).not.toContain("Maximum of 10")
+  })
+
+  it("marks an empty pool", () => {
+    const instructions = formatAuthSummary([], 10)
+    expect(instructions).toContain("0/10")
+    expect(instructions).toContain("(none yet)")
+  })
+
+  it("adds the capacity message at the account limit", () => {
+    const accounts = Array.from({ length: 10 }, (_, index) => ({ email: `saved-${index}@example.com` }))
+    const instructions = formatAuthSummary(accounts, 10)
+    expect(instructions).toContain("10/10")
+    expect(instructions).toContain("Maximum of 10 Antigravity accounts reached")
+  })
+
+  it("falls back to an unnamed label for blank emails", () => {
+    const instructions = formatAuthSummary([{ email: "   " }], 10)
+    expect(instructions).toContain("- Unnamed account")
+  })
+})
+
+describe("formatAuthInstructions", () => {
+  it("only describes completing the authorization already selected", () => {
+    const instructions = formatAuthInstructions([{ email: "one@example.com" }], 10)
+    expect(instructions).toContain("authorization code")
+    expect(instructions).not.toContain("Menu:")
+    expect(instructions).not.toContain("one@example.com")
   })
 })
 

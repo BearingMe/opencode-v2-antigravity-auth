@@ -226,14 +226,16 @@ non-streaming variant.
   `persistOAuthAccount` (dedupe by refresh then case-insensitive email,
   cap 10, single-lock `updateAccounts`), `persistRefreshRotation`, quota
   presentation (per-account 12 s timeout clamped 1–30 s, 15 m staleness,
-  fetch-abort-only cancellation).
+   fetch-abort-only cancellation, successful snapshot persistence matched
+   to the checked account generation, retaining newer/last-good cache).
 - `tui.ts` / `rpc.ts`: production `/antigravity` dialog + credential-free
   `AntigravityAccounts` RPC (`list/quota/verify/mutate/deleteAll/ping`),
   sharing the `account-service.ts` backend with the legacy
   `antigravity_accounts` tool. Transport rule: omit absent optionals, never
   send explicit `undefined` (host JSON codec rejects it); stale mutation
-  targets fail closed. Full dialog/toast flow has no automated coverage by
-  design — hand-verified via `../dev/manual-testing.md`.
+   targets fail closed. Quota controller and built native rendering have
+   automated coverage; installed host input/auth/stack integration needs
+   `../dev/manual-testing.md`.
 - `version.ts :: initAntigravityVersion` (changelog scrape 5 k chars →
   fallback; regex `\d+\.\d+\.\d+`; 5 s; `setAntigravityVersion` write-once).
 - `debug.ts` (file logs, 25-file rotation, Authorization masking, 12 k

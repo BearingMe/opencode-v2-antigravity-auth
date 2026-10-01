@@ -69,10 +69,11 @@ opencode run "Hello" --model=google/antigravity-gemini-3-flash
 
 ## Multi-account in 30 seconds
 
-- Add: `opencode auth login` (re-signing refreshes the same entry in place).
-- Manage: `/antigravity` — quota bars, refresh, rotation hint (`Use next`,
-  never pinning), enable/disable, verify with reconnect guidance,
-  confirm-guarded removal.
+- Add: `opencode auth login` — choose Add/reconnect before the browser opens
+  (re-signing refreshes the same entry in place). Adds one account per command;
+  rerun to add another (max 10), or press Ctrl+C to cancel. No custom host needed.
+- Manage: `/antigravity` — saved quota bars, refresh-on-open and manual refresh (`ctrl+r`),
+  enable/disable, verify with reconnect guidance, confirm-guarded removal.
 - Details: [docs/user/accounts-and-quota.md](docs/user/accounts-and-quota.md).
 
 ## Configuration (optional)
