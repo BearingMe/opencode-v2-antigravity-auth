@@ -100,7 +100,8 @@ describe("published account list", () => {
       await setup.flush()
       const frame = setup.captureCharFrame()
       expect(frame).toContain("number-10")
-      expect(frame).toContain("● enabled · ● disabled")
+      expect(frame).toContain("ctrl+t")
+      expect(frame).toContain("toggle")
       expect(frame.match(/Add accounts: opencode auth login/gu)).toHaveLength(1)
       commands.find((command) => command.id === "antigravity.list.select")!.run()
       expect(picked).toEqual(["9"])
@@ -142,7 +143,7 @@ describe("published account list", () => {
     try {
       await setup.flush()
       const frame = setup.captureCharFrame()
-      expect(frame).toContain("● enabled · ● disabled")
+      expect(frame).toContain("● enabled · ● disabled · ctrl+t toggle")
       expect(frame).toContain("Add accounts: opencode auth login")
     } finally {
       setup.renderer.destroy()
@@ -175,7 +176,7 @@ describe("published account list", () => {
       const frame = setup.captureCharFrame()
       expect(frame).toContain("● one@example.com")
       expect(frame).toContain("● two@example.com [disabled]")
-      expect(frame).toContain("● enabled · ● disabled")
+      expect(frame).toContain("● enabled · ● disabled · ctrl+t toggle")
       expect(frame.match(/Add accounts: opencode auth login/gu)).toHaveLength(1)
       const lines = setup.captureSpans().lines
       for (const [email, color] of [
@@ -202,6 +203,40 @@ describe("published account list", () => {
       expect(picked).toHaveLength(2)
       run("antigravity.list.close")
       expect(picked).toEqual(["two", "one", undefined])
+    } finally {
+      setup.renderer.destroy()
+    }
+  })
+
+  test("toggles account in place on ctrl+t", async () => {
+    let commands: Array<QuotaDialogKeymapCommand> = []
+    let toggledId: string | undefined
+    const setup = await testRender(
+      () =>
+        AccountListDialogView({
+          accounts: [{ id: "one", email: "one@example.com", enabled: true, description: "[selected]" }],
+          colors: { ...colors, selected: RGBA.fromHex("#333333") },
+          choose: () => {},
+          toggle: (id) => {
+            toggledId = id
+            return true
+          },
+          layer: (input) => {
+            commands = input().commands
+          },
+        }),
+      { width: 64, height: 22 },
+    )
+    try {
+      await setup.flush()
+      expect(setup.captureCharFrame()).toContain("● one@example.com")
+      expect(setup.captureCharFrame()).not.toContain("[disabled]")
+      const toggle = commands.find((command) => command.id === "antigravity.list.toggle")!
+      expect(toggle.bind).toBe("ctrl+t")
+      await toggle.run()
+      await setup.flush()
+      expect(toggledId).toBe("one")
+      expect(setup.captureCharFrame()).toContain("● one@example.com [disabled]")
     } finally {
       setup.renderer.destroy()
     }

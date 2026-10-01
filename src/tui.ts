@@ -5,6 +5,7 @@ import type { QuotaRefreshOutcome } from "./plugin/account-ui-format.js"
 import { MissingAccountDialogView, QuotaDialogView } from "./tui-quota-dialog.js"
 import { createQuotaDialogController } from "./tui-quota-controller.js"
 import { AccountListDialogView } from "./tui-account-list-dialog.js"
+import { DIALOG_SIZE } from "./tui-dialog-shell.js"
 
 type AccountAction = "show-quota" | "toggle-enabled" | "verify" | "remove" | "back"
 
@@ -163,11 +164,40 @@ export default Plugin.define({
           settle(id)
           context.ui.dialog.clear()
         }
+        const toggle = async (id: string): Promise<boolean> => {
+          const target = listing.accounts.find((entry) => entry.id === id)
+          if (!target) return false
+          try {
+            const outcome = (await context.client
+              .rpc(AntigravityAccounts)
+              .mutate(
+                { id: target.id, op: target.enabled ? "disable" : "enable" },
+                { location: rpcLocation(context) },
+              )) as MutateOutcome
+            if (isStaleMutate(outcome)) {
+              choose(undefined)
+              await toastStaleAccount()
+              await openList()
+              return false
+            }
+            target.enabled = !target.enabled
+            context.ui.toast.show({
+              title: "Antigravity accounts",
+              message: `${target.email} ${target.enabled ? "enabled" : "disabled"}.`,
+              variant: "success",
+            })
+            return true
+          } catch (error: unknown) {
+            toastRpcFailure(error)
+            return false
+          }
+        }
         context.ui.dialog.show(
           () =>
             AccountListDialogView({
               accounts: items,
               choose,
+              toggle,
               layer: (input) => context.keymap.layer(input),
               colors: {
                 base: context.theme.text.base,
@@ -182,7 +212,7 @@ export default Plugin.define({
           () => settle(undefined),
         )
         if (!settled) closeAccountList = () => choose(undefined)
-        context.ui.dialog.set({ size: "large" })
+        context.ui.dialog.set({ size: DIALOG_SIZE })
       })
       if (disposed || picked === undefined) return
       const selected = listing.accounts.find((entry) => entry.id === picked)
@@ -244,7 +274,7 @@ export default Plugin.define({
             settle(false)
             context.ui.dialog.clear()
           }
-        context.ui.dialog.set({ size: "medium" })
+        context.ui.dialog.set({ size: DIALOG_SIZE })
       })
       if (acknowledged && !disposed) await openList()
     }
@@ -332,7 +362,7 @@ export default Plugin.define({
         },
       )
       closeQuota = quotaCloser
-      context.ui.dialog.set({ size: "large" })
+      context.ui.dialog.set({ size: DIALOG_SIZE })
     }
 
     const openActions = async (account: ListAccount): Promise<void> => {

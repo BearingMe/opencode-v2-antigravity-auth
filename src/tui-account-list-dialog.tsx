@@ -1,7 +1,11 @@
+import { DialogShell } from "./tui-dialog-shell.js"
 import type { RGBA, ScrollBoxRenderable } from "@opentui/core"
-import { For, createSignal } from "solid-js"
+import { For, Show, createSignal } from "solid-js"
 import type { QuotaDialogLayer } from "./tui-quota-dialog.js"
 
+/**
+ * Account entry displayed in the account selection modal.
+ */
 export interface AccountListItem {
   id: string
   email: string
@@ -9,6 +13,9 @@ export interface AccountListItem {
   description: string
 }
 
+/**
+ * Presentation props for the account selection modal.
+ */
 export interface AccountListDialogProps {
   accounts: Array<AccountListItem>
   layer: QuotaDialogLayer
@@ -22,16 +29,42 @@ export interface AccountListDialogProps {
     inputBackground: RGBA
   }
   choose: (id: string | undefined) => void
+  toggle?: (id: string) => Promise<boolean> | void
 }
 
+/**
+ * Account list dialog view with keyboard navigation and active/inactive toggle.
+ */
 export function AccountListDialogView(props: AccountListDialogProps) {
   const [query, setQuery] = createSignal("")
   const [selected, setSelected] = createSignal(0)
+  const [overrides, setOverrides] = createSignal<Record<string, boolean>>({})
   let scroll: ScrollBoxRenderable | undefined
+
+  const accountList = () => {
+    const map = overrides()
+    return props.accounts.map((account) => {
+      const override = map[account.id]
+      if (override === undefined || override === account.enabled) return account
+      let desc = account.description
+      if (override) {
+        desc = desc.replace(/\[disabled\]\s*/g, "").trim()
+      } else if (!desc.includes("[disabled]")) {
+        desc = desc ? `[disabled] ${desc}` : "[disabled]"
+      }
+      return {
+        ...account,
+        enabled: override,
+        description: desc,
+      }
+    })
+  }
+
   const filtered = () =>
-    props.accounts.filter((account) =>
+    accountList().filter((account) =>
       `${account.email} ${account.description}`.toLowerCase().includes(query().trim().toLowerCase()),
     )
+  const selectedAccount = () => filtered()[selected()]
   const move = (delta: number) => {
     const length = filtered().length
     if (length === 0) return
@@ -51,8 +84,24 @@ export function AccountListDialogView(props: AccountListDialogProps) {
         title: "Manage account",
         bind: "return",
         run: () => {
-          const account = filtered()[selected()]
+          const account = selectedAccount()
           if (account) props.choose(account.id)
+        },
+      },
+      {
+        id: "antigravity.list.toggle",
+        title: "Toggle account active/inactive",
+        bind: "ctrl+t",
+        run: async () => {
+          const account = selectedAccount()
+          if (!account || !props.toggle) return
+          const current = account.enabled
+          const next = !current
+          setOverrides((prev) => ({ ...prev, [account.id]: next }))
+          const ok = await props.toggle(account.id)
+          if (ok === false) {
+            setOverrides((prev) => ({ ...prev, [account.id]: current }))
+          }
         },
       },
       {
@@ -65,15 +114,11 @@ export function AccountListDialogView(props: AccountListDialogProps) {
   }))
 
   return (
-    <box flexDirection="column" paddingLeft={4} paddingRight={4} paddingBottom={1} gap={1}>
-      <box flexDirection="row" justifyContent="space-between">
-        <text fg={props.colors.base}>
-          <b>Antigravity accounts</b>
-        </text>
-        <text fg={props.colors.muted} onMouseUp={() => props.choose(undefined)}>
-          esc
-        </text>
-      </box>
+    <DialogShell
+      title="Antigravity accounts"
+      colors={{ base: props.colors.base, muted: props.colors.muted }}
+      onClose={() => props.choose(undefined)}
+    >
       <input
         focused
         placeholder="Search accounts"
@@ -98,7 +143,6 @@ export function AccountListDialogView(props: AccountListDialogProps) {
           scroll = value
         }}
         maxHeight={6}
-        minHeight={1}
         scrollX={false}
         contentOptions={{ flexDirection: "column" }}
       >
@@ -123,16 +167,21 @@ export function AccountListDialogView(props: AccountListDialogProps) {
             </box>
           )}
         </For>
-        <text fg={props.colors.muted}>{filtered().length === 0 ? "No matching accounts." : ""}</text>
+        <Show when={filtered().length === 0}>
+          <text fg={props.colors.muted}>No matching accounts.</text>
+        </Show>
       </scrollbox>
-      <text fg={props.colors.muted}>{filtered()[selected()]?.description ?? ""}</text>
+      <Show when={Boolean(selectedAccount()?.description)}>
+        <text fg={props.colors.muted}>{selectedAccount()?.description}</text>
+      </Show>
       <box flexDirection="column">
         <text fg={props.colors.muted}>
           <span style={{ fg: props.colors.success }}>●</span> enabled ·{" "}
-          <span style={{ fg: props.colors.error }}>●</span> disabled
+          <span style={{ fg: props.colors.error }}>●</span> disabled ·{" "}
+          <span style={{ fg: props.colors.base }}>ctrl+t</span> toggle
         </text>
         <text fg={props.colors.muted}>Add accounts: opencode auth login</text>
       </box>
-    </box>
+    </DialogShell>
   )
 }

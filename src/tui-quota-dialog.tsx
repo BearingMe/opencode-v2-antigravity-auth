@@ -1,7 +1,8 @@
 import type { RGBA } from "@opentui/core"
-import { For, createSignal, onCleanup, onMount } from "solid-js"
+import { For, Show, createSignal, onCleanup, onMount } from "solid-js"
 import { formatResetCountdown, quotaBarParts, quotaViewPlaceholder } from "./plugin/account-ui-format.js"
 import type { QuotaDialogController } from "./tui-quota-controller.js"
+import { DialogShell } from "./tui-dialog-shell.js"
 
 export interface QuotaDialogKeymapCommand {
   id: string
@@ -50,20 +51,16 @@ export function MissingAccountDialogView(props: MissingAccountDialogProps) {
     ],
   }))
   return (
-    <box flexDirection="column" paddingLeft={4} paddingRight={4} paddingBottom={1} gap={1}>
-      <box flexDirection="row" justifyContent="space-between">
-        <text fg={props.colors.base}>
-          <b>{props.email}</b>
-        </text>
-        <text fg={props.colors.muted} onMouseUp={props.acknowledge}>
-          esc
-        </text>
-      </box>
+    <DialogShell
+      title={props.email}
+      colors={{ base: props.colors.base, muted: props.colors.muted }}
+      onClose={props.acknowledge}
+    >
       <text fg={props.colors.base}>That account is no longer saved.</text>
       <text fg={props.colors.muted} onMouseUp={props.acknowledge}>
         OK enter
       </text>
-    </box>
+    </DialogShell>
   )
 }
 
@@ -127,20 +124,13 @@ export function QuotaDialogView(props: QuotaDialogProps) {
   }
 
   return (
-    <box flexDirection="column" paddingLeft={4} paddingRight={4} paddingBottom={1} gap={1}>
-      <box flexDirection="row" justifyContent="space-between">
-        <text fg={props.colors.base}>
-          <b>Antigravity quota</b>
-        </text>
-        <text
-          fg={props.colors.muted}
-          onMouseUp={() => {
-            void props.controller.back()
-          }}
-        >
-          esc
-        </text>
-      </box>
+    <DialogShell
+      title="Antigravity quota"
+      colors={{ base: props.colors.base, muted: props.colors.muted }}
+      onClose={() => {
+        void props.controller.back()
+      }}
+    >
       <text fg={props.colors.muted}>{props.email}</text>
       <box
         flexDirection="column"
@@ -184,7 +174,9 @@ export function QuotaDialogView(props: QuotaDialogProps) {
       </box>
       <box flexDirection="column">
         <text fg={props.colors.muted}>{checked()}</text>
-        <text fg={state().failed ? props.colors.error : props.colors.muted}>{status()}</text>
+        <Show when={Boolean(status())}>
+          <text fg={state().failed ? props.colors.error : props.colors.muted}>{status()}</text>
+        </Show>
         <text fg={props.colors.muted}>{quotaViewPlaceholder()}</text>
       </box>
       <box flexDirection="row" gap={2} flexWrap="wrap">
@@ -198,6 +190,6 @@ export function QuotaDialogView(props: QuotaDialogProps) {
           <span style={{ fg: props.colors.muted }}> {props.shortcuts("antigravity.quota.refresh") ?? "ctrl+r"}</span>
         </text>
       </box>
-    </box>
+    </DialogShell>
   )
 }

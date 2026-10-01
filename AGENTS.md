@@ -194,6 +194,13 @@ Login (`opencode auth login`, one account per run) only adds/reconnects;
 (`list`, `quota`, `verify`, `mutate`, `deleteAll`, `ping`). Mutations use
 durable ids, omit `undefined` optionals, and fail closed on stale targets.
 
+### 7. Host Boundary Rule
+
+Never modify or couple to the OpenCode host application itself. OpenCode is an
+external runtime host; this repository is strictly an out-of-tree plugin that
+integrates solely through public `@opencode/plugin` APIs, typed RPC, and TUI
+surfaces. Do not attempt to patch or touch OpenCode core codebase.
+
 ## Dependencies
 
 - `zod ^4` — schema validation (NOT zod v3)
