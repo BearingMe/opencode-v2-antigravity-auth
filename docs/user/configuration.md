@@ -17,8 +17,9 @@ Config file precedence (lowest to highest):
 }
 ```
 
-Config files are validated as a whole: if any value fails validation, the
-file is rejected and defaults apply (a warning names the offending keys).
+Config files are validated as a whole: if any value fails validation, that
+file is ignored and lower-precedence settings remain (a warning names the
+offending keys).
 Environment overrides are applied individually — an invalid env value warns
 and is ignored on its own.
 

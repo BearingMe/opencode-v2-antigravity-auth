@@ -40,9 +40,8 @@ below), then exercise the packaged-install check in
 ## `dist/` hygiene
 
 `dist/` is gitignored build output, but stale files survive incremental
-builds: removed sources (V1 `plugin.ts`, `cli.ts`, `server.ts`, `ui/`,
-`plugin/search.ts`) previously lingered as compiled `dist/src/plugin*.js`
-until a clean rebuild. `bun run build` does not clean by itself, so:
+builds: removed sources previously lingered as compiled `dist/` output
+until a clean rebuild. `bun run build` cleans via `prebuild`, so:
 
 - Never hand-delete individual `dist/` files — clean the directory and
   rebuild (`bun run clean && bun run build`).

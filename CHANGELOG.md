@@ -30,7 +30,7 @@
   `server.ts`, `ui/`) and the `google_search` tool were removed
   (model-declared web search is still sanitized via D-SEARCH-MUTEX).
 - Documentation split: user guides (`docs/user/`), developer guides
-  (`docs/dev/`), normative `specs/00-07`. The `google` provider models
+  (`docs/dev/`), normative `docs/specs/00-07`. The `google` provider models
   register automatically; `plugins` (plural) is the V2 config key.
 
 ## [1.6.0] - 2026-02-20

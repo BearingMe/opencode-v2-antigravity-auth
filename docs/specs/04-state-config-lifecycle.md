@@ -4,7 +4,7 @@
 
 | State | Owner | Persistence | Invalidation |
 |---|---|---|---|
-| Account pool (`refreshToken, projectId, managedProjectId, email, enabled, rateLimits, cooldowns, fingerprints, cachedQuota, verification`) | `plugin/accounts.ts :: AccountManager`, persisted by `plugin/storage.ts` | `antigravity-accounts.json` v4, 0600, lockfile-guarded atomic writes | `invalid_grant` evicts; `saveAccountsReplace` for deletes; `clearAccounts` on non-OAuth loader |
+| Account pool (`refreshToken, projectId, managedProjectId, email, enabled, rateLimits, cooldowns, fingerprints, cachedQuota, verification`) | `plugin/accounts.ts :: AccountManager`, persisted by `plugin/storage.ts` | `antigravity-accounts.json` v4, 0600, lockfile-guarded atomic writes | `invalid_grant` evicts; deletes use single-lock `updateAccounts` replace-transactions with same-transaction tombstones |
 | OAuth session (`currentAuth`, native manager) | `v2-plugin.ts :: setup` closure | Memory only | Auth change / account mutation resets native manager (stops refresh queue, clears cached state) |
 | Project context cache | `plugin/project.ts` keyed by refresh (+pending dedup) | Memory | `invalidateProjectContextCache` on refresh rotation / `invalid_grant` |
 | Auth cache (refresh→details, prefer unexpired) | `plugin/cache.ts` | Memory | `clearCachedAuth` on `invalid_grant` |
@@ -20,9 +20,7 @@
 single-lock `updateAccounts` transactions with replace (not merge)
 semantics, tombstoning the removed identity in the same transaction.
 `saveAccounts` (merge-by-refreshToken) MUST NOT be used for deletes — it
-can resurrect deleted accounts. (`saveAccountsReplace` was the earlier
-spelling of this rule; `updateAccounts` is the current implementation and
-the only writer service code MUST use.)
+can resurrect deleted accounts.
 
 **Status:** Explicit (implementation + test evidence).
 
@@ -37,10 +35,16 @@ well as the 3-segment form with `managedProjectId`.
 
 ## Configuration
 
-Sources (precedence): user `~/.config/opencode/antigravity.json` THEN
-project `.opencode/antigravity.json` (partial Zod, `signature_cache`
-deep-merged) — `plugin/config/loader.ts :: loadConfig`; runtime singleton
+Sources (precedence, lowest to highest): schema defaults, then user
+`~/.config/opencode/antigravity.json` (`OPENCODE_CONFIG_DIR` overrides the
+config directory when set), then project `.opencode/antigravity.json`
+(partial Zod, `signature_cache` deep-merged), then documented
+`OPENCODE_ANTIGRAVITY_*` environment overrides (invalid values warn and are
+ignored) — `plugin/config/loader.ts :: loadConfig`; runtime singleton
 `initRuntimeConfig / getKeepThinking`.
+A config file that fails validation is ignored as a whole: lower-precedence
+settings remain (an invalid project file does not reset valid user
+settings to defaults); environment overrides apply individually.
 
 Key knobs and defaults (`config/schema.ts :: DEFAULT_CONFIG`): `quiet_mode`,
 `toast_scope root_only|all`, `debug/debug_tui/log_dir`, `keep_thinking`,
@@ -53,11 +57,11 @@ memory/disk/write}`, empty-response retries, `tool_id_recovery`,
 performance_first`, `max_cache_first 60`, `failure_ttl 3600`,
 soft quota `soft_quota 90` / `quota_refresh 15` / ttl-auto,
 health/token-bucket params, `auto_update`, `claude_prompt_auto_caching`
-(1.6.0, default off).
+(default off).
 `quota_fallback` is deprecated and ignored (Gemini fallback across pools is
 always on; see `quota-fallback.test.ts`).
-Header-normalization note (1.5.0): `x-goog-user-project` is stripped for all
-styles. Debug-sink split (1.6.0): `debug` = file only, `debug_tui` = TUI only.
+Header-normalization note: `x-goog-user-project` is stripped for all
+styles. Debug-sink split: `debug` = file only, `debug_tui` = TUI only.
 
 Validation: Zod partial schemas; malformed JSONC in the update checker is
 tolerated (`continue` / null, no-throw — `checker.test.ts`).

@@ -100,7 +100,7 @@ Schema: `assets/antigravity.schema.json`.
 - Developer: [docs/dev/README.md](docs/dev/README.md) (architecture,
   storage, RPC/TUI, quota contract, API, testing, manual checklist,
   maintainer ops)
-- Normative specs: `specs/00-07` (agent/reviewer source of truth)
+- Normative specs: `docs/specs/00-07` (agent/reviewer source of truth)
 - [Changelog](CHANGELOG.md)
 
 ## Compatibility

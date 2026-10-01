@@ -20,7 +20,7 @@ progress, task gates, or host internals.
 
 | Guide | Contents |
 |---|---|
-| [dev/README.md](dev/README.md) | Map of developer docs and normative `specs/` |
+| [dev/README.md](dev/README.md) | Map of developer docs and normative specs |
 | [dev/architecture.md](dev/architecture.md) | Request flow, module map, boundaries |
 | [dev/account-storage.md](dev/account-storage.md) | Store format, transactions, tombstones, credential precedence |
 | [dev/rpc-and-tui.md](dev/rpc-and-tui.md) | `AntigravityAccounts` RPC contract, `/antigravity` dialog, transport rules |
@@ -32,7 +32,7 @@ progress, task gates, or host internals.
 
 ## Normative specifications
 
-`specs/00-07` are the canonical rules for agents and reviewers
+[specs/00-07](specs/README.md) are the canonical rules for agents and reviewers
 (invariants, contracts, divergences `D-*`, open questions `U*`).
 Developer guides explain the system; `specs/` define what must stay true.
 When they disagree, `specs/` win for behavior and code evidence wins for facts.

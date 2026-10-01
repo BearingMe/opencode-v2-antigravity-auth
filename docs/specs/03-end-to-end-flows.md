@@ -6,10 +6,7 @@ Trigger: `opencode auth login` (one account per run; repeat to grow the
 pool to the 10-account cap).
 Participants: V2 form-less `google-oauth` method → `antigravity/oauth.ts` →
 `storage.ts` (via `account-service.ts`) → `project.ts` → `quota.ts`.
-(Historical V1: `cli.ts` → `server.ts` localhost listener → same tail;
-both deleted Task 2. Historical V2 intermediate: declared `accountAction` /
-`projectId` form fields — removed; the method now declares zero fields and
-renders prompt-free and Skip-free.)
+The method declares zero fields and renders prompt-free and Skip-free.
 
 1. Login instructions show live pool state (`Saved accounts: N/10` with
    disabled markers), the one-account-per-run note, and the `/antigravity`
@@ -39,8 +36,7 @@ failure tolerated; project failure tolerated to empty-project (deferred).
 Trigger: SDK call to `generativelanguage.googleapis.com/v1*/models/*:
 (generateContent|streamGenerateContent|countTokens)`.
 Participants: V2 `antigravityFetch` → `normalizeFetchBody` → native engine
-`executeAntigravityRequest` (`src/plugin/engine.ts`, sole router since
-Task 2) → `accounts → token → project → request → fetch(Antigravity) →
+`executeAntigravityRequest` (`src/plugin/engine.ts`, sole router) → `accounts → token → project → request → fetch(Antigravity) →
 streaming transformer`.
 
 1. V2: `requireOAuthAuth`; reject non-model GL paths; strip credentials for
@@ -95,6 +91,8 @@ without consuming the once-flag; non-created events ignored).
 `invalidatePackage` + success toast; unpinned → invalidate + info toast.
 All fire-and-forget (`setTimeout(0)`); toast failures swallowed; failures to
 debug log. Local-dev (`file://`) → warning toast, no check.
+Known limitation: the checker reads the legacy `plugin` (singular) config
+key, not V2 `plugins` (plural); local-path installs stay silent.
 
 ## F6 — Teardown
 

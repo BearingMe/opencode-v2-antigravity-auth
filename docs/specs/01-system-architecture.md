@@ -5,11 +5,11 @@
 | Part | Paths | Responsibility |
 |---|---|---|
 | Shared identity | `src/constants.ts`, `src/shims.d.ts`, `src/google-sdk.ts` | OAuth client id/secret/scopes/redirect, endpoint orders, header styles, version pinning, hardening prompts, search tuning |
-| Native engine | `src/plugin/engine.ts` | Request execution + rotation loop (ported from V1, Task 1; sole router since Task 2), unified OAuth refresh, thinking warmup |
+| Native engine | `src/plugin/engine.ts` | Request execution + rotation loop (sole router), unified OAuth refresh, thinking warmup |
 | V2 bridge | `src/v2-plugin.ts` | V2 `integration/provider/model/aisdk/tool/session/event` transforms; routes via the native engine |
 | OAuth leaf | `src/antigravity/oauth.ts` | PKCE URL build + code exchange + `loadCodeAssist` project discovery |
 | Auto-update | `src/hooks/auto-update-checker/*` | Root-session npm check, toast or pinned rewrite + cache invalidate |
-| Core domains | `src/plugin/*` + `cache/config/core/recovery/stores/transform` | Request transform, schema/thinking utils, accounts/rotation/quota/storage/fingerprint/project/refresh, recovery ×2, streaming, debug/logger, version, images (`search`, `cli`, `ui/`, `server` removed Tasks 2–3) |
+| Core domains | `src/plugin/*` + `cache/config/core/recovery/stores/transform` | Request transform, schema/thinking utils, accounts/rotation/quota/storage/fingerprint/project/refresh, recovery ×2, streaming, debug/logger, version, images |
 
 ## Dependency direction (normative)
 
@@ -25,20 +25,15 @@ plugin/* ──uses──> constants.ts (identity/endpoints/headers)
 transform/*, request-helpers ──should stay──> pure re: I/O
                    (except cache + config reads)
 ```
-(Historical diagram referencing `plugin.ts :: createAntigravityPlugin` was
-retired with the V1 deletion 2026-09-28, Task 2.)
 
-### Rule: R-ARCH-V2-DELEGATES-V1 (retargeted 2026-09-28, Task 2)
+### Rule: R-ARCH-V2-DELEGATES-V1
 
 **Requirement:** V2 MUST route ALL Antigravity model traffic through the
 native engine: `aisdk.hook("sdk") → antigravityFetch →
-executeAntigravityRequest` (`src/plugin/engine.ts`, ported from the V1
-hot-path loop: rotation, soft-quota gate, Retry-After/RetryInfo, thinking
+executeAntigravityRequest` (`src/plugin/engine.ts`: rotation,
+soft-quota gate, Retry-After/RetryInfo, thinking
 warmup, toasts, `invalid_grant` eviction, gemini-only dual-pool fallback).
-The V1 harness is deleted (`src/plugin.ts`, `cli.ts`, `server.ts`, `ui/`,
-`@opencode-ai/plugin` removed; `verifyAccountAccess` moved to
-`src/plugin/verify.ts`). No parallel router, no legacy fallback;
-`OPENCODE_ANTIGRAVITY_V2_LEGACY_FETCH` is retired.
+No parallel router, no legacy fallback.
 
 **Rationale:** Single routing implementation; prevents quota/signature drift.
 
@@ -47,7 +42,7 @@ The V1 harness is deleted (`src/plugin.ts`, `cli.ts`, `server.ts`, `ui/`,
 - `src/plugin/engine.ts :: executeAntigravityRequest`,
   `:: refreshOAuthCredentialUnified`, `:: isNativeEngineEnabled`
 - `src/v2-plugin.ts :: loadRoutedFetch`, `:: antigravityFetch`
-- `src/plugin/engine.test.ts` (13 parity tests),
+- `src/plugin/engine.test.ts`,
   `src/v2-plugin.setup.test.ts` :: routes SDK JSON through native engine
 
 **Status:** Explicit.
@@ -87,17 +82,14 @@ in `request.ts`, `accounts.ts`, `storage.ts`, `quota.ts`, `project.ts`.
   (`src/plugin/transform/types.ts`, `src/plugin/core/streaming/types.ts`).
 - `antigravity_accounts` tool (`src/v2-plugin.ts :: manageAccounts`,
   backed by `src/plugin/account-service.ts`).
-  (`google_search` tool + `src/plugin/search.ts` REMOVED 2026-09-28, Task 3;
-  the D-SEARCH-MUTEX guard in `transform/gemini.ts` stays.)
+  No search tool is registered; the D-SEARCH-MUTEX guard in
+  `transform/gemini.ts` stays for SDK-supplied search tools.
 - Production account UI (`src/tui.ts :: /antigravity` dialog,
   `src/rpc.ts :: AntigravityAccounts` with `list/quota/verify/mutate/
   deleteAll/ping`) — the interactive management surface sharing the
-  `account-service.ts` backend with the legacy tool. The `/antigravity-smoke`
-  command and `ANTIGRAVITY_RPC_SMOKE_OK` ping were removed with the smoke
-  phase; `ping` now returns `ANTIGRAVITY_RPC_ACCOUNTS_OK`.
-- (Historical, REMOVED Task 2) `AuthMenuAction/AccountAction` UI actions
-  (`src/plugin/ui/auth-menu.ts`), `cli.ts` readline prompts, `server.ts`
-  localhost listener. V2 replacements: form-less `google-oauth` integration
+  `account-service.ts` backend with the legacy tool. `ping` returns
+  `ANTIGRAVITY_RPC_ACCOUNTS_OK`.
+- V2 login surface: form-less `google-oauth` integration
   method (no declared fields, prompt-free and Skip-free; one account per
   login run) + `antigravity_accounts` tool + `/antigravity` dialog +
   manual code/URL paste callback.

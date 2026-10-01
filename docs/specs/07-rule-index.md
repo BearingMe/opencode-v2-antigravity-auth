@@ -1,4 +1,4 @@
-# 07 — Normative Rule Index (Oracle quick lookup)
+# 07 — Normative Rule Index
 
 How to read: each rule states a MUST/SHOULD/MAY. Status = Explicit (code,
 test, or contract evidence) | Strong (repeated consistent behavior) |
@@ -6,9 +6,10 @@ Inferred (likely intent). Details live in the referenced sections.
 
 ## Routing and scope
 
-- R-ARCH-V2-DELEGATES-V1 (Explicit, §01; retargeted Task 2): V2 MUST route
+- R-ARCH-V2-DELEGATES-V1 (Explicit, §01): V2 MUST route
   all model traffic through the native engine (`src/plugin/engine.ts`).
-  The V1 loader is deleted; no parallel router, no legacy fallback.
+  No parallel router, no legacy fallback. The name is historical; the
+  requirement is the current native engine.
 - R-ARCH-NO-BYPASS-SDK (Explicit, §01): OAuth models MUST use
   `aisdk:<google-sdk.js>`; API-key Gemini MUST NOT receive `options.fetch`.
 - R-FETCH-SCOPE (Explicit, §05): only absolute http(s) GL model paths
@@ -23,8 +24,15 @@ Inferred (likely intent). Details live in the referenced sections.
   single-lock `updateAccounts` replace-transactions (with same-transaction
   tombstoning), never merging `saveAccounts`.
 - Max 10 accounts; dedupe by refresh token or case-insensitive email
-  preserving `addedAt` (Explicit, F1).
+  preserving `addedAt` and the durable id (Explicit, F1).
 - Out-of-range/unknown account actions are messages, not writes (Explicit).
+- RPC/TUI mutations address durable ids only, never indices; unknown ids
+  fail closed (Explicit, §02).
+- RPC outputs MUST be credential-free and MUST omit absent optionals rather
+  than sending explicit `undefined` (Explicit, §02).
+- Deletes MUST tombstone the removed identity in the same `updateAccounts`
+  transaction; tombstones are bounded and generation-aware (Explicit,
+  §02/§04).
 
 ## Quota and rotation
 
@@ -35,6 +43,10 @@ Inferred (likely intent). Details live in the referenced sections.
 - `Retry-After` respected with ≥ 2 s floor (Explicit).
 - `googleSearch + functionDeclarations` MUST NOT be sent together; drop
   web_search with warn (Explicit, D-SEARCH-MUTEX).
+- Quota `0` means genuinely exhausted; unknown (missing, non-finite, or
+  out-of-range fractions) MUST render as `null`/unknown, never `0` or
+  clamped. Failed refreshes keep the last good cached reading (Explicit,
+  §02/quota-contract).
 
 ## Thinking signatures (external-backed)
 
@@ -55,22 +67,20 @@ Inferred (likely intent). Details live in the referenced sections.
 - `exchangeAntigravity` never throws (`failed{error}`); userinfo/project
   failures tolerated to degraded-but-continuable states (Explicit).
 - `invalid_grant` MUST evict project cache + clear cached auth (Explicit;
-  single unified refresh path since Task 1, D-REFRESH-DUAL resolved and
-  re-confirmed 2026-09-29; the old V2 generic-error divergence note is
-  retired).
+  single unified refresh path, D-REFRESH-DUAL).
 - Session recovery gated by `session_recovery`; dedup in-flight errors;
   toasts never throw; recovery-success toast honors `quiet_mode` and
-  `toast_scope=root_only` with explicit session ID (Explicit, Task 4).
+  `toast_scope=root_only` with explicit session ID (Explicit).
   The `session.retry` hook is provider-agnostic: recoverable-pattern
   errors in NON-Google sessions also trigger recovery (D-RETRY-GLOBAL) —
   do not assume Google-only.
 - Child tracker is duplicate-safe: re-remembering a tracked id at
-  capacity MUST NOT evict a different child (Explicit, F-UP-7).
+  capacity MUST NOT evict a different child (Explicit).
 - Fetch-path toasts are fail-open: unknown sessions classify as ROOT
-  (session ID unavailable at the fetch call site, Oracle-verified), so
+  (session ID unavailable at the fetch call site), so
   `toast_scope=root_only` suppression applies to update checks and
   recovery toasts, not fetch-path toasts (Accepted exception to
-  R-LIFECYCLE-ROOT-ONLY-CHILD, Task 4).
+  R-LIFECYCLE-ROOT-ONLY-CHILD).
 - Update checks root-sessions-only; once per instance; child MUST NOT
   consume the flag; all failures silent-to-debug-log (Explicit,
   R-LIFECYCLE-ROOT-ONLY-CHILD).
@@ -98,7 +108,7 @@ Inferred (likely intent). Details live in the referenced sections.
   extensionless relative imports — `.ts`-suffixed imports pass `typecheck`
   but fail `bun run build` with TS5097 (Explicit).
 
-## What the Oracle MUST leave unresolved
+## What to leave unresolved
 
 U1–U6 in §06. Do not invent quota numbers, endpoint-order optimality,
 collision probabilities, cap precedence, per-family staging intent, or

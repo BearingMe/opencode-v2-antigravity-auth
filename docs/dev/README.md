@@ -1,7 +1,7 @@
 # Developer docs
 
 Developer guides explain **how the plugin works and how it is verified**.
-Normative rules live in `specs/00-07`; when a guide and `specs/` disagree on
+Normative rules live in `../specs/00-07`; when a guide and `specs/` disagree on
 required behavior, `specs/` win. When any doc and the code disagree on facts,
 the code wins — fix the doc.
 

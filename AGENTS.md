@@ -33,7 +33,8 @@ No linter or formatter is configured. Style is enforced by convention (see below
 - `strict: true` with extra strictness: `noUncheckedIndexedAccess`, `noImplicitOverride`, `noFallthroughCasesInSwitch`
 - `verbatimModuleSyntax: true` — use `import type` for type-only imports
 - `target: ESNext`, `module: Preserve`, `moduleResolution: bundler`
-- `allowImportingTsExtensions: true` — use `.ts` extensions in imports
+- `allowImportingTsExtensions: true` for `typecheck` (`tsconfig.json`) —
+  `tsconfig.build.json` sets it to `false` for emit (see Imports exception)
 - No path aliases — all imports are relative
 
 ## Code Style
@@ -41,7 +42,7 @@ No linter or formatter is configured. Style is enforced by convention (see below
 ### Imports
 - Use `import type { ... }` for type-only imports (enforced by `verbatimModuleSyntax`)
 - Named imports only — no default imports in src/
-- Relative paths with `.ts` extensions: `import { foo } from "./bar.ts"`
+- Relative paths; test sources may use `.ts` extensions (`import { foo } from "./bar.ts"`)
 - Order: node builtins > external packages > local modules
 - Exception: `tsconfig.build.json` sets `allowImportingTsExtensions: false`
   (TS5097 under emit), so NON-TEST runtime sources MUST use emit-compatible
@@ -180,7 +181,7 @@ durable ids, omit `undefined` optionals, and fail closed on stale targets.
 
 - User guides (`docs/user/`) describe what users can do. Developer guides
   (`docs/dev/`) describe how it works and how it is verified. Normative
-  rules live in `specs/00-07` — link to them, do not duplicate them.
+  rules live in `docs/specs/00-07` — link to them, do not duplicate them.
 - Task plans, progress reports, transcripts, and investigation dumps do NOT
   belong in maintained docs. Keep temporary artifacts outside the repo;
   integrate only durable findings into an existing canonical document.
@@ -193,5 +194,5 @@ durable ids, omit `undefined` optionals, and fail closed on stale targets.
 - [README.md](README.md) — Install, login, `/antigravity`, links
 - [docs/README.md](docs/README.md) — Full doc index (user + dev)
 - [docs/dev/README.md](docs/dev/README.md) — Developer map + host target
-- [specs/07-rule-index.md](specs/07-rule-index.md) — Normative rule lookup
+- [docs/specs/07-rule-index.md](docs/specs/07-rule-index.md) — Normative rule lookup
 - [CHANGELOG.md](CHANGELOG.md) — Version history
