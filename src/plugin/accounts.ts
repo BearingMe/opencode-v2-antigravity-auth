@@ -150,7 +150,7 @@ export type QuotaKey = BaseQuotaKey | `${BaseQuotaKey}:${string}`
 
 export interface ManagedAccount {
   index: number
-  /** Durable account id carried through from disk; backfilled on save. */
+
   id?: string
   email?: string
   addedAt: number
@@ -171,13 +171,13 @@ export interface ManagedAccount {
   cooldownReason?: CooldownReason
   touchedForQuota: Record<string, number>
   consecutiveFailures?: number
-  /** Timestamp of last failure for TTL-based reset of consecutiveFailures */
+
   lastFailureTime?: number
-  /** Per-account device fingerprint for rate limit mitigation */
+
   fingerprint?: import("./fingerprint").Fingerprint
-  /** History of previous fingerprints for this account */
+
   fingerprintHistory?: FingerprintVersion[]
-  /** Cached quota data from last checkAccountsQuota() call */
+
   cachedQuota?: Partial<Record<QuotaGroup, QuotaGroupSummary>>
   cachedQuotaUpdatedAt?: number
   verificationRequired?: boolean
@@ -269,10 +269,6 @@ function clearExpiredRateLimits(account: ManagedAccount): void {
  * When model is null/undefined, we fall back based on family:
  * - Claude → "claude" quota group
  * - Gemini → "gemini-pro" (conservative fallback; may misclassify flash models)
- *
- * @param family - The model family ("claude" | "gemini")
- * @param model - Optional model string for precise resolution
- * @returns The QuotaGroup to use for soft quota checks
  */
 export function resolveQuotaGroup(family: ModelFamily, model?: string | null): QuotaGroup {
   if (model) {
@@ -838,11 +834,6 @@ export class AccountManager {
    * Used to determine whether to switch accounts vs fall back to gemini-cli:
    * - If true: Switch to another account (preserve antigravity priority)
    * - If false: All accounts exhausted antigravity, safe to fall back to gemini-cli
-   *
-   * @param currentAccountIndex - Index of the current account (will be excluded from check)
-   * @param family - Model family ("gemini" or "claude")
-   * @param model - Optional model name for model-specific rate limits
-   * @returns true if any other enabled, non-cooling-down account has antigravity available
    */
   hasOtherAccountWithAntigravityAvailable(
     currentAccountIndex: number,
@@ -1288,8 +1279,6 @@ export class AccountManager {
 
   /**
    * Regenerate fingerprint for an account, saving the old one to history.
-   * @param accountIndex - Index of the account to regenerate fingerprint for
-   * @returns The new fingerprint, or null if account not found
    */
   regenerateAccountFingerprint(accountIndex: number): Fingerprint | null {
     const account = this.accounts[accountIndex]
@@ -1325,9 +1314,6 @@ export class AccountManager {
 
   /**
    * Restore a fingerprint from history for an account.
-   * @param accountIndex - Index of the account
-   * @param historyIndex - Index in the fingerprint history to restore from (0 = most recent)
-   * @returns The restored fingerprint, or null if account/history not found
    */
   restoreAccountFingerprint(accountIndex: number, historyIndex: number): Fingerprint | null {
     const account = this.accounts[accountIndex]
@@ -1367,8 +1353,6 @@ export class AccountManager {
 
   /**
    * Get fingerprint history for an account.
-   * @param accountIndex - Index of the account
-   * @returns Array of fingerprint versions, or empty array if not found
    */
   getAccountFingerprintHistory(accountIndex: number): FingerprintVersion[] {
     const account = this.accounts[accountIndex]

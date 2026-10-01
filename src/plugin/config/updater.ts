@@ -1,9 +1,3 @@
-/**
- * OpenCode configuration file updater.
- *
- * Updates ~/.config/opencode/opencode.json(c) with plugin models.
- */
-
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { homedir } from "node:os"
@@ -33,7 +27,6 @@ export interface OpencodeConfig {
 }
 
 export interface UpdateConfigOptions {
-  /** Override the config file path (for testing) */
   configPath?: string
 }
 
@@ -99,9 +92,6 @@ export function getOpencodeConfigPath(): string {
  * - $schema and other top-level config keys
  * - Non-google provider sections
  * - Other settings within google provider (except models)
- *
- * @param options - Optional configuration (e.g., custom configPath for testing)
- * @returns UpdateConfigResult with success status and path
  */
 export async function updateOpencodeConfig(options: UpdateConfigOptions = {}): Promise<UpdateConfigResult> {
   const configPath = options.configPath ?? getOpencodeConfigPath()

@@ -438,7 +438,6 @@ export function logToast(message: string, variant: "info" | "warning" | "success
 
 /**
  * Logs retry attempt information.
- * @param maxAttempts - Use -1 for unlimited retries
  */
 export function logRetryAttempt(attempt: number, maxAttempts: number, reason: string, delayMs?: number): void {
   runWithDebugEnabled(() => {

@@ -1,32 +1,20 @@
-/**
- * Account Rotation System
- *
- * Implements advanced account selection algorithms:
- * - Health Score: Track account wellness based on success/failure
- * - LRU Selection: Prefer accounts with longest rest periods
- * - Jitter: Add random variance to break predictable patterns
- *
- * Used by 'hybrid' strategy for improved ban prevention and load distribution.
- */
-
 // ============================================================================
 // HEALTH SCORE SYSTEM
 // ============================================================================
 
 export interface HealthScoreConfig {
-  /** Initial score for new accounts (default: 70) */
   initial: number
-  /** Points added on successful request (default: 1) */
+
   successReward: number
-  /** Points removed on rate limit (default: -10) */
+
   rateLimitPenalty: number
-  /** Points removed on failure (auth, network, etc.) (default: -20) */
+
   failurePenalty: number
-  /** Points recovered per hour of rest (default: 2) */
+
   recoveryRatePerHour: number
-  /** Minimum score to be considered usable (default: 50) */
+
   minUsable: number
-  /** Maximum score cap (default: 100) */
+
   maxScore: number
 }
 
@@ -166,10 +154,6 @@ export class HealthScoreTracker {
 /**
  * Add random jitter to a delay value.
  * Helps break predictable timing patterns.
- *
- * @param baseMs - Base delay in milliseconds
- * @param jitterFactor - Fraction of base to vary (default: 0.3 = ±30%)
- * @returns Jittered delay in milliseconds
  */
 export function addJitter(baseMs: number, jitterFactor: number = 0.3): number {
   const jitterRange = baseMs * jitterFactor
@@ -179,10 +163,6 @@ export function addJitter(baseMs: number, jitterFactor: number = 0.3): number {
 
 /**
  * Generate a random delay within a range.
- *
- * @param minMs - Minimum delay in milliseconds
- * @param maxMs - Maximum delay in milliseconds
- * @returns Random delay between min and max
  */
 export function randomDelay(minMs: number, maxMs: number): number {
   return Math.round(minMs + Math.random() * (maxMs - minMs))
@@ -222,10 +202,8 @@ export function sortByLruWithHealth(accounts: AccountWithMetrics[], minHealthSco
     })
 }
 
-/** Stickiness bonus added to current account's score to prevent unnecessary switching */
 const STICKINESS_BONUS = 150
 
-/** Minimum score advantage required to switch away from current account */
 const SWITCH_THRESHOLD = 100
 
 /**
@@ -234,12 +212,6 @@ const SWITCH_THRESHOLD = 100
  * 2. Calculate priority score: health (2x) + tokens (5x) + freshness (0.1x)
  * 3. Apply stickiness bonus to current account
  * 4. Only switch if another account beats current by SWITCH_THRESHOLD
- *
- * @param accounts - All accounts with their metrics
- * @param tokenTracker - Token bucket tracker for token balances
- * @param currentAccountIndex - Currently active account index (for stickiness)
- * @param minHealthScore - Minimum health score to be considered
- * @returns Best account index, or null if none available
  */
 export function selectHybridAccount(
   accounts: AccountWithMetrics[],
@@ -315,11 +287,10 @@ function calculateHybridScore(account: AccountWithTokens, maxTokens: number): nu
 // ============================================================================
 
 export interface TokenBucketConfig {
-  /** Maximum tokens per account (default: 50) */
   maxTokens: number
-  /** Tokens regenerated per minute (default: 6) */
+
   regenerationRatePerMinute: number
-  /** Initial tokens for new accounts (default: 50) */
+
   initialTokens: number
 }
 
@@ -364,7 +335,6 @@ export class TokenBucketTracker {
 
   /**
    * Check if account has enough tokens for a request.
-   * @param cost Cost of the request (default: 1)
    */
   hasTokens(accountIndex: number, cost: number = 1): boolean {
     return this.getTokens(accountIndex) >= cost
@@ -372,7 +342,6 @@ export class TokenBucketTracker {
 
   /**
    * Consume tokens for a request.
-   * @returns true if tokens were consumed, false if insufficient
    */
   consume(accountIndex: number, cost: number = 1): boolean {
     const current = this.getTokens(accountIndex)

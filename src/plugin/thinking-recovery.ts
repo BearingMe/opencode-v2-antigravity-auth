@@ -1,14 +1,3 @@
-/**
- * Thinking Recovery Module
- *
- * Minimal implementation for recovering from corrupted thinking state.
- * When Claude's conversation history gets corrupted (thinking blocks stripped/malformed),
- * this module provides a "last resort" recovery by closing the current turn and starting fresh.
- *
- * Philosophy: "Let it crash and start again" - Instead of trying to fix corrupted state,
- * we abandon the corrupted turn and let Claude generate fresh thinking.
- */
-
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -17,17 +6,16 @@
  * Conversation state for thinking mode analysis
  */
 export interface ConversationState {
-  /** True if we're in an incomplete tool use loop (ends with functionResponse) */
   inToolLoop: boolean
-  /** Index of first model message in current turn */
+
   turnStartIdx: number
-  /** Whether the TURN started with thinking */
+
   turnHasThinking: boolean
-  /** Index of last model message */
+
   lastModelIdx: number
-  /** Whether last model msg has thinking */
+
   lastModelHasThinking: boolean
-  /** Whether last model msg has tool calls */
+
   lastModelHasToolCalls: boolean
 }
 
@@ -313,9 +301,6 @@ export function needsThinkingRecovery(state: ConversationState): boolean {
  * 1. Has functionCall parts (typical thinking flow produces tool calls)
  * 2. No thinking parts (thought: true)
  * 3. No text content before functionCall (thinking responses usually have text)
- *
- * @param msg - A single message from the conversation
- * @returns true if the message looks like thinking was stripped
  */
 export function looksLikeCompactedThinkingTurn(msg: any): boolean {
   if (!msg || typeof msg !== "object") return false
@@ -352,10 +337,6 @@ export function looksLikeCompactedThinkingTurn(msg: any): boolean {
 
 /**
  * Checks if any message in the current turn looks like it was compacted.
- *
- * @param contents - Full conversation contents
- * @param turnStartIdx - Index of the first model message in current turn
- * @returns true if any model message in the turn looks compacted
  */
 export function hasPossibleCompactedThinking(contents: any[], turnStartIdx: number): boolean {
   if (!Array.isArray(contents) || turnStartIdx < 0) return false

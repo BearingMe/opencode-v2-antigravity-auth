@@ -1,13 +1,3 @@
-/**
- * Structured Logger for Antigravity Plugin
- *
- * Logging behavior:
- * - debug controls file logs only (via debug.ts)
- * - debug_tui controls TUI log panel only
- * - either sink can be enabled independently
- * - OPENCODE_ANTIGRAVITY_CONSOLE_LOG=1 → console output (independent of debug flags)
- */
-
 import type { PluginClient } from "./types"
 import { isDebugTuiEnabled } from "./debug"
 import { isTruthyFlag, writeConsoleLog } from "./logging-utils"
@@ -42,9 +32,6 @@ export function initLogger(client: PluginClient): void {
 
 /**
  * Create a logger instance for a specific module.
- *
- * @param module - The module name (e.g., "refresh-queue", "transform.claude")
- * @returns Logger instance with debug, info, warn, error methods
  *
  * @example
  * ```typescript

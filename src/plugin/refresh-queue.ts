@@ -1,21 +1,3 @@
-/**
- * Proactive Token Refresh Queue
- *
- * Ported from LLM-API-Key-Proxy's BackgroundRefresher.
- *
- * This module provides background token refresh to ensure OAuth tokens
- * remain valid without blocking user requests. It periodically checks
- * all accounts and refreshes tokens that are approaching expiry.
- *
- * Features:
- * - Non-blocking background refresh (doesn't block requests)
- * - Configurable refresh buffer (default: 30 minutes before expiry)
- * - Configurable check interval (default: 5 minutes)
- * - Serialized refresh to prevent concurrent refresh storms
- * - Integrates with existing AccountManager and token refresh logic
- * - Silent operation: no console output, uses structured logger
- */
-
 import type { AccountManager, ManagedAccount } from "./accounts"
 import type { PluginClient, OAuthAuthDetails } from "./types"
 import { refreshAccessToken } from "./token"
@@ -23,13 +5,11 @@ import { createLogger } from "./logger"
 
 const log = createLogger("refresh-queue")
 
-/** Configuration for the proactive refresh queue */
 export interface ProactiveRefreshConfig {
-  /** Enable proactive token refresh (default: true) */
   enabled: boolean
-  /** Seconds before expiry to trigger proactive refresh (default: 1800 = 30 minutes) */
+
   bufferSeconds: number
-  /** Interval between refresh checks in seconds (default: 300 = 5 minutes) */
+
   checkIntervalSeconds: number
 }
 
@@ -39,7 +19,6 @@ export const DEFAULT_PROACTIVE_REFRESH_CONFIG: ProactiveRefreshConfig = {
   checkIntervalSeconds: 300, // 5 minutes
 }
 
-/** State for tracking refresh operations */
 interface RefreshQueueState {
   isRunning: boolean
   intervalHandle: ReturnType<typeof setInterval> | null

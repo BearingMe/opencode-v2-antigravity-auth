@@ -182,17 +182,17 @@ export interface AccountMetadataV3 {
   rateLimitResetTimes?: RateLimitStateV3
   coolingDownUntil?: number
   cooldownReason?: CooldownReason
-  /** Per-account device fingerprint for rate limit mitigation */
+
   fingerprint?: import("./fingerprint").Fingerprint
   fingerprintHistory?: import("./fingerprint").FingerprintVersion[]
-  /** Set when Google asks the user to verify this account before requests can continue. */
+
   verificationRequired?: boolean
   verificationRequiredAt?: number
   verificationRequiredReason?: string
   verificationUrl?: string
   lastVerificationAt?: number
   lastVerificationStatus?: "ok" | "blocked" | "error"
-  /** Cached soft quota data */
+
   cachedQuota?: Record<string, { remainingFraction?: number; resetTime?: string; modelCount: number }>
   cachedQuotaUpdatedAt?: number
 }
@@ -247,7 +247,6 @@ export interface RemovedAccountTombstone {
  * "unreappearable" identities is not possible. */
 export const MAX_TOMBSTONES = 50
 
-/** Deterministic credential-free identity for token matching. */
 export function fingerprintRefreshToken(refreshToken: string): string {
   return createHash("sha256").update(refreshToken, "utf8").digest("hex")
 }
@@ -257,7 +256,6 @@ function normalizeTombstoneEmail(email?: string): string | undefined {
   return normalized ? normalized : undefined
 }
 
-/** Builds a tombstone for a removed account. */
 export function tombstoneForAccount(
   account: { id?: string; refreshToken: string; email?: string },
   removedAt: number = Date.now(),
@@ -341,7 +339,6 @@ export function tombstoneMatchesReAdd(
   return false
 }
 
-/** True when any tombstone identifies this account. */
 export function isTombstoned(
   account: { id?: string; refreshToken?: string; email?: string },
   tombstones?: RemovedAccountTombstone[],
@@ -352,7 +349,6 @@ export function isTombstoned(
   return tombstones.some((tombstone) => tombstoneMatchesAccount(tombstone, account))
 }
 
-/** Drops every account identified by a tombstone. */
 export function filterTombstonedAccounts<T extends { id?: string; refreshToken?: string; email?: string }>(
   accounts: T[],
   tombstones?: RemovedAccountTombstone[],
@@ -373,7 +369,6 @@ function isValidTombstone(value: unknown): value is RemovedAccountTombstone {
   return hasIdentity && typeof entry.removedAt === "number" && Number.isFinite(entry.removedAt)
 }
 
-/** Drops malformed tombstone entries from untrusted disk data. */
 export function sanitizeTombstones(value: unknown): RemovedAccountTombstone[] | undefined {
   if (value === undefined) {
     return undefined

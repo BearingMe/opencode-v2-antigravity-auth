@@ -1,15 +1,3 @@
-/**
- * Signature cache for persisting thinking block signatures to disk.
- *
- * Features (based on LLM-API-Key-Proxy's ProviderCache):
- * - Dual-TTL system: short memory TTL, longer disk TTL
- * - Background disk persistence with batched writes
- * - Atomic writes with temp file + move pattern
- * - Automatic cleanup of expired entries
- *
- * Cache key format: `${sessionId}:${modelId}`
- */
-
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, unlinkSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { homedir } from "node:os"
@@ -24,11 +12,11 @@ import { ensureGitignoreSync } from "../storage"
 interface CacheEntry {
   value: string
   timestamp: number
-  /** Full thinking text content (optional, for recovery) */
+
   thinkingText?: string
-  /** Preview of the thinking text for debugging */
+
   textPreview?: string
-  /** Tool call IDs associated with this thinking block */
+
   toolIds?: string[]
 }
 

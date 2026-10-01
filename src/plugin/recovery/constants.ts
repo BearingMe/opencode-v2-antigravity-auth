@@ -1,9 +1,3 @@
-/**
- * Constants for session recovery storage paths.
- *
- * Based on oh-my-opencode/src/hooks/session-recovery/constants.ts
- */
-
 import { join } from "node:path"
 import { homedir } from "node:os"
 

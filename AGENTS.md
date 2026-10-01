@@ -101,6 +101,25 @@ Git hooks managed via Husky + lint-staged (pre-commit: eslint --fix + prettier) 
 - `createLogger("module-name")` for structured logging
 - `console.log` only for CLI/user-facing output
 
+### Documentation
+
+- No file headers in `src/` modules
+- Every exported symbol and private helper uses JSDoc (`/** ... */`)
+- For `*.test.ts`, document helper functions only (not `describe` or `it` blocks)
+- Format:
+  ```ts
+  /**
+   * <one to three lines description>
+   *
+   * @example <example>
+   * @throws <throw when applied>
+   * @deprecated <keep existing only>
+   */
+  ```
+- Omit `@param`, `@returns`, and trailing double-space line breaks
+- Use blank lines between sections, never trailing spaces
+- Include `@example`, `@throws`, and `@deprecated` only when applicable
+
 ## Module Structure
 
 ```
