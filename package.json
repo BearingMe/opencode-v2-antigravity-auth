@@ -1,82 +1,108 @@
 {
-    "name": "opencode-v2-antigravity-auth",
-    "version": "0.1.0",
-    "description": "Google Antigravity IDE OAuth auth plugin for OpenCode V2 - access Gemini 3 Pro and Claude 4.6 using Google credentials (maintained V2 port)",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
-    "exports": {
-        ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-        "./tui": { "types": "./dist/src/tui.d.ts", "import": "./dist/src/tui.js" },
-        "./rpc": { "types": "./dist/src/rpc.d.ts", "import": "./dist/src/rpc.js" }
+  "name": "opencode-v2-antigravity-auth",
+  "version": "0.1.0",
+  "description": "Google Antigravity IDE OAuth auth plugin for OpenCode V2 - access Gemini 3 Pro and Claude 4.6 using Google credentials (maintained V2 port)",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     },
-    "type": "module",
-    "license": "MIT",
-    "author": "BearingMe",
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/BearingMe/opencode-v2-antigravity-auth.git"
+    "./tui": {
+      "types": "./dist/src/tui.d.ts",
+      "import": "./dist/src/tui.js"
     },
-    "homepage": "https://github.com/BearingMe/opencode-v2-antigravity-auth#readme",
-    "bugs": {
-        "url": "https://github.com/BearingMe/opencode-v2-antigravity-auth/issues"
-    },
-    "keywords": [
-        "opencode",
-        "google",
-        "antigravity",
-        "gemini",
-        "oauth",
-        "plugin",
-        "auth",
-        "claude"
-    ],
-    "packageManager": "bun@1.4.2",
-    "engines": {
-        "node": ">=20.0.0"
-    },
-    "files": [
-        "dist/",
-        "README.md",
-        "LICENSE"
-    ],
-    "scripts": {
-        "clean": "node -e \"import{rmSync}from'node:fs';rmSync('dist',{recursive:true,force:true})\"",
-        "prebuild": "bun run clean",
-        "build": "tsc -p tsconfig.build.json && bun run script/build-tui.mjs",
-        "build:schema": "bun run script/build-schema.ts",
-        "typecheck": "tsc --noEmit",
-        "test": "vitest run",
-        "test:tui": "bun run build && bun --conditions=browser test test/tui-quota-render.test.ts",
-        "test:watch": "vitest",
-        "test:ui": "vitest --ui",
-        "test:coverage": "vitest run --coverage",
-        "prepublishOnly": "bun run build",
-        "test:e2e:models": "bun run script/test-models.ts",
-        "test:e2e:regression": "bun run script/test-regression.ts"
-    },
-    "peerDependencies": {
-        "@opentui/core": ">=0.5.12",
-        "@opentui/solid": ">=0.5.12",
-        "solid-js": ">=1.9.0",
-        "typescript": "^5"
-    },
-    "devDependencies": {
-        "@types/node": "^24.10.1",
-        "@types/proper-lockfile": "^4.1.4",
-        "@vitest/coverage-v8": "^3.0.0",
-        "@vitest/ui": "^3.0.0",
-        "typescript": "^5.0.0",
-        "vitest": "^3.0.0",
-        "zod-to-json-schema": "^3.25.1"
-    },
-    "dependencies": {
-        "@ai-sdk/google": "^4.0.82",
-        "@opencode/plugin": "^2.0.18",
-        "@opencode/schema": "^2.0.18",
-        "@openauthjs/openauth": "^0.4.3",
-        "effect": "4.0.0-rc.112",
-        "proper-lockfile": "^4.1.2",
-        "xdg-basedir": "^5.1.0",
-        "zod": "^4.0.0"
+    "./rpc": {
+      "types": "./dist/src/rpc.d.ts",
+      "import": "./dist/src/rpc.js"
     }
+  },
+  "type": "module",
+  "license": "MIT",
+  "author": "BearingMe",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BearingMe/opencode-v2-antigravity-auth.git"
+  },
+  "homepage": "https://github.com/BearingMe/opencode-v2-antigravity-auth#readme",
+  "bugs": {
+    "url": "https://github.com/BearingMe/opencode-v2-antigravity-auth/issues"
+  },
+  "keywords": [
+    "opencode",
+    "google",
+    "antigravity",
+    "gemini",
+    "oauth",
+    "plugin",
+    "auth",
+    "claude"
+  ],
+  "packageManager": "bun@1.4.2",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "clean": "node -e \"import{rmSync}from'node:fs';rmSync('dist',{recursive:true,force:true})\"",
+    "prebuild": "bun run clean",
+    "build": "tsc -p tsconfig.build.json && bun run script/build-tui.mjs",
+    "build:schema": "bun run script/build-schema.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --quiet",
+    "lint:all": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:tui": "bun run build && bun --conditions=browser test test/tui-quota-render.test.ts",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "bun run build",
+    "test:e2e:models": "bun run script/test-models.ts",
+    "test:e2e:regression": "bun run script/test-regression.ts",
+    "prepare": "husky"
+  },
+  "peerDependencies": {
+    "@opentui/core": ">=0.5.12",
+    "@opentui/solid": ">=0.5.12",
+    "solid-js": ">=1.9.0",
+    "typescript": "^5"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "21.2.3",
+    "@commitlint/config-conventional": "21.2.3",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.10.1",
+    "@types/proper-lockfile": "^4.1.4",
+    "@vitest/coverage-v8": "^3.0.0",
+    "@vitest/ui": "^3.0.0",
+    "eslint": "10.11.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-import-x": "4.16.2",
+    "globals": "16.0.0",
+    "husky": "9.1.7",
+    "lint-staged": "17.6.0",
+    "prettier": "3.9.9",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "8.71.0",
+    "vitest": "^3.0.0",
+    "zod-to-json-schema": "^3.25.1"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^4.0.82",
+    "@opencode/plugin": "^2.0.18",
+    "@opencode/schema": "^2.0.18",
+    "@openauthjs/openauth": "^0.4.3",
+    "effect": "4.0.0-rc.112",
+    "proper-lockfile": "^4.1.2",
+    "xdg-basedir": "^5.1.0",
+    "zod": "^4.0.0"
+  }
 }

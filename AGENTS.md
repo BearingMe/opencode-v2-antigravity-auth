@@ -24,9 +24,13 @@ bunx vitest --watch src/plugin/auth.test.ts      # Watch mode, single file
 bun run test:coverage                # Coverage report
 bun run test:e2e:models              # E2E: model availability check (needs real quota)
 bun run test:e2e:regression          # E2E: regression suite (needs real quota)
+bun run lint                         # Check code with ESLint
+bun run lint:fix                     # Fix ESLint issues
+bun run format                       # Format with Prettier
+bun run format:check                 # Verify formatting with Prettier
 ```
 
-No linter or formatter is configured. Style is enforced by convention (see below).
+Git hooks managed via Husky + lint-staged (pre-commit: eslint --fix + prettier) and commitlint (commit-msg: conventional commits).
 
 ## TypeScript Configuration
 
@@ -40,6 +44,7 @@ No linter or formatter is configured. Style is enforced by convention (see below
 ## Code Style
 
 ### Imports
+
 - Use `import type { ... }` for type-only imports (enforced by `verbatimModuleSyntax`)
 - Named imports only — no default imports in src/
 - Relative paths; test sources may use `.ts` extensions (`import { foo } from "./bar.ts"`)
@@ -50,11 +55,13 @@ No linter or formatter is configured. Style is enforced by convention (see below
   imports break `bun run build` even though `typecheck` accepts them
 
 ### Exports
+
 - Named exports only in src/ — no default exports (sole exceptions:
   `src/v2-plugin.ts` and `src/tui.ts` default-export `Plugin.define`, as
   required by the OpenCode V2 server / TUI plugin contracts)
 
 ### Naming
+
 - `camelCase` for functions, variables, parameters
 - `PascalCase` for types, interfaces, classes, enums
 - `UPPER_SNAKE_CASE` for constants
@@ -62,6 +69,7 @@ No linter or formatter is configured. Style is enforced by convention (see below
 - Test files: `*.test.ts` colocated with source
 
 ### Types
+
 - No `I` prefix on interfaces, no `Type` suffix
 - Use `z.infer<typeof Schema>` for Zod-derived types
 - Extract to `types.ts` when shared, inline when local
@@ -69,23 +77,27 @@ No linter or formatter is configured. Style is enforced by convention (see below
 - Never use `as any`, `@ts-ignore`, or `@ts-expect-error`
 
 ### Functions
+
 - `export function` for public APIs
 - Arrow functions for callbacks, factories, and inline closures
 - Async functions with targeted try/catch (not blanket)
 
 ### Error Handling
+
 - Defensive try/catch with graceful degradation (fallback values, not crashes)
 - Custom error classes with metadata when domain-specific
 - Catch `unknown`, log, and convert to domain errors — never empty catch blocks
 - Rate limit / quota errors trigger account rotation, not failure
 
 ### Formatting
+
 - 2-space indentation
 - Double quotes for strings
 - Trailing commas in multiline constructs
 - No semicolons (project convention)
 
 ### Logging
+
 - `createLogger("module-name")` for structured logging
 - `console.log` only for CLI/user-facing output
 
@@ -126,32 +138,38 @@ src/
 ## Key Design Patterns
 
 ### 1. Request Routing
+
 AI SDK hook + fetch bridge for `generativelanguage.googleapis.com` model
 paths only; single native engine (`executeAntigravityRequest`). Two header
 styles: `antigravity` and `gemini-cli` (dual Gemini quota pools).
 
 ### 2. Claude Thinking Blocks
+
 Outgoing Claude requests strip ALL thinking blocks by default
 (`keep_thinking: false`); Claude re-thinks fresh each turn. With
 `keep_thinking: true`, cached signatures are re-injected (first assistant
 message of a turn only).
 
 ### 3. Session Recovery
+
 Two layers: in-request turn repair plus the session-error hook, which injects
 synthetic `tool_result` blocks after interrupted tool execution. Gated by
 `session_recovery`; optional `auto_resume`.
 
 ### 4. Schema Sanitization
+
 Tool schemas are cleaned via allowlist. Unsupported fields (`const`, `$ref`,
 `$defs`) are removed or converted to Antigravity-compatible format.
 
 ### 5. Multi-Account Load Balancing
+
 Up to 10 accounts rotate on rate limits (sticky/round-robin/hybrid).
 Gemini-only cross-pool fallback; Claude always Antigravity. All
 `account-service.ts` writes are single-lock replace transactions; deletes
 tombstone the identity (bounded, 50) so stale saves cannot resurrect it.
 
 ### 6. Account UI
+
 Login (`opencode auth login`, one account per run) only adds/reconnects;
 `/antigravity` manages via the credential-free `AntigravityAccounts` RPC
 (`list`, `quota`, `verify`, `mutate`, `deleteAll`, `ping`). Mutations use
