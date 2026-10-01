@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest"
-import { formatAccountOneLiner, formatResetCountdown, quotaDetailLines, quotaInfoRows, quotaViewPlaceholder, renderQuotaBar } from "./account-ui-format.js"
+import {
+  formatAccountOneLiner,
+  formatResetCountdown,
+  quotaDetailLines,
+  quotaInfoRows,
+  quotaViewPlaceholder,
+  renderQuotaBar,
+} from "./account-ui-format.js"
 
 describe("renderQuotaBar", () => {
   it("renders null and undefined as unknown", () => {
@@ -66,42 +73,43 @@ describe("formatAccountOneLiner", () => {
   })
 
   it("marks selected, disabled, verification, and cooldown states", () => {
-    expect(formatAccountOneLiner({
-      email: "one@example.com",
-      enabled: false,
-      active: true,
-      verificationRequired: true,
-      coolingDown: true,
-      status: "error",
-    })).toBe("one@example.com [selected] [disabled] [verify required] [cooling down] [quota error]")
+    expect(
+      formatAccountOneLiner({
+        email: "one@example.com",
+        enabled: false,
+        active: true,
+        verificationRequired: true,
+        coolingDown: true,
+        status: "error",
+      }),
+    ).toBe("one@example.com [selected] [disabled] [verify required] [cooling down] [quota error]")
   })
 
   it("marks family-selected accounts without a global cursor", () => {
-    expect(formatAccountOneLiner({
-      email: "two@example.com",
-      selectedByFamily: { claude: false, gemini: true },
-    })).toBe("two@example.com [selected]")
+    expect(
+      formatAccountOneLiner({
+        email: "two@example.com",
+        selectedByFamily: { claude: false, gemini: true },
+      }),
+    ).toBe("two@example.com [selected]")
   })
 
   it("marks unknown quota explicitly", () => {
-    expect(formatAccountOneLiner({ email: "three@example.com", status: "unknown" }))
-      .toBe("three@example.com [quota unknown]")
+    expect(formatAccountOneLiner({ email: "three@example.com", status: "unknown" })).toBe(
+      "three@example.com [quota unknown]",
+    )
   })
 })
 
 describe("quotaInfoRows", () => {
   it("renders one labeled row per quota group", () => {
     const rows = quotaInfoRows({
-      "claude": { remainingFraction: 0.5, resetTime: null },
+      claude: { remainingFraction: 0.5, resetTime: null },
       "gemini-pro": { remainingFraction: null, resetTime: null },
       "gemini-flash": { remainingFraction: 1, resetTime: null },
     })
     expect(rows.map((row) => row.title)).toEqual(["Claude", "Gemini Pro", "Gemini Flash"])
-    expect(rows.map((row) => row.value)).toEqual([
-      "quota-row-claude",
-      "quota-row-gemini-pro",
-      "quota-row-gemini-flash",
-    ])
+    expect(rows.map((row) => row.value)).toEqual(["quota-row-claude", "quota-row-gemini-pro", "quota-row-gemini-flash"])
     expect(rows[0]?.description).toContain("50%")
     expect(rows[1]?.description).toContain("unknown")
     expect(rows[2]?.description).toContain("100%")
@@ -127,7 +135,7 @@ describe("quotaDetailLines", () => {
   it("renders one labeled row per quota group plus a status line", () => {
     const lines = quotaDetailLines({
       groups: {
-        "claude": { remainingFraction: 0.5, resetTime: null },
+        claude: { remainingFraction: 0.5, resetTime: null },
         "gemini-pro": { remainingFraction: null, resetTime: null },
         "gemini-flash": { remainingFraction: 1, resetTime: null },
       },

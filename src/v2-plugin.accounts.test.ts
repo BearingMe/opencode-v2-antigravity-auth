@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const { loadAccounts, updateAccounts, verifyAccountAccess, written, memory } = vi.hoisted(() => ({
   loadAccounts: vi.fn(),
   updateAccounts: vi.fn(),
-  verifyAccountAccess: vi.fn(async (): Promise<{ status: "ok" | "blocked" | "error"; message: string; verifyUrl?: string }> => ({
-    status: "blocked",
-    message: "verification required",
-    verifyUrl: "https://google.test/verify",
-  })),
+  verifyAccountAccess: vi.fn(
+    async (): Promise<{ status: "ok" | "blocked" | "error"; message: string; verifyUrl?: string }> => ({
+      status: "blocked",
+      message: "verification required",
+      verifyUrl: "https://google.test/verify",
+    }),
+  ),
   written: [] as unknown[],
   memory: { store: null as unknown },
 }))
@@ -26,15 +28,17 @@ import { manageAccounts } from "./v2-plugin.js"
 // updater commits its replacement, so a mutation is visible to subsequent
 // reads exactly like the file store. Unchanged inputs record nothing.
 loadAccounts.mockImplementation(async () => structuredClone(memory.store))
-updateAccounts.mockImplementation(async (updater: (current: unknown) => Promise<{ storage: unknown; result: unknown }>) => {
-  const input = structuredClone(memory.store)
-  const { storage, result } = await updater(input)
-  if (storage !== input) {
-    memory.store = storage
-    written.push(storage)
-  }
-  return result
-})
+updateAccounts.mockImplementation(
+  async (updater: (current: unknown) => Promise<{ storage: unknown; result: unknown }>) => {
+    const input = structuredClone(memory.store)
+    const { storage, result } = await updater(input)
+    if (storage !== input) {
+      memory.store = storage
+      written.push(storage)
+    }
+    return result
+  },
+)
 
 beforeEach(() => {
   written.length = 0
@@ -50,7 +54,11 @@ describe("manageAccounts", () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    verifyAccountAccess.mockResolvedValue({ status: "blocked", message: "verification required", verifyUrl: "https://google.test/verify" })
+    verifyAccountAccess.mockResolvedValue({
+      status: "blocked",
+      message: "verification required",
+      verifyUrl: "https://google.test/verify",
+    })
     memory.store = { version: 4, accounts: structuredClone(accounts), activeIndex: 1 }
   })
 
@@ -76,7 +84,10 @@ describe("manageAccounts", () => {
 
   it("leaves pool state untouched when listing accounts", async () => {
     const result = await manageAccounts({ action: "list" }, {} as never, invalidateFetch, setAuth)
-    const parsed = JSON.parse(result.content) as { activeIndex: number; accounts: Array<{ email: string; active: boolean; verificationStatus: string }> }
+    const parsed = JSON.parse(result.content) as {
+      activeIndex: number
+      accounts: Array<{ email: string; active: boolean; verificationStatus: string }>
+    }
 
     expect(parsed.activeIndex).toBe(1)
     expect(parsed.accounts[1]?.email).toBe("two@example.com")
@@ -90,13 +101,15 @@ describe("manageAccounts", () => {
     const verified = written[0] as { accounts: Array<Record<string, unknown>> }
 
     expect(result.content).toContain("verification required")
-    expect(verified?.accounts[0]).toEqual(expect.objectContaining({
-      enabled: false,
-      verificationRequired: true,
-      verificationUrl: "https://google.test/verify",
-      lastVerificationStatus: "blocked",
-      lastVerificationAt: expect.any(Number),
-    }))
+    expect(verified?.accounts[0]).toEqual(
+      expect.objectContaining({
+        enabled: false,
+        verificationRequired: true,
+        verificationUrl: "https://google.test/verify",
+        lastVerificationStatus: "blocked",
+        lastVerificationAt: expect.any(Number),
+      }),
+    )
   })
 
   it("persists successful verification and reports it as a last check", async () => {
@@ -104,7 +117,9 @@ describe("manageAccounts", () => {
     const result = await manageAccounts({ action: "verify", index: 1 }, {} as never, invalidateFetch, setAuth)
     const verified = JSON.parse(result.content) as { status: string; checkedAt: number }
     const listResult = await manageAccounts({ action: "list" }, {} as never, invalidateFetch, setAuth)
-    const list = JSON.parse(listResult.content) as { accounts: Array<{ verificationStatus: string; lastVerificationAt?: number }> }
+    const list = JSON.parse(listResult.content) as {
+      accounts: Array<{ verificationStatus: string; lastVerificationAt?: number }>
+    }
 
     expect(verified.status).toBe("ok")
     expect(verified.checkedAt).toEqual(expect.any(Number))
@@ -117,10 +132,14 @@ describe("manageAccounts", () => {
     await manageAccounts({ action: "verify", index: 0 }, {} as never, invalidateFetch, setAuth)
     const verifiedError = written[0] as { accounts: Array<Record<string, unknown>> }
 
-    expect(verifiedError.accounts).toEqual(expect.arrayContaining([expect.objectContaining({
-      enabled: true,
-      lastVerificationStatus: "error",
-      lastVerificationAt: expect.any(Number),
-    })]))
+    expect(verifiedError.accounts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          enabled: true,
+          lastVerificationStatus: "error",
+          lastVerificationAt: expect.any(Number),
+        }),
+      ]),
+    )
   })
 })

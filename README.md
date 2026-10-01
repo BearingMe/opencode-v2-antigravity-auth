@@ -48,7 +48,7 @@ config (`~/.config/opencode/opencode.json` or `opencode.jsonc`):
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["/absolute/path/to/opencode-v2-antigravity-auth"]
+  "plugins": ["/absolute/path/to/opencode-v2-antigravity-auth"],
 }
 ```
 
@@ -81,12 +81,12 @@ opencode run "Hello" --model=google/antigravity-gemini-3-flash
 Create `~/.config/opencode/antigravity.json` (project override:
 `.opencode/antigravity.json`). Defaults work for most users.
 
-| Area | Key options |
-|---|---|
+| Area              | Key options                                                                                                    |
+| ----------------- | -------------------------------------------------------------------------------------------------------------- |
 | Thinking/recovery | `keep_thinking` (default `false`), `session_recovery` (`true`), `auto_resume` (`false`), `cli_first` (`false`) |
-| Rotation | `account_selection_strategy` (`hybrid`), `scheduling_mode` (`cache_first`), `pid_offset_enabled` (`false`) |
-| Quota protection | `soft_quota_threshold_percent` (`90`), `quota_refresh_interval_minutes` (`15`) |
-| Behavior | `quiet_mode` (`false`), `toast_scope` (`root_only`), `debug` / `debug_tui` (`false`), `auto_update` (`true`) |
+| Rotation          | `account_selection_strategy` (`hybrid`), `scheduling_mode` (`cache_first`), `pid_offset_enabled` (`false`)     |
+| Quota protection  | `soft_quota_threshold_percent` (`90`), `quota_refresh_interval_minutes` (`15`)                                 |
+| Behavior          | `quiet_mode` (`false`), `toast_scope` (`root_only`), `debug` / `debug_tui` (`false`), `auto_update` (`true`)   |
 
 Full reference: [docs/user/configuration.md](docs/user/configuration.md).
 Schema: `assets/antigravity.schema.json`.

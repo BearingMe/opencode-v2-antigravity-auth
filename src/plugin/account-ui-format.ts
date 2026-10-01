@@ -69,7 +69,7 @@ export interface QuotaInfoRow {
 const QUOTA_GROUP_KEYS = ["claude", "gemini-pro", "gemini-flash"] as const
 
 const QUOTA_GROUP_LABELS: Record<string, string> = {
-  "claude": "Claude",
+  claude: "Claude",
   "gemini-pro": "Gemini Pro",
   "gemini-flash": "Gemini Flash",
 }
@@ -98,8 +98,7 @@ export interface QuotaDetailSnapshot {
 }
 
 export type QuotaRefreshOutcome =
-  | { ok: true; entry: QuotaDetailSnapshot }
-  | { ok: false; reason: "missing" | "failed"; invalidResponse: boolean }
+  { ok: true; entry: QuotaDetailSnapshot } | { ok: false; reason: "missing" | "failed"; invalidResponse: boolean }
 
 export function quotaDetailLines(snapshot: QuotaDetailSnapshot): Array<string> {
   const checked = snapshot.checkedAt === null ? "never checked" : new Date(snapshot.checkedAt).toLocaleString()

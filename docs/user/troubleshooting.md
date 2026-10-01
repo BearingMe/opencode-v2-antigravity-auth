@@ -3,12 +3,12 @@
 Paths below use `~/.config/opencode/` on **all** platforms (Windows
 included; `~` = your home directory). `OPENCODE_CONFIG_DIR` overrides it.
 
-| File | Path |
-|------|------|
-| Main config | `~/.config/opencode/opencode.json(c)` |
-| Accounts | `~/.config/opencode/antigravity-accounts.json` |
-| Plugin config | `~/.config/opencode/antigravity.json` |
-| Debug logs | `~/.config/opencode/antigravity-logs/` |
+| File          | Path                                           |
+| ------------- | ---------------------------------------------- |
+| Main config   | `~/.config/opencode/opencode.json(c)`          |
+| Accounts      | `~/.config/opencode/antigravity-accounts.json` |
+| Plugin config | `~/.config/opencode/antigravity.json`          |
+| Debug logs    | `~/.config/opencode/antigravity-logs/`         |
 
 ## First steps
 

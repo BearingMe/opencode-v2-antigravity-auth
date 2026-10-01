@@ -43,7 +43,7 @@ mutation target (fail closed).
 - Removed accounts leave credential-free tombstones (`removedAccounts`):
   durable `id` when known, refresh-token fingerprint, normalized email,
   `removedAt`. Matching is generation-aware (`storage.ts ::
-  tombstoneMatchesAccount`): equal ids match only with a corroborating
+tombstoneMatchesAccount`): equal ids match only with a corroborating
   token fingerprint or email; equal token fingerprints always match (the
   credential identifies itself across the pre-id upgrade path); email alone
   matches only as a legacy fallback when neither side has id or token

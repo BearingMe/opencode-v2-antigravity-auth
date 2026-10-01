@@ -65,7 +65,7 @@ Non-goals:
 
 - V2 bridge (current product path):
   `src/v2-plugin.ts` default export `Plugin.define({id:
-  "opencode-v2-antigravity-auth"})`. Routing lives in
+"opencode-v2-antigravity-auth"})`. Routing lives in
   `src/plugin/engine.ts :: executeAntigravityRequest`;
   `verifyAccountAccess` lives in `src/plugin/verify.ts`.
 - AI-SDK shim: `src/google-sdk.ts :: createGoogle` re-export. Models MUST

@@ -14,34 +14,53 @@ const snapshot = (fraction: number) => ({
   status: "ok",
 })
 const colors = {
-  base: RGBA.fromHex("#eeeeee"), muted: RGBA.fromHex("#888888"),
-  success: RGBA.fromHex("#00ff00"), warning: RGBA.fromHex("#ffff00"), error: RGBA.fromHex("#ff0000"),
-  inputText: RGBA.fromHex("#eeeeee"), inputBackground: RGBA.fromHex("#222222"),
+  base: RGBA.fromHex("#eeeeee"),
+  muted: RGBA.fromHex("#888888"),
+  success: RGBA.fromHex("#00ff00"),
+  warning: RGBA.fromHex("#ffff00"),
+  error: RGBA.fromHex("#ff0000"),
+  inputText: RGBA.fromHex("#eeeeee"),
+  inputBackground: RGBA.fromHex("#222222"),
 }
 
 describe("published account list", () => {
   test("renders readable themed search text on a light background", async () => {
     const light = {
-      ...colors, base: RGBA.fromHex("#111111"), muted: RGBA.fromHex("#666666"),
-      selected: RGBA.fromHex("#eeeeee"), inputText: RGBA.fromHex("#222222"), inputBackground: RGBA.fromHex("#fafafa"),
+      ...colors,
+      base: RGBA.fromHex("#111111"),
+      muted: RGBA.fromHex("#666666"),
+      selected: RGBA.fromHex("#eeeeee"),
+      inputText: RGBA.fromHex("#222222"),
+      inputBackground: RGBA.fromHex("#fafafa"),
     }
-    const setup = await testRender(() => {
-      const root = createElement("box")
-      setProp(root, "backgroundColor", RGBA.fromHex("#ffffff"))
-      insert(root, () => AccountListDialogView({
-        accounts: [{ id: "one", email: "one@example.com", enabled: true, description: "" }],
-        colors: light, layer: () => {}, choose: () => {},
-      }))
-      return root
-    }, { width: 64, height: 22 })
+    const setup = await testRender(
+      () => {
+        const root = createElement("box")
+        setProp(root, "backgroundColor", RGBA.fromHex("#ffffff"))
+        insert(root, () =>
+          AccountListDialogView({
+            accounts: [{ id: "one", email: "one@example.com", enabled: true, description: "" }],
+            colors: light,
+            layer: () => {},
+            choose: () => {},
+          }),
+        )
+        return root
+      },
+      { width: 64, height: 22 },
+    )
     try {
       await setup.flush()
-      const placeholder = setup.captureSpans().lines.flatMap((line) => line.spans)
+      const placeholder = setup
+        .captureSpans()
+        .lines.flatMap((line) => line.spans)
         .find((span) => span.text.includes("Search accounts"))!
       expect(placeholder.fg).toEqual(light.muted)
       await setup.mockInput.typeText("one")
       await setup.flush()
-      const typed = setup.captureSpans().lines.flatMap((line) => line.spans)
+      const typed = setup
+        .captureSpans()
+        .lines.flatMap((line) => line.spans)
         .find((span) => span.text.trim() === "one")!
       expect(typed.fg).toEqual(light.inputText)
       expect(typed.bg).toEqual(light.inputBackground)
@@ -54,15 +73,25 @@ describe("published account list", () => {
   test("keeps the legend visible in a narrow, scrolling ten-account list", async () => {
     let commands: Array<QuotaDialogKeymapCommand> = []
     const picked: Array<string | undefined> = []
-    const setup = await testRender(() => AccountListDialogView({
-      accounts: Array.from({ length: 10 }, (_, index) => ({
-        id: String(index), email: `saved-account-number-${index + 1}@example.com`,
-        enabled: index % 2 === 0, description: "",
-      })),
-      colors: { ...colors, selected: RGBA.fromHex("#333333") },
-      choose: (id) => { picked.push(id) },
-      layer: (input) => { commands = input().commands },
-    }), { width: 42, height: 26 })
+    const setup = await testRender(
+      () =>
+        AccountListDialogView({
+          accounts: Array.from({ length: 10 }, (_, index) => ({
+            id: String(index),
+            email: `saved-account-number-${index + 1}@example.com`,
+            enabled: index % 2 === 0,
+            description: "",
+          })),
+          colors: { ...colors, selected: RGBA.fromHex("#333333") },
+          choose: (id) => {
+            picked.push(id)
+          },
+          layer: (input) => {
+            commands = input().commands
+          },
+        }),
+      { width: 42, height: 26 },
+    )
     try {
       await setup.flush()
       for (let index = 0; index < 9; index++) {
@@ -81,27 +110,35 @@ describe("published account list", () => {
   })
 
   test("keeps the shared footer visible in a host-sized 80x24 dialog", async () => {
-    const setup = await testRender(() => {
-      const backdrop = createElement("box")
-      setProp(backdrop, "height", 24)
-      setProp(backdrop, "width", 80)
-      setProp(backdrop, "paddingTop", 24 / 4)
-      setProp(backdrop, "alignItems", "center")
-      const content = createElement("box")
-      setProp(content, "width", 88)
-      setProp(content, "maxWidth", 80 - 2)
-      setProp(content, "paddingTop", 1)
-      insert(content, () => AccountListDialogView({
-        accounts: Array.from({ length: 10 }, (_, index) => ({
-          id: String(index), email: `saved-${index}@example.com`,
-          enabled: index % 2 === 0, description: "[selected]",
-        })),
-        colors: { ...colors, selected: RGBA.fromHex("#333333") },
-        layer: () => {}, choose: () => {},
-      }))
-      insert(backdrop, content)
-      return backdrop
-    }, { width: 80, height: 24 })
+    const setup = await testRender(
+      () => {
+        const backdrop = createElement("box")
+        setProp(backdrop, "height", 24)
+        setProp(backdrop, "width", 80)
+        setProp(backdrop, "paddingTop", 24 / 4)
+        setProp(backdrop, "alignItems", "center")
+        const content = createElement("box")
+        setProp(content, "width", 88)
+        setProp(content, "maxWidth", 80 - 2)
+        setProp(content, "paddingTop", 1)
+        insert(content, () =>
+          AccountListDialogView({
+            accounts: Array.from({ length: 10 }, (_, index) => ({
+              id: String(index),
+              email: `saved-${index}@example.com`,
+              enabled: index % 2 === 0,
+              description: "[selected]",
+            })),
+            colors: { ...colors, selected: RGBA.fromHex("#333333") },
+            layer: () => {},
+            choose: () => {},
+          }),
+        )
+        insert(backdrop, content)
+        return backdrop
+      },
+      { width: 80, height: 24 },
+    )
     try {
       await setup.flush()
       const frame = setup.captureCharFrame()
@@ -115,15 +152,23 @@ describe("published account list", () => {
   test("uses single-cell colored dots and a shared legend/login footer, with search and selection", async () => {
     let commands: Array<QuotaDialogKeymapCommand> = []
     const picked: Array<string | undefined> = []
-    const setup = await testRender(() => AccountListDialogView({
-      accounts: [
-        { id: "one", email: "one@example.com", enabled: true, description: "[selected]" },
-        { id: "two", email: "two@example.com", enabled: false, description: "[disabled]" },
-      ],
-      colors: { ...colors, selected: RGBA.fromHex("#333333") },
-      choose: (id) => { picked.push(id) },
-      layer: (input) => { commands = input().commands },
-    }), { width: 64, height: 22 })
+    const setup = await testRender(
+      () =>
+        AccountListDialogView({
+          accounts: [
+            { id: "one", email: "one@example.com", enabled: true, description: "[selected]" },
+            { id: "two", email: "two@example.com", enabled: false, description: "[disabled]" },
+          ],
+          colors: { ...colors, selected: RGBA.fromHex("#333333") },
+          choose: (id) => {
+            picked.push(id)
+          },
+          layer: (input) => {
+            commands = input().commands
+          },
+        }),
+      { width: 64, height: 22 },
+    )
     const run = (id: string) => commands.find((command) => command.id === id)!.run()
     try {
       await setup.flush()
@@ -133,7 +178,10 @@ describe("published account list", () => {
       expect(frame).toContain("● enabled · ● disabled")
       expect(frame.match(/Add accounts: opencode auth login/gu)).toHaveLength(1)
       const lines = setup.captureSpans().lines
-      for (const [email, color] of [["one@example.com", colors.success], ["two@example.com", colors.error]] as const) {
+      for (const [email, color] of [
+        ["one@example.com", colors.success],
+        ["two@example.com", colors.error],
+      ] as const) {
         const line = lines.find((line) => line.spans.some((span) => span.text.includes(email)))!
         const dot = line.spans.find((span) => span.text.includes("●"))!
         expect(dot.text.trim()).toBe("●")
@@ -163,10 +211,20 @@ describe("published account list", () => {
 test("missing-account notice acknowledges Enter and Esc in its mounted layer", async () => {
   let commands: Array<QuotaDialogKeymapCommand> = []
   let accepted = 0
-  const setup = await testRender(() => MissingAccountDialogView({
-    email: "one@example.com", colors, acknowledge: () => { accepted++ },
-    layer: (input) => { commands = input().commands },
-  }), { width: 64, height: 22 })
+  const setup = await testRender(
+    () =>
+      MissingAccountDialogView({
+        email: "one@example.com",
+        colors,
+        acknowledge: () => {
+          accepted++
+        },
+        layer: (input) => {
+          commands = input().commands
+        },
+      }),
+    { width: 64, height: 22 },
+  )
   try {
     await setup.flush()
     expect(setup.captureCharFrame()).toContain("That account is no longer saved.")
@@ -188,15 +246,28 @@ describe("published quota view", () => {
       initial: snapshot(0.7),
       refreshQuota: () => {
         calls++
-        return new Promise((done) => { resolve = done })
+        return new Promise((done) => {
+          resolve = done
+        })
       },
-      notifyRefreshFailed: () => {}, showMissingThenList: async () => {}, goList: async () => {},
+      notifyRefreshFailed: () => {},
+      showMissingThenList: async () => {},
+      goList: async () => {},
     })
-    const setup = await testRender(() => QuotaDialogView({
-      email: "one@example.com", enabled: true, controller, colors,
-      shortcuts: () => undefined,
-      layer: (input) => { commands = input().commands },
-    }), { width: 60, height: 22 })
+    const setup = await testRender(
+      () =>
+        QuotaDialogView({
+          email: "one@example.com",
+          enabled: true,
+          controller,
+          colors,
+          shortcuts: () => undefined,
+          layer: (input) => {
+            commands = input().commands
+          },
+        }),
+      { width: 60, height: 22 },
+    )
     try {
       await setup.flush()
       const frame = setup.captureCharFrame()
@@ -229,13 +300,26 @@ describe("published quota view", () => {
     let calls = 0
     const controller = createQuotaDialogController({
       initial: snapshot(0.7),
-      refreshQuota: async () => { calls++; return { ok: true, entry: snapshot(0.2) } },
-      notifyRefreshFailed: () => {}, showMissingThenList: async () => {}, goList: async () => {},
+      refreshQuota: async () => {
+        calls++
+        return { ok: true, entry: snapshot(0.2) }
+      },
+      notifyRefreshFailed: () => {},
+      showMissingThenList: async () => {},
+      goList: async () => {},
     })
-    const setup = await testRender(() => QuotaDialogView({
-      email: "long-saved-account@example.com", enabled: false, controller, colors,
-      shortcuts: () => undefined, layer: () => {},
-    }), { width: 42, height: 26 })
+    const setup = await testRender(
+      () =>
+        QuotaDialogView({
+          email: "long-saved-account@example.com",
+          enabled: false,
+          controller,
+          colors,
+          shortcuts: () => undefined,
+          layer: () => {},
+        }),
+      { width: 42, height: 26 },
+    )
     try {
       await setup.flush()
       expect(calls).toBe(0)
@@ -261,15 +345,35 @@ describe("published quota view", () => {
           "gemini-flash": { remainingFraction: null, resetTime: null },
         },
       },
-      refreshQuota: async () => { calls++; return { ok: true, entry: snapshot(0.2) } },
-      notifyRefreshFailed: () => {}, showMissingThenList: async () => {},
-      goList: async () => { backs++ },
+      refreshQuota: async () => {
+        calls++
+        return { ok: true, entry: snapshot(0.2) }
+      },
+      notifyRefreshFailed: () => {},
+      showMissingThenList: async () => {},
+      goList: async () => {
+        backs++
+      },
     })
-    const setup = await testRender(() => QuotaDialogView({
-      email: "one@example.com", enabled: false, controller, colors,
-      shortcuts: () => undefined, layer: (input) => { commands = input().commands },
-    }), { width: 120, height: 30 })
-    const barLines = () => setup.captureCharFrame().split("\n").filter((line) => /[█░]/u.test(line))
+    const setup = await testRender(
+      () =>
+        QuotaDialogView({
+          email: "one@example.com",
+          enabled: false,
+          controller,
+          colors,
+          shortcuts: () => undefined,
+          layer: (input) => {
+            commands = input().commands
+          },
+        }),
+      { width: 120, height: 30 },
+    )
+    const barLines = () =>
+      setup
+        .captureCharFrame()
+        .split("\n")
+        .filter((line) => /[█░]/u.test(line))
     const checkWide = (width: number) => {
       const rows = barLines()
       expect(rows).toHaveLength(3)
@@ -320,28 +424,45 @@ describe("published quota view", () => {
         },
       },
       refreshQuota: async () => ({ ok: true, entry: snapshot(0.2) }),
-      notifyRefreshFailed: () => {}, showMissingThenList: async () => {}, goList: async () => {},
+      notifyRefreshFailed: () => {},
+      showMissingThenList: async () => {},
+      goList: async () => {},
     })
     let container!: ReturnType<typeof createElement>
-    const setup = await testRender(() => {
-      container = createElement("box")
-      setProp(container, "width", 72)
-      insert(container, () => QuotaDialogView({
-        email: "one@example.com", enabled: false, controller, colors,
-        shortcuts: () => undefined, layer: () => {},
-      }))
-      return container
-    }, { width: 140, height: 30 })
+    const setup = await testRender(
+      () => {
+        container = createElement("box")
+        setProp(container, "width", 72)
+        insert(container, () =>
+          QuotaDialogView({
+            email: "one@example.com",
+            enabled: false,
+            controller,
+            colors,
+            shortcuts: () => undefined,
+            layer: () => {},
+          }),
+        )
+        return container
+      },
+      { width: 140, height: 30 },
+    )
     try {
       await setup.flush()
-      const rows = setup.captureCharFrame().split("\n").filter((line) => /[█░]/u.test(line))
+      const rows = setup
+        .captureCharFrame()
+        .split("\n")
+        .filter((line) => /[█░]/u.test(line))
       expect(rows).toHaveLength(3)
       expect(rows.map((row) => row.match(/[█░]+/u)?.[0].length)).toEqual([25, 25, 25])
       expect(rows.map((row) => row.indexOf("reset"))).toEqual([51, 51, 51])
       for (const row of rows) expect(row.trimEnd().length).toBeLessThanOrEqual(68)
       setProp(container, "width", 42)
       await setup.flush()
-      const narrowRows = setup.captureCharFrame().split("\n").filter((line) => /[█░]/u.test(line))
+      const narrowRows = setup
+        .captureCharFrame()
+        .split("\n")
+        .filter((line) => /[█░]/u.test(line))
       expect(narrowRows.map((row) => row.match(/[█░]+/u)?.[0].length)).toEqual([26, 26, 26])
       expect(narrowRows.every((row) => !row.includes("reset"))).toBe(true)
     } finally {

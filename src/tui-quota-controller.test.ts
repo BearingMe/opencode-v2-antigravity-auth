@@ -5,7 +5,7 @@ import type { QuotaDetailSnapshot, QuotaRefreshOutcome } from "./plugin/account-
 function snapshot(claudeFraction: number | null = 0.7): QuotaDetailSnapshot {
   return {
     groups: {
-      "claude": { remainingFraction: claudeFraction, resetTime: null },
+      claude: { remainingFraction: claudeFraction, resetTime: null },
       "gemini-pro": { remainingFraction: null, resetTime: null },
       "gemini-flash": { remainingFraction: 1, resetTime: null },
     },
@@ -36,9 +36,12 @@ describe("createQuotaDialogController", () => {
   it("refreshes the entry and notifies subscribers on each transition", async () => {
     let resolveRefresh!: (outcome: QuotaRefreshOutcome) => void
     const deps = createDeps({
-      refreshQuota: vi.fn(() => new Promise<QuotaRefreshOutcome>((resolve) => {
-        resolveRefresh = resolve
-      })),
+      refreshQuota: vi.fn(
+        () =>
+          new Promise<QuotaRefreshOutcome>((resolve) => {
+            resolveRefresh = resolve
+          }),
+      ),
     })
     const controller = createQuotaDialogController(deps)
     const seen: Array<boolean> = []
@@ -56,9 +59,12 @@ describe("createQuotaDialogController", () => {
 
   it("ignores overlapping refresh requests", async () => {
     let resolveRefresh!: (outcome: QuotaRefreshOutcome) => void
-    const refreshQuota = vi.fn(() => new Promise<QuotaRefreshOutcome>((resolve) => {
-      resolveRefresh = resolve
-    }))
+    const refreshQuota = vi.fn(
+      () =>
+        new Promise<QuotaRefreshOutcome>((resolve) => {
+          resolveRefresh = resolve
+        }),
+    )
     const controller = createQuotaDialogController(createDeps({ refreshQuota }))
     const first = controller.refresh()
     await controller.refresh()
@@ -107,7 +113,12 @@ describe("createQuotaDialogController", () => {
   })
 
   it("recovers from unexpected rejection and allows retry", async () => {
-    const deps = createDeps({ refreshQuota: vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({ ok: true, entry: snapshot(0.2) }) })
+    const deps = createDeps({
+      refreshQuota: vi
+        .fn()
+        .mockRejectedValueOnce(new Error("offline"))
+        .mockResolvedValueOnce({ ok: true, entry: snapshot(0.2) }),
+    })
     const controller = createQuotaDialogController(deps)
     await controller.refresh()
     expect(controller.snapshot().refreshing).toBe(false)
@@ -119,7 +130,12 @@ describe("createQuotaDialogController", () => {
 
   it("ignores late results and notifications after disposal", async () => {
     let resolve!: (result: QuotaRefreshOutcome) => void
-    const deps = createDeps({ refreshQuota: () => new Promise((done) => { resolve = done }) })
+    const deps = createDeps({
+      refreshQuota: () =>
+        new Promise((done) => {
+          resolve = done
+        }),
+    })
     const controller = createQuotaDialogController(deps)
     const listener = vi.fn()
     controller.subscribe(listener)
@@ -134,9 +150,12 @@ describe("createQuotaDialogController", () => {
 
   it("retains a concurrent disable and blocks subsequent refresh", async () => {
     const refreshQuota = vi.fn(async (): Promise<QuotaRefreshOutcome> => ({
-      ok: true, entry: { ...snapshot(0.2), enabled: false },
+      ok: true,
+      entry: { ...snapshot(0.2), enabled: false },
     }))
-    const controller = createQuotaDialogController(createDeps({ initial: { ...snapshot(), enabled: true }, refreshQuota }))
+    const controller = createQuotaDialogController(
+      createDeps({ initial: { ...snapshot(), enabled: true }, refreshQuota }),
+    )
     await controller.refresh()
     expect(controller.snapshot().entry.enabled).toBe(false)
     await controller.refresh()
@@ -144,10 +163,12 @@ describe("createQuotaDialogController", () => {
   })
 
   it("keeps last-good bars but applies a disabled state from an error response", async () => {
-    const controller = createQuotaDialogController(createDeps({
-      initial: { ...snapshot(), enabled: true },
-      refreshQuota: async () => ({ ok: true, entry: { ...snapshot(0), enabled: false, status: "error" } }),
-    }))
+    const controller = createQuotaDialogController(
+      createDeps({
+        initial: { ...snapshot(), enabled: true },
+        refreshQuota: async () => ({ ok: true, entry: { ...snapshot(0), enabled: false, status: "error" } }),
+      }),
+    )
     await controller.refresh()
     expect(controller.snapshot().entry).toEqual({ ...snapshot(), enabled: false })
   })

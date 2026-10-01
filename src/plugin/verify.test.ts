@@ -65,10 +65,16 @@ describe("verifyAccountAccess", () => {
       access: "probe-access",
       expires: Date.now() + 3600_000,
     })
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    })))
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response("{}", {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+      ),
+    )
     const result = await verifyAccountAccess({ refreshToken: "rt" }, makeClient(), "google")
     expect(result).toMatchObject({ status: "ok" })
   })
@@ -80,14 +86,21 @@ describe("verifyAccountAccess", () => {
       access: "probe-access",
       expires: Date.now() + 3600_000,
     })
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(
-      JSON.stringify({
-        error: {
-          message: "validation_required: verify your account at https://accounts.google.com/signin/continue?plt=1",
-        },
-      }),
-      { status: 403, headers: { "content-type": "application/json" } },
-    )))
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              error: {
+                message:
+                  "validation_required: verify your account at https://accounts.google.com/signin/continue?plt=1",
+              },
+            }),
+            { status: 403, headers: { "content-type": "application/json" } },
+          ),
+      ),
+    )
     const result = await verifyAccountAccess({ refreshToken: "rt" }, makeClient(), "google")
     expect(result.status).toBe("blocked")
     expect(result.verifyUrl).toContain("accounts.google.com")

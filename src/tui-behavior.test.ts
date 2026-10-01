@@ -19,10 +19,12 @@ describe("isInvalidRpcResponse", () => {
   })
 
   it("matches serialized host error objects and rpc.invalid_output codes", () => {
-    expect(isInvalidRpcResponse({
-      name: "InvalidRequestError",
-      message: 'Expected JSON value at ["output"]',
-    })).toBe(true)
+    expect(
+      isInvalidRpcResponse({
+        name: "InvalidRequestError",
+        message: 'Expected JSON value at ["output"]',
+      }),
+    ).toBe(true)
     expect(isInvalidRpcResponse({ type: "rpc.invalid_output" })).toBe(true)
     expect(isInvalidRpcResponse({ code: "rpc.invalid_output" })).toBe(true)
   })
@@ -61,7 +63,7 @@ function quotaEntry(overrides: Record<string, unknown> = {}) {
     enabled: true,
     status: "ok",
     groups: {
-      "claude": { remainingFraction: 0.7, resetTime: null },
+      claude: { remainingFraction: 0.7, resetTime: null },
       "gemini-pro": { remainingFraction: null, resetTime: null },
       "gemini-flash": { remainingFraction: 1, resetTime: null },
     },
@@ -106,9 +108,19 @@ function createHarness(options: {
     client: {
       rpc: vi.fn(() => ({ list: listMock, quota: quotaMock })),
     },
-    theme: { background: { raised: { high: "selected" }, formfield: { focused: "inputBackground" } }, text: { base: "base", muted: "muted", formfield: { focused: "inputText" }, feedback: {
-      success: { base: "success" }, warning: { base: "warning" }, error: { base: "error" },
-    } } },
+    theme: {
+      background: { raised: { high: "selected" }, formfield: { focused: "inputBackground" } },
+      text: {
+        base: "base",
+        muted: "muted",
+        formfield: { focused: "inputText" },
+        feedback: {
+          success: { base: "success" },
+          warning: { base: "warning" },
+          error: { base: "error" },
+        },
+      },
+    },
     ui: {
       toast: { show: toastMock },
       dialog: {
@@ -139,7 +151,8 @@ function createHarness(options: {
             listViews.push(props)
             selectCalls.push({ title: "Antigravity accounts" })
             const picked = selectQueue.shift()
-            if (!options.deferListSelection) queueMicrotask(() => props.choose(typeof picked === "string" ? picked : undefined))
+            if (!options.deferListSelection)
+              queueMicrotask(() => props.choose(typeof picked === "string" ? picked : undefined))
             return
           }
           showCalls.push({ render, onClose })
@@ -161,10 +174,21 @@ function createHarness(options: {
   const cleanup = plugin.setup(context)
   if (!registeredRun) throw new Error("antigravity.accounts command was not registered")
   return {
-    listMock, quotaMock, toastMock, clearMock, alerts, selectCalls, showCalls, listViews, missingViews, runAccounts: registeredRun,
+    listMock,
+    quotaMock,
+    toastMock,
+    clearMock,
+    alerts,
+    selectCalls,
+    showCalls,
+    listViews,
+    missingViews,
+    runAccounts: registeredRun,
     dismiss,
     view: () => showCalls[0]?.render() as QuotaDialogProps,
-    cleanup: () => { if (typeof cleanup === "function") cleanup() },
+    cleanup: () => {
+      if (typeof cleanup === "function") cleanup()
+    },
   }
 }
 
@@ -176,7 +200,10 @@ describe("show-quota opens one quota screen", () => {
       listResponses: [{ accounts: [testAccount] }, { accounts: [testAccount] }],
       quotaImpl: async () => {
         quotaCalls += 1
-        if (quotaCalls % 2 === 0) return new Promise((resolve) => { deferred.push(resolve) })
+        if (quotaCalls % 2 === 0)
+          return new Promise((resolve) => {
+            deferred.push(resolve)
+          })
         return { accounts: [quotaEntry()] }
       },
       selectQueue: [testAccount.id, "show-quota", testAccount.id, "show-quota"],
@@ -204,7 +231,8 @@ describe("show-quota opens one quota screen", () => {
     const harness = createHarness({
       listResponses: [{ accounts: [testAccount] }],
       quotaImpl: async (input) => ({ accounts: input.refresh ? [] : [quotaEntry()] }),
-      selectQueue: [testAccount.id, "show-quota"], deferMissingAcknowledgement: true,
+      selectQueue: [testAccount.id, "show-quota"],
+      deferMissingAcknowledgement: true,
     })
     await harness.runAccounts()
     const pending = harness.view().controller.refresh()
@@ -223,7 +251,8 @@ describe("show-quota opens one quota screen", () => {
     const harness = createHarness({
       listResponses: [{ accounts: [testAccount] }, { accounts: [] }],
       quotaImpl: async (input) => ({ accounts: input.refresh ? [] : [quotaEntry()] }),
-      selectQueue: [testAccount.id, "show-quota"], deferMissingAcknowledgement: true,
+      selectQueue: [testAccount.id, "show-quota"],
+      deferMissingAcknowledgement: true,
     })
     await harness.runAccounts()
     const pending = harness.view().controller.refresh()
@@ -238,7 +267,8 @@ describe("show-quota opens one quota screen", () => {
     const harness = createHarness({
       listResponses: [{ accounts: [testAccount] }],
       quotaImpl: async () => ({ accounts: [quotaEntry()] }),
-      selectQueue: [], deferListSelection: true,
+      selectQueue: [],
+      deferListSelection: true,
     })
     const pending = harness.runAccounts()
     await vi.waitFor(() => expect(harness.listViews).toHaveLength(1))
@@ -325,9 +355,12 @@ describe("show-quota opens one quota screen", () => {
     let reject!: (error: Error) => void
     const harness = createHarness({
       listResponses: [{ accounts: [testAccount] }],
-      quotaImpl: (input) => input.refresh
-        ? new Promise((_resolve, fail) => { reject = fail })
-        : Promise.resolve({ accounts: [quotaEntry()] }),
+      quotaImpl: (input) =>
+        input.refresh
+          ? new Promise((_resolve, fail) => {
+              reject = fail
+            })
+          : Promise.resolve({ accounts: [quotaEntry()] }),
       selectQueue: [testAccount.id, "show-quota"],
     })
     await harness.runAccounts()
@@ -358,7 +391,8 @@ describe("show-quota on a deleted account", () => {
     const harness = createHarness({
       listResponses: [{ accounts: [testAccount] }],
       quotaImpl: async () => ({ accounts: [] }),
-      selectQueue: [testAccount.id, "show-quota"], deferMissingAcknowledgement: true,
+      selectQueue: [testAccount.id, "show-quota"],
+      deferMissingAcknowledgement: true,
     })
     const pending = harness.runAccounts()
     await vi.waitFor(() => expect(harness.missingViews).toHaveLength(1))

@@ -6,23 +6,23 @@ Explicit model definitions are optional; the inventory below matches
 
 ## Antigravity pool (default routing for Claude and Gemini)
 
-| Model | Variants | Notes |
-|-------|----------|-------|
-| `antigravity-gemini-3-pro` | `low`, `high` | Gemini 3 Pro with thinking |
-| `antigravity-gemini-3.1-pro` | `low`, `high` | Gemini 3.1 Pro with thinking (rollout-dependent) |
-| `antigravity-gemini-3-flash` | `minimal`, `low`, `medium`, `high` | Gemini 3 Flash with thinking |
-| `antigravity-claude-sonnet-4-6` | — | Claude Sonnet 4.6 |
-| `antigravity-claude-opus-4-6-thinking` | `low`, `max` | Claude Opus 4.6 with extended thinking |
+| Model                                  | Variants                           | Notes                                            |
+| -------------------------------------- | ---------------------------------- | ------------------------------------------------ |
+| `antigravity-gemini-3-pro`             | `low`, `high`                      | Gemini 3 Pro with thinking                       |
+| `antigravity-gemini-3.1-pro`           | `low`, `high`                      | Gemini 3.1 Pro with thinking (rollout-dependent) |
+| `antigravity-gemini-3-flash`           | `minimal`, `low`, `medium`, `high` | Gemini 3 Flash with thinking                     |
+| `antigravity-claude-sonnet-4-6`        | —                                  | Claude Sonnet 4.6                                |
+| `antigravity-claude-opus-4-6-thinking` | `low`, `max`                       | Claude Opus 4.6 with extended thinking           |
 
 ## Gemini CLI pool (separate quota; fallback target)
 
-| Model | Notes |
-|-------|-------|
-| `gemini-2.5-flash` | Gemini 2.5 Flash |
-| `gemini-2.5-pro` | Gemini 2.5 Pro |
-| `gemini-3-flash-preview` | Gemini 3 Flash (preview) |
-| `gemini-3-pro-preview` | Gemini 3 Pro (preview) |
-| `gemini-3.1-pro-preview` | Gemini 3.1 Pro (preview, rollout-dependent) |
+| Model                                | Notes                                                            |
+| ------------------------------------ | ---------------------------------------------------------------- |
+| `gemini-2.5-flash`                   | Gemini 2.5 Flash                                                 |
+| `gemini-2.5-pro`                     | Gemini 2.5 Pro                                                   |
+| `gemini-3-flash-preview`             | Gemini 3 Flash (preview)                                         |
+| `gemini-3-pro-preview`               | Gemini 3 Pro (preview)                                           |
+| `gemini-3.1-pro-preview`             | Gemini 3.1 Pro (preview, rollout-dependent)                      |
 | `gemini-3.1-pro-preview-customtools` | Gemini 3.1 Pro Preview Custom Tools (preview, rollout-dependent) |
 
 ## Routing
@@ -44,11 +44,11 @@ opencode run "Hello" --model=google/antigravity-claude-opus-4-6-thinking --varia
 
 ## Variant formats
 
-| Family | Format | Example |
-|--------|--------|---------|
-| Claude | `thinkingConfig.thinkingBudget` (tokens) | `{ "thinkingConfig": { "thinkingBudget": 8192 } }` |
-| Gemini 3 | `thinkingLevel` (`minimal`/`low`/`medium`/`high`) | `{ "thinkingLevel": "high" }` |
-| Gemini 2.5 | `thinkingConfig.thinkingBudget` | `{ "thinkingConfig": { "thinkingBudget": 8192 } }` |
+| Family     | Format                                            | Example                                            |
+| ---------- | ------------------------------------------------- | -------------------------------------------------- |
+| Claude     | `thinkingConfig.thinkingBudget` (tokens)          | `{ "thinkingConfig": { "thinkingBudget": 8192 } }` |
+| Gemini 3   | `thinkingLevel` (`minimal`/`low`/`medium`/`high`) | `{ "thinkingLevel": "high" }`                      |
+| Gemini 2.5 | `thinkingConfig.thinkingBudget`                   | `{ "thinkingConfig": { "thinkingBudget": 8192 } }` |
 
 Gemini 3 levels differ by model: Flash supports
 `minimal`/`low`/`medium`/`high`; Pro supports `low`/`high`. The API rejects

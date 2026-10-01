@@ -16,7 +16,7 @@
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["/absolute/path/to/opencode-v2-antigravity-auth"]
+  "plugins": ["/absolute/path/to/opencode-v2-antigravity-auth"],
 }
 ```
 

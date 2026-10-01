@@ -4,14 +4,14 @@
 
 `AntigravityAccounts` (`src/rpc.ts`, handlers in `src/v2-plugin.ts`):
 
-| Method | Input | Output |
-|---|---|---|
-| `list` | `{}` | Accounts (redacted) + `activeIndex` / `activeIndexByFamily` |
-| `quota` | `{ refresh? }` | `QuotaPresentation` (see [quota-contract.md](quota-contract.md)) |
-| `verify` | `{ id }` | Success `{ index, email?, checkedAt, status: ok\|blocked\|error, message, verifyUrl? }` or `{ ok: false, kind: invalid-index\|not-found\|ambiguous, accountCount }` |
-| `mutate` | `{ id, op: select\|enable\|disable\|delete, family? }` | Success (selection/cursors/remaining/selected) or `{ ok: false, kind, accountCount }` |
-| `deleteAll` | `{}` | `{ remaining: 0 }` |
-| `ping` | `{}` | `"ANTIGRAVITY_RPC_ACCOUNTS_OK"` |
+| Method      | Input                                                  | Output                                                                                                                                                              |
+| ----------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list`      | `{}`                                                   | Accounts (redacted) + `activeIndex` / `activeIndexByFamily`                                                                                                         |
+| `quota`     | `{ refresh? }`                                         | `QuotaPresentation` (see [quota-contract.md](quota-contract.md))                                                                                                    |
+| `verify`    | `{ id }`                                               | Success `{ index, email?, checkedAt, status: ok\|blocked\|error, message, verifyUrl? }` or `{ ok: false, kind: invalid-index\|not-found\|ambiguous, accountCount }` |
+| `mutate`    | `{ id, op: select\|enable\|disable\|delete, family? }` | Success (selection/cursors/remaining/selected) or `{ ok: false, kind, accountCount }`                                                                               |
+| `deleteAll` | `{}`                                                   | `{ remaining: 0 }`                                                                                                                                                  |
+| `ping`      | `{}`                                                   | `"ANTIGRAVITY_RPC_ACCOUNTS_OK"`                                                                                                                                     |
 
 Rules:
 
@@ -36,8 +36,8 @@ Rules:
 - The host-mounted account-list view uses small colored `●` glyphs beside
   emails (enabled/disabled only), `[disabled]` text fallback, and a shared
   legend/login footer. Search, arrow selection, Enter, Esc, and mouse selection
-   are component-owned; long lists scroll. Search uses the host's focused
-   formfield text/background tokens, including on light themes. Muted selection/quota metadata for
+  are component-owned; long lists scroll. Search uses the host's focused
+  formfield text/background tokens, including on light themes. Muted selection/quota metadata for
   the highlighted account appears below the rows. Empty
   state alerts point to `opencode auth login`. Verify-blocked alerts show
   the `verifyUrl` plus reconnect guidance.
@@ -53,25 +53,25 @@ Rules:
   changes layout only. Saved readings render first; `onMount` refreshes enabled
   accounts. `ctrl+r` or clicking refresh uses the same controller operation.
   Loading and failures render inline; there is no polling or submenu.
-   The component-owned modal keymap has priority 10. Explicit Back/Esc returns
-   to the list once. Native dismissal/replacement only disposes: `onClose`
-   cannot distinguish them, so it must never reopen menus or clear a replacement.
-    Missing-account notices use host-mounted content with explicit Enter/Esc
-    or mouse acknowledgement before list navigation. Replacing the notice
-    cancels navigation; native alert promise resolution is not acknowledgement.
-    Teardown disposes without
-   reopening menus; late results cannot update a closed view. Enabled state
-   comes from the quota response and is retained across refreshes.
+  The component-owned modal keymap has priority 10. Explicit Back/Esc returns
+  to the list once. Native dismissal/replacement only disposes: `onClose`
+  cannot distinguish them, so it must never reopen menus or clear a replacement.
+  Missing-account notices use host-mounted content with explicit Enter/Esc
+  or mouse acknowledgement before list navigation. Replacing the notice
+  cancels navigation; native alert promise resolution is not acknowledgement.
+  Teardown disposes without
+  reopening menus; late results cannot update a closed view. Enabled state
+  comes from the quota response and is retained across refreshes.
 - `script/build-tui.mjs` compiles JSX through the OpenTUI Solid transform
   and externalizes all imports. tsc's automatic JSX emit alone evaluates
   dynamic props eagerly. `test/tui-quota-render.test.ts` uses Bun's native
   renderer to verify the built artifact's loading, bar updates, failure
   retention, full-width/aligned rows, host-constrained sizing, resizing,
   narrow layout, and disposal. It does not replace an installed
-   host input/auth check. The separate test checkout's optional
-   `antigravity-package.test.tsx` loads a packed plugin through its runtime
-   singleton bridge and real keymap/dialog stack; it exercises Enter, ctrl+r,
-   Esc, replacement, and cleanup with fixture RPC data.
+  host input/auth check. The separate test checkout's optional
+  `antigravity-package.test.tsx` loads a packed plugin through its runtime
+  singleton bridge and real keymap/dialog stack; it exercises Enter, ctrl+r,
+  Esc, replacement, and cleanup with fixture RPC data.
 - TUI→server calls go through `context.client.rpc(AntigravityAccounts)`
   with the current location. Quota text renders via the pure helpers in
   `src/plugin/account-ui-format.ts` (`renderQuotaBar`, `formatResetCountdown`,
@@ -110,12 +110,12 @@ smoke remnants, and they are gone from the current contract (`ping` returns
   generated. `authorize` validates the answer; no Exit option is exposed.
   Ctrl+C while answering uses the host's native prompt cancellation.
 - The form summary is captured by the integration transform and refreshed
-   after successful OAuth, RPC mutations/verification/deletion, and tool
-   management actions via `integration.reload`. External store changes
+  after successful OAuth, RPC mutations/verification/deletion, and tool
+  management actions via `integration.reload`. External store changes
   may require plugin reload to refresh this pre-auth summary; authorization
   and the capacity transaction always reread the live store.
 - The stock v2.0.18 CLI performs one authentication and exits with Done.
   Rerun the command to add another account. No host-specific login metadata
   or repeated-login loop is used. Login
   additions remain on `opencode auth login`, not silently moved to a TUI flow.
-   Live OAuth completion still requires user-participated verification.
+  Live OAuth completion still requires user-participated verification.

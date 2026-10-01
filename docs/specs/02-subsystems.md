@@ -8,7 +8,7 @@
   5 scopes joined by space, `code_challenge` + `code_challenge_method=S256`,
   `state=base64url({verifier,projectId})`, `access_type=offline`,
   `prompt=consent`. PKCE pair from `@openauthjs/openauth/pkce ::
-  generatePKCE`. No I/O.
+generatePKCE`. No I/O.
 - `exchangeAntigravity(code, state)` never throws; returns
   `success{refresh,access,expires,email?,projectId} | failed{error}`.
   Sequence: `decodeState` → `Date.now()` startTime → POST
@@ -18,7 +18,7 @@
   `fetchProjectID(access)` → pack `refresh|projectId` (2 segments only) →
   `expires = calculateTokenExpiry(startTime, expires_in)`.
 - `fetchProjectID` POSTs `{metadata:{ideType:ANTIGRAVITY,
-  platform:WINDOWS|MACOS, pluginType:GEMINI}}` to deduped
+platform:WINDOWS|MACOS, pluginType:GEMINI}}` to deduped
   `[...ANTIGRAVITY_LOAD_ENDPOINTS, ...ANTIGRAVITY_ENDPOINT_FALLBACKS]`
   `v1internal:loadCodeAssist`, mixing Gemini-CLI UA with Antigravity
   Client-Metadata. Accepts `cloudaicompanionProject` string or `{id}`.
@@ -33,19 +33,19 @@
   `formatRefreshParts` serializes. Callers MUST tolerate the 2-segment form
   written by `oauth.ts` (missing 3rd segment).
 - `accessTokenExpired` uses a 60 s clock-skew buffer. `calculateTokenExpiry
-  (requestTimeMs, expiresInSeconds)` defaults 3600 s; NaN/≤0 → immediate
+(requestTimeMs, expiresInSeconds)` defaults 3600 s; NaN/≤0 → immediate
   expiry.
 - `refreshAccessToken` (`src/plugin/token.ts`) POSTs
   `grant_type=refresh_token` with client id/secret, parses varied error
   shapes, throws `AntigravityTokenRefreshError{code,description,status,
-  statusText}` on `!ok`; `invalid_grant` invalidates project cache and clears
+statusText}` on `!ok`; `invalid_grant` invalidates project cache and clears
   cached auth; preserves project ids when the server omits `refresh_token`;
   stores cached auth + invalidates project cache on success.
 - Refresh is unified: `src/plugin/engine.ts ::
-  refreshOAuthCredentialUnified` and the V2 authorize-callback path both go
+refreshOAuthCredentialUnified` and the V2 authorize-callback path both go
   through `src/plugin/token.ts :: refreshAccessToken` (skew handling,
   `invalid_grant` eviction). `src/v2-plugin.ts ::
-  refreshOAuthCredential` is a thin wrapper that delegates to the unified
+refreshOAuthCredential` is a thin wrapper that delegates to the unified
   path and persists refresh rotation; new code MUST NOT add a parallel
   refresh implementation.
 
@@ -56,7 +56,7 @@ endpointOverride, headerStyle, forceThinkingRecovery, opts)`:
 
 1. Rejects non-generative-language URLs (`isGenerativeLanguageRequest`
    hostname check); strips `x-goog-api-key / x-api-key /
-   x-goog-user-project` for ALL header styles.
+x-goog-user-project` for ALL header styles.
 2. Parses `/models/([^:]+):(\w+)`; resolves via
    `resolveModelForHeaderStyle`; builds
    `v1internal:streamGenerateContent?alt=sse` or `generateContent` with
@@ -75,14 +75,14 @@ endpointOverride, headerStyle, forceThinkingRecovery, opts)`:
    `functionCall` parts; empty/invalid `contents.parts` and
    `systemInstruction.parts` are removed before forwarding.
 6. Signature plumbing: `buildSignatureSessionKey(session:model:project:
-   conversation + seed-hash fallback)`, `deepFilterThinkingBlocks`,
+conversation + seed-hash fallback)`, `deepFilterThinkingBlocks`,
    `ensureThinkingBeforeToolUseInContents/Messages` (sentinel
    `skip_thought_signature_validator` / `SKIP_THOUGHT_SIGNATURE`),
    `sanitizeRequestPayloadForAntigravity` (first functionCall keeps the
    signature; parallels stripped), debug/synthetic thinking inject + strip.
 7. Returns `{request, init, streaming, requestedModel, effectiveModel,
-   projectId, endpoint, sessionId, toolDebug*, needsSignedThinkingWarmup,
-   headerStyle, thinkingRecoveryMessage}`.
+projectId, endpoint, sessionId, toolDebug*, needsSignedThinkingWarmup,
+headerStyle, thinkingRecoveryMessage}`.
 
 ## 2.4 Schema + thinking utilities — `src/plugin/request-helpers.ts`
 
@@ -101,14 +101,14 @@ endpointOverride, headerStyle, forceThinkingRecovery, opts)`:
   `providerMetadata.anthropic.signature`; functionCall args JSON-parse with
   `{}` fallback; inlineData → `processImageData`); usage extractors;
   preview-access rewrite; `injectParameterSignatures /
-  injectToolHardeningInstruction`; `fixToolResponseGrouping /
-  validateAndFixClaudeToolPairing`; `isEmptyResponseBody /
-  createSyntheticErrorResponse`.
+injectToolHardeningInstruction`; `fixToolResponseGrouping /
+validateAndFixClaudeToolPairing`; `isEmptyResponseBody /
+createSyntheticErrorResponse`.
 
 ## 2.5 Multi-account pool + rotation — `accounts.ts`, `rotation.ts`
 
 - `RateLimitReason = QUOTA_EXHAUSTED | RATE_LIMIT_EXCEEDED |
-  MODEL_CAPACITY_EXHAUSTED | SERVER_ERROR | UNKNOWN`.
+MODEL_CAPACITY_EXHAUSTED | SERVER_ERROR | UNKNOWN`.
   `parseRateLimitReason`: 529/503 → capacity, 500 → server, reason/message
   scan capacity>rate-limit>quota, 429 → UNKNOWN.
 - `calculateBackoffMs`: quota `[60 s, 5 m, 30 m, 2 h]` by failure count;
@@ -116,8 +116,8 @@ endpointOverride, headerStyle, forceThinkingRecovery, opts)`:
   `Retry-After` respected (≥2 s floor).
 - `QuotaKey = claude | gemini-antigravity[:model] | gemini-cli[:model]`.
 - `ManagedAccount{index,email,addedAt,lastUsed,parts,access,expires,enabled,
-  rateLimitResetTimes,touchedForQuota,consecutiveFailures+TTL,
-  fingerprint+history[5],cachedQuota+updatedAt,verification*}`.
+rateLimitResetTimes,touchedForQuota,consecutiveFailures+TTL,
+fingerprint+history[5],cachedQuota+updatedAt,verification*}`.
 - Selection: sticky / round-robin / hybrid (default hybrid) via
   `getCurrentOrNextForFamily` with headerStyle + soft-quota + cooldown
   filters, PID offset, cursor round-robin. Hybrid score =
@@ -226,16 +226,16 @@ non-streaming variant.
   `persistOAuthAccount` (dedupe by refresh then case-insensitive email,
   cap 10, single-lock `updateAccounts`), `persistRefreshRotation`, quota
   presentation (per-account 12 s timeout clamped 1–30 s, 15 m staleness,
-   fetch-abort-only cancellation, successful snapshot persistence matched
-   to the checked account generation, retaining newer/last-good cache).
+  fetch-abort-only cancellation, successful snapshot persistence matched
+  to the checked account generation, retaining newer/last-good cache).
 - `tui.ts` / `rpc.ts`: production `/antigravity` dialog + credential-free
   `AntigravityAccounts` RPC (`list/quota/verify/mutate/deleteAll/ping`),
   sharing the `account-service.ts` backend with the legacy
   `antigravity_accounts` tool. Transport rule: omit absent optionals, never
   send explicit `undefined` (host JSON codec rejects it); stale mutation
-   targets fail closed. Quota controller and built native rendering have
-   automated coverage; installed host input/auth/stack integration needs
-   `../dev/manual-testing.md`.
+  targets fail closed. Quota controller and built native rendering have
+  automated coverage; installed host input/auth/stack integration needs
+  `../dev/manual-testing.md`.
 - `version.ts :: initAntigravityVersion` (changelog scrape 5 k chars →
   fallback; regex `\d+\.\d+\.\d+`; 5 s; `setAntigravityVersion` write-once).
 - `debug.ts` (file logs, 25-file rotation, Authorization masking, 12 k

@@ -63,10 +63,7 @@ describe("initAntigravityVersion — network failure path", () => {
   })
 
   it("falls back to hardcoded version when both fetches return non-ok", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({ ok: false, status: 503, text: async () => "" }),
-    )
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 503, text: async () => "" }))
 
     const { ANTIGRAVITY_VERSION_FALLBACK, getAntigravityVersion } = await import("../constants.ts")
     const { initAntigravityVersion } = await import("./version.ts")
@@ -76,10 +73,7 @@ describe("initAntigravityVersion — network failure path", () => {
   })
 
   it("uses API version when auto-updater responds", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({ ok: true, text: async () => "1.19.0" }),
-    )
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, text: async () => "1.19.0" }))
 
     const { getAntigravityVersion } = await import("../constants.ts")
     const { initAntigravityVersion } = await import("./version.ts")

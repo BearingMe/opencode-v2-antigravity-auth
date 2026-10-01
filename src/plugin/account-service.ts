@@ -87,26 +87,37 @@ export interface QuotaCheckOutcome {
 
 export type QuotaPresentationGroup = "claude" | "gemini-pro" | "gemini-flash"
 
-export const quotaPresentationSchema = z.object({
-  activeIndexByFamily: z.object({ claude: z.number().int().nonnegative(), gemini: z.number().int().nonnegative() }),
-  accounts: z.array(z.object({
-    id: z.string(),
-    email: z.string(),
-    enabled: z.boolean(),
-    status: z.enum(["ok", "error", "unknown"]),
-    groups: z.record(z.enum(["claude", "gemini-pro", "gemini-flash"]), z.object({
-      remainingFraction: z.number().min(0).max(1).nullable(),
-      consumedPercent: z.number().min(0).max(100).nullable(),
-      resetTime: z.number().finite().nullable(),
-    }).strict()),
-    checkedAt: z.number().finite().nullable(),
-    freshness: z.enum(["fresh", "stale", "unchecked"]),
-    verificationRequired: z.boolean(),
-    cooldownUntil: z.number().finite().nullable(),
-    coolingDown: z.boolean(),
-    selectedByFamily: z.object({ claude: z.boolean(), gemini: z.boolean() }).strict(),
-  }).strict()),
-}).strict()
+export const quotaPresentationSchema = z
+  .object({
+    activeIndexByFamily: z.object({ claude: z.number().int().nonnegative(), gemini: z.number().int().nonnegative() }),
+    accounts: z.array(
+      z
+        .object({
+          id: z.string(),
+          email: z.string(),
+          enabled: z.boolean(),
+          status: z.enum(["ok", "error", "unknown"]),
+          groups: z.record(
+            z.enum(["claude", "gemini-pro", "gemini-flash"]),
+            z
+              .object({
+                remainingFraction: z.number().min(0).max(1).nullable(),
+                consumedPercent: z.number().min(0).max(100).nullable(),
+                resetTime: z.number().finite().nullable(),
+              })
+              .strict(),
+          ),
+          checkedAt: z.number().finite().nullable(),
+          freshness: z.enum(["fresh", "stale", "unchecked"]),
+          verificationRequired: z.boolean(),
+          cooldownUntil: z.number().finite().nullable(),
+          coolingDown: z.boolean(),
+          selectedByFamily: z.object({ claude: z.boolean(), gemini: z.boolean() }).strict(),
+        })
+        .strict(),
+    ),
+  })
+  .strict()
 
 export type QuotaPresentation = z.infer<typeof quotaPresentationSchema>
 
@@ -122,8 +133,7 @@ export interface QuotaPresentationOptions {
 export type AccountTarget = { id: string } | { index: number }
 
 export type TargetResolution =
-  | { ok: true; index: number }
-  | { ok: false; kind: "invalid-index" | "not-found" | "ambiguous"; accountCount: number }
+  { ok: true; index: number } | { ok: false; kind: "invalid-index" | "not-found" | "ambiguous"; accountCount: number }
 
 /** Failure half of a resolution. Service entry points never return ok:true. */
 export type ResolutionFailure = Exclude<TargetResolution, { ok: true }>
@@ -166,9 +176,7 @@ export interface MutationOutcome {
   selected: SelectedAccount | null
 }
 
-export type MutationFailure =
-  | ResolutionFailure
-  | { ok: false; kind: "unknown-op"; accountCount: number }
+export type MutationFailure = ResolutionFailure | { ok: false; kind: "unknown-op"; accountCount: number }
 
 export interface OAuthPersistInput {
   refresh: string
@@ -231,9 +239,10 @@ function summarize(storage: AccountStorageV4, account: AccountMetadataV3, index:
     enabled: account.enabled !== false,
     active: index === storage.activeIndex,
     verificationRequired: account.verificationRequired === true,
-    verificationStatus: account.verificationRequired === true
-      ? "verification_required"
-      : account.lastVerificationStatus ?? "not_checked",
+    verificationStatus:
+      account.verificationRequired === true
+        ? "verification_required"
+        : (account.lastVerificationStatus ?? "not_checked"),
   }
   if (typeof account.lastVerificationAt === "number" && Number.isFinite(account.lastVerificationAt)) {
     summary.lastVerificationAt = account.lastVerificationAt
@@ -303,7 +312,7 @@ export function resolveAccountTarget(accounts: AccountMetadataV3[], target: Acco
 }
 
 export async function listAccounts(): Promise<AccountList> {
-  const storage = await loadAccounts() ?? emptyStorage()
+  const storage = (await loadAccounts()) ?? emptyStorage()
   return toAccountList(storage)
 }
 
@@ -323,7 +332,7 @@ export async function checkQuota(
   client: PluginClient,
   providerId: string = ANTIGRAVITY_PROVIDER_ID,
 ): Promise<QuotaCheckOutcome> {
-  const stored = await loadAccounts() ?? emptyStorage()
+  const stored = (await loadAccounts()) ?? emptyStorage()
   const accounts = [...stored.accounts]
   const results = await checkAccountsQuota(accounts, client, providerId)
 
@@ -366,15 +375,19 @@ async function persistQuotaSnapshots(
   checkedAt: number,
 ): Promise<AccountStorageV4> {
   if (!results.some((result) => result?.status === "ok" && result.quota && !result.quota.error)) {
-    return await loadAccounts() ?? emptyStorage()
+    return (await loadAccounts()) ?? emptyStorage()
   }
   return updateAccounts((current) => {
     let dirty = false
     const next = current.accounts.map((account) => {
       // Reconnects change the token, deletions remove the identity. Never
       // apply an in-flight check to a different generation of that account.
-      const index = accounts.findIndex((source) => source.id === account.id
-        && source.refreshToken === account.refreshToken && source.addedAt === account.addedAt)
+      const index = accounts.findIndex(
+        (source) =>
+          source.id === account.id &&
+          source.refreshToken === account.refreshToken &&
+          source.addedAt === account.addedAt,
+      )
       const result = results[index]
       if (!result || result.status !== "ok" || !result.quota || result.quota.error) return account
       if ((account.cachedQuotaUpdatedAt ?? 0) > checkedAt) return account
@@ -434,7 +447,7 @@ async function checkSingleAccountQuota(
           resolve(undefined)
         }, timeoutMs)
       }),
-    ]).then((result) => result ? { ...result, index } : undefined)
+    ]).then((result) => (result ? { ...result, index } : undefined))
   } catch {
     return undefined
   } finally {
@@ -456,20 +469,23 @@ export async function getQuotaPresentation(
   options: QuotaPresentationOptions = {},
   providerId: string = ANTIGRAVITY_PROVIDER_ID,
 ): Promise<QuotaPresentation> {
-  let storage = await loadAccounts() ?? emptyStorage()
+  let storage = (await loadAccounts()) ?? emptyStorage()
   const sources = storage.accounts
   const checkStartedAt = Date.now()
   const refresh = options.refresh !== false
   const timeoutMs = boundedTimeout(options.timeoutMs)
-  const staleAfterMs = typeof options.staleAfterMs === "number" && Number.isFinite(options.staleAfterMs)
-    ? Math.max(0, options.staleAfterMs)
-    : DEFAULT_QUOTA_STALE_AFTER_MS
+  const staleAfterMs =
+    typeof options.staleAfterMs === "number" && Number.isFinite(options.staleAfterMs)
+      ? Math.max(0, options.staleAfterMs)
+      : DEFAULT_QUOTA_STALE_AFTER_MS
 
   const refreshed = refresh
-    ? await Promise.all(storage.accounts.map(async (account, index) => {
-      if (account.enabled === false) return undefined
-      return checkSingleAccountQuota(account, index, client, providerId, timeoutMs)
-    }))
+    ? await Promise.all(
+        storage.accounts.map(async (account, index) => {
+          if (account.enabled === false) return undefined
+          return checkSingleAccountQuota(account, index, client, providerId, timeoutMs)
+        }),
+      )
     : []
 
   if (refresh) {
@@ -480,41 +496,48 @@ export async function getQuotaPresentation(
       // metadata rather than projecting the pre-check pool after a failed write.
       // Do not log raw storage errors: they can contain credential material.
       log.warn("Failed to persist quota snapshots; reloading account state")
-      storage = await loadAccounts() ?? emptyStorage()
+      storage = (await loadAccounts()) ?? emptyStorage()
     }
   }
   const familySelection = familyCursors(storage, storage.accounts.length)
 
   const now = Date.now()
   const accounts = storage.accounts.map((account, index) => {
-    const sourceIndex = sources.findIndex((source) => source.id === account.id
-      && source.refreshToken === account.refreshToken && source.addedAt === account.addedAt)
+    const sourceIndex = sources.findIndex(
+      (source) =>
+        source.id === account.id && source.refreshToken === account.refreshToken && source.addedAt === account.addedAt,
+    )
     const result = refreshed[sourceIndex]
-    const cachedAt = typeof account.cachedQuotaUpdatedAt === "number" && Number.isFinite(account.cachedQuotaUpdatedAt)
-      ? account.cachedQuotaUpdatedAt
-      : null
+    const cachedAt =
+      typeof account.cachedQuotaUpdatedAt === "number" && Number.isFinite(account.cachedQuotaUpdatedAt)
+        ? account.cachedQuotaUpdatedAt
+        : null
     const checkAttempted = refresh && sources[sourceIndex]?.enabled !== false && sourceIndex >= 0
     const resultHasError = checkAttempted && (!result || result.status === "error" || !!result.quota?.error)
     const resultHasKnownQuota = Object.values(result?.quota?.groups ?? {}).some((group) => {
       const value = group.remainingFraction
       return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1
     })
-    const useFreshQuota = !!result && !resultHasError && resultHasKnownQuota && (account.cachedQuotaUpdatedAt ?? 0) <= checkStartedAt
+    const useFreshQuota =
+      !!result && !resultHasError && resultHasKnownQuota && (account.cachedQuotaUpdatedAt ?? 0) <= checkStartedAt
     const checkedAt = useFreshQuota ? checkStartedAt : cachedAt
     const cacheIsStale = cachedAt === null || now - cachedAt > staleAfterMs || cachedAt > now
     const quotaGroups = useFreshQuota ? result.quota?.groups : account.cachedQuota
-    const groups = Object.fromEntries(QUOTA_PRESENTATION_GROUPS.map((group) => {
-      const quota = quotaGroups?.[group]
-      const raw = quota?.remainingFraction
-      const fraction = typeof raw === "number" && Number.isFinite(raw) && raw >= 0 && raw <= 1
-        ? raw
-        : null
-      return [group, {
-        remainingFraction: fraction,
-        consumedPercent: fraction === null ? null : Math.round((1 - fraction) * 1000) / 10,
-        resetTime: parseQuotaResetTime(quota?.resetTime),
-      }]
-    })) as QuotaPresentation["accounts"][number]["groups"]
+    const groups = Object.fromEntries(
+      QUOTA_PRESENTATION_GROUPS.map((group) => {
+        const quota = quotaGroups?.[group]
+        const raw = quota?.remainingFraction
+        const fraction = typeof raw === "number" && Number.isFinite(raw) && raw >= 0 && raw <= 1 ? raw : null
+        return [
+          group,
+          {
+            remainingFraction: fraction,
+            consumedPercent: fraction === null ? null : Math.round((1 - fraction) * 1000) / 10,
+            resetTime: parseQuotaResetTime(quota?.resetTime),
+          },
+        ]
+      }),
+    ) as QuotaPresentation["accounts"][number]["groups"]
     const hasKnownQuota = Object.values(groups).some((group) => group.remainingFraction !== null)
     const status: QuotaPresentation["accounts"][number]["status"] = resultHasError
       ? "error"
@@ -541,9 +564,10 @@ export async function getQuotaPresentation(
       checkedAt,
       freshness,
       verificationRequired: account.verificationRequired === true,
-      cooldownUntil: typeof account.coolingDownUntil === "number" && Number.isFinite(account.coolingDownUntil)
-        ? account.coolingDownUntil
-        : null,
+      cooldownUntil:
+        typeof account.coolingDownUntil === "number" && Number.isFinite(account.coolingDownUntil)
+          ? account.coolingDownUntil
+          : null,
       coolingDown: typeof account.coolingDownUntil === "number" && account.coolingDownUntil > now,
       selectedByFamily: {
         claude: index === familySelection.claude,
@@ -560,7 +584,7 @@ export async function verifyAccount(
   client: PluginClient,
   providerId: string = ANTIGRAVITY_PROVIDER_ID,
 ): Promise<VerifyOutcome | ResolutionFailure> {
-  const stored = await loadAccounts() ?? emptyStorage()
+  const stored = (await loadAccounts()) ?? emptyStorage()
   const accounts = [...stored.accounts]
   const resolution = resolveAccountTarget(accounts, target)
   if (!resolution.ok) return resolution
@@ -579,9 +603,7 @@ export async function verifyAccount(
   return updateAccounts<VerifyOutcome | ResolutionFailure>((current) => {
     const currentAccounts = [...current.accounts]
     ensureAccountIds(currentAccounts)
-    let index = targetId !== undefined
-      ? currentAccounts.findIndex((entry) => entry.id === targetId)
-      : -1
+    let index = targetId !== undefined ? currentAccounts.findIndex((entry) => entry.id === targetId) : -1
     if (index < 0) {
       const tokenMatches: number[] = []
       currentAccounts.forEach((entry, entryIndex) => {
@@ -660,7 +682,7 @@ export async function mutateAccount(
   options: MutateOptions = {},
 ): Promise<MutationOutcome | MutationFailure> {
   if (op !== "select" && op !== "enable" && op !== "disable" && op !== "delete") {
-    const stored = await loadAccounts() ?? emptyStorage()
+    const stored = (await loadAccounts()) ?? emptyStorage()
     return { ok: false, kind: "unknown-op", accountCount: stored.accounts.length }
   }
   // Resolve and apply inside one lock acquisition: a concurrent delete or
@@ -691,13 +713,14 @@ export async function mutateAccount(
       return { storage: current, result: { ok: false, kind: "unknown-op", accountCount: accounts.length } }
     }
 
-    const nextActiveIndex = op === "select"
-      ? index
-      : accounts.length === 0
-        ? 0
-        : index < current.activeIndex
-          ? current.activeIndex - 1
-          : Math.min(current.activeIndex, accounts.length - 1)
+    const nextActiveIndex =
+      op === "select"
+        ? index
+        : accounts.length === 0
+          ? 0
+          : index < current.activeIndex
+            ? current.activeIndex - 1
+            : Math.min(current.activeIndex, accounts.length - 1)
 
     let nextFamily: { claude: number; gemini: number }
     if (op === "select" && options.family) {
@@ -708,9 +731,10 @@ export async function mutateAccount(
     } else if (op === "select" && LEGACY_TOOL_SELECT_UPDATES_BOTH_FAMILIES) {
       nextFamily = { claude: nextActiveIndex, gemini: nextActiveIndex }
     } else if (op === "delete") {
-      nextFamily = accounts.length === 0
-        ? { claude: 0, gemini: 0 }
-        : remapFamilyCursorsAfterDelete(previous, index, nextActiveIndex, accounts.length)
+      nextFamily =
+        accounts.length === 0
+          ? { claude: 0, gemini: 0 }
+          : remapFamilyCursorsAfterDelete(previous, index, nextActiveIndex, accounts.length)
     } else {
       nextFamily = familyCursors({ ...current, accounts, activeIndex: nextActiveIndex }, accounts.length)
     }
@@ -749,11 +773,13 @@ export async function deleteAllAccounts(): Promise<{ remaining: 0 }> {
       activeIndexByFamily: { claude: 0, gemini: 0 },
       removedAccounts: addTombstones(
         current.removedAccounts,
-        current.accounts.map((account) => tombstoneForAccount({
-          id: account.id,
-          refreshToken: account.refreshToken,
-          email: account.email,
-        })),
+        current.accounts.map((account) =>
+          tombstoneForAccount({
+            id: account.id,
+            refreshToken: account.refreshToken,
+            email: account.email,
+          }),
+        ),
       ),
     },
     result: { remaining: 0 as const },
@@ -792,15 +818,17 @@ export async function persistOAuthAccount(
 
     const accounts = action === "replace" ? [] : [...current.accounts]
     ensureAccountIds(accounts)
-    const matchIndex = accounts.findIndex((existing) =>
-      existing.refreshToken === account.refreshToken ||
-      (!!account.email && existing.email?.toLowerCase() === account.email.toLowerCase()),
+    const matchIndex = accounts.findIndex(
+      (existing) =>
+        existing.refreshToken === account.refreshToken ||
+        (!!account.email && existing.email?.toLowerCase() === account.email.toLowerCase()),
     )
     let isNew = false
     if (matchIndex >= 0) {
       const existing = accounts[matchIndex]
       // Preserve the durable id and original add time across reconnects.
-      if (existing) accounts[matchIndex] = { ...existing, ...account, id: existing.id ?? account.id, addedAt: existing.addedAt }
+      if (existing)
+        accounts[matchIndex] = { ...existing, ...account, id: existing.id ?? account.id, addedAt: existing.addedAt }
     } else {
       if (accounts.length >= MAX_SAVED_ACCOUNTS) throw new Error("Maximum of 10 Antigravity accounts reached")
       accounts.push(account)
@@ -856,9 +884,8 @@ export async function persistRefreshRotation(
     }
     ensureAccountIds(current.accounts)
     const accounts = current.accounts.map((account) =>
-      account.refreshToken === previousRefreshToken
-        ? { ...account, refreshToken: rotatedRefreshToken }
-        : account)
+      account.refreshToken === previousRefreshToken ? { ...account, refreshToken: rotatedRefreshToken } : account,
+    )
     return { storage: { ...current, accounts }, result: true }
   })
 }

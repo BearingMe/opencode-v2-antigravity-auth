@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest"
-import {
-  GEMINI_CLI_HEADERS,
-  getRandomizedHeaders,
-  type HeaderSet,
-} from "./constants.ts"
+import { GEMINI_CLI_HEADERS, getRandomizedHeaders, type HeaderSet } from "./constants.ts"
 
 describe("GEMINI_CLI_HEADERS", () => {
   it("matches Code Assist headers from opencode-gemini-auth", () => {

@@ -1,6 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { authorizeAntigravity, exchangeAntigravity, loadAccounts, updateAccounts, verifyAccountAccess, mockNativeFetch, mockLoadManager, mockUnifiedRefresh, mockRefreshQueue, mockDisposeResources, written } = vi.hoisted(() => ({
+const {
+  authorizeAntigravity,
+  exchangeAntigravity,
+  loadAccounts,
+  updateAccounts,
+  verifyAccountAccess,
+  mockNativeFetch,
+  mockLoadManager,
+  mockUnifiedRefresh,
+  mockRefreshQueue,
+  mockDisposeResources,
+  written,
+} = vi.hoisted(() => ({
   authorizeAntigravity: vi.fn(async () => ({
     url: "https://accounts.google.com/auth?state=encoded-state",
     verifier: "verifier",
@@ -32,16 +44,18 @@ const { authorizeAntigravity, exchangeAntigravity, loadAccounts, updateAccounts,
 // Transactional storage mock mirroring src/plugin/storage.ts updateAccounts:
 // the updater runs against a clone of the latest loadAccounts value and its
 // replacement store is recorded. Unchanged inputs record nothing.
-updateAccounts.mockImplementation(async (updater: (current: unknown) => Promise<{ storage: unknown; result: unknown }>) => {
-  const current = (await loadAccounts()) ?? { version: 4, accounts: [], activeIndex: 0 }
-  const input = structuredClone(current)
-  const { storage, result } = await updater(input)
-  if (storage !== input) {
-    written.push(storage)
-    loadAccounts.mockResolvedValue(storage)
-  }
-  return result
-})
+updateAccounts.mockImplementation(
+  async (updater: (current: unknown) => Promise<{ storage: unknown; result: unknown }>) => {
+    const current = (await loadAccounts()) ?? { version: 4, accounts: [], activeIndex: 0 }
+    const input = structuredClone(current)
+    const { storage, result } = await updater(input)
+    if (storage !== input) {
+      written.push(storage)
+      loadAccounts.mockResolvedValue(storage)
+    }
+    return result
+  },
+)
 
 beforeEach(() => {
   written.length = 0
@@ -80,7 +94,15 @@ describe("V2 Antigravity runtime bridge", () => {
     vi.clearAllMocks()
     loadAccounts.mockResolvedValue({
       version: 4,
-      accounts: [{ email: "old@example.com", refreshToken: "old-refresh-token", projectId: "old-project", addedAt: 1, lastUsed: 2 }],
+      accounts: [
+        {
+          email: "old@example.com",
+          refreshToken: "old-refresh-token",
+          projectId: "old-project",
+          addedAt: 1,
+          lastUsed: 2,
+        },
+      ],
       activeIndex: 0,
     })
     mockLoadManager.mockResolvedValue({ index: "native-manager", getAccountCount: () => 1 })
@@ -95,13 +117,18 @@ describe("V2 Antigravity runtime bridge", () => {
     const otherOAuth = { type: "oauth", id: "other-oauth", label: "Other OAuth" }
     const listMethods = vi.fn(() => [inheritedKey, inheritedEnv, otherOAuth])
     const removeMethod = vi.fn()
-    const googleProviderInfo: { activation?: string; package?: string } = { activation: "auto", package: "@opencode/ai/providers/google" }
-    let sdkHook: ((event: {
-      package: string
-      model: { id: string }
-      options: Record<string, unknown>
-      sdk?: unknown
-    }) => Promise<void> | void) | undefined
+    const googleProviderInfo: { activation?: string; package?: string } = {
+      activation: "auto",
+      package: "@opencode/ai/providers/google",
+    }
+    let sdkHook:
+      | ((event: {
+          package: string
+          model: { id: string }
+          options: Record<string, unknown>
+          sdk?: unknown
+        }) => Promise<void> | void)
+      | undefined
     let cleanup: (() => void) | void
 
     const connection = { id: "google-connection" }
@@ -117,16 +144,21 @@ describe("V2 Antigravity runtime bridge", () => {
     const ctx = {
       location: { directory: "C:/test-project" },
       integration: {
-        reload: vi.fn(async () => { replayIntegration?.() }),
+        reload: vi.fn(async () => {
+          replayIntegration?.()
+        }),
         transform: async (callback: (editor: unknown) => void) => {
-          replayIntegration = () => callback({
-            update: vi.fn(),
-            method: {
-              list: listMethods,
-              remove: removeMethod,
-              update: (value: Record<string, unknown>) => { integrationMethod = value },
-            },
-          })
+          replayIntegration = () =>
+            callback({
+              update: vi.fn(),
+              method: {
+                list: listMethods,
+                remove: removeMethod,
+                update: (value: Record<string, unknown>) => {
+                  integrationMethod = value
+                },
+              },
+            })
           replayIntegration()
         },
         connection: {
@@ -135,31 +167,45 @@ describe("V2 Antigravity runtime bridge", () => {
         },
       },
       provider: {
-        transform: async (callback: (editor: unknown) => void) => callback({
-          get: () => ({ models: new Map([[
-            "antigravity-gemini-3.8-flash-tiered",
-            {
-              id: "antigravity-gemini-3.8-flash-tiered",
-              package: "@opencode/ai/providers/google",
-              settings: {},
+        transform: async (callback: (editor: unknown) => void) =>
+          callback({
+            get: () => ({
+              models: new Map([
+                [
+                  "antigravity-gemini-3.8-flash-tiered",
+                  {
+                    id: "antigravity-gemini-3.8-flash-tiered",
+                    package: "@opencode/ai/providers/google",
+                    settings: {},
+                  },
+                ],
+              ]),
+              info: googleProviderInfo,
+            }),
+            update: (_id: string, update: (provider: { activation?: string; package?: string }) => void) =>
+              update(googleProviderInfo),
+            models: {
+              set: (_id: string, models: Array<Record<string, unknown>>) => {
+                modelDefinitions = models
+              },
             },
-          ]]), info: googleProviderInfo }),
-          update: (_id: string, update: (provider: { activation?: string; package?: string }) => void) => update(googleProviderInfo),
-          models: { set: (_id: string, models: Array<Record<string, unknown>>) => { modelDefinitions = models } },
-          add: vi.fn(),
-        }),
+            add: vi.fn(),
+          }),
       },
       model: {
-        transform: async (callback: (editor: unknown) => void) => callback({
-          list: () => modelDefinitions,
-          update: (_providerID: string, modelID: string, update: (model: Record<string, unknown>) => void) => {
-            const model = modelDefinitions.find((item) => item.id === modelID)
-            if (model) update(model)
-          },
-        }),
+        transform: async (callback: (editor: unknown) => void) =>
+          callback({
+            list: () => modelDefinitions,
+            update: (_providerID: string, modelID: string, update: (model: Record<string, unknown>) => void) => {
+              const model = modelDefinitions.find((item) => item.id === modelID)
+              if (model) update(model)
+            },
+          }),
       },
       aisdk: {
-        hook: vi.fn(async (_name: string, callback: typeof sdkHook) => { sdkHook = callback }),
+        hook: vi.fn(async (_name: string, callback: typeof sdkHook) => {
+          sdkHook = callback
+        }),
       },
       session: { hook: vi.fn(async () => ({ dispose: vi.fn() })) },
       tool: { transform: async (callback: (editor: unknown) => void) => callback({ add: vi.fn() }) },
@@ -180,7 +226,9 @@ describe("V2 Antigravity runtime bridge", () => {
     expect(customGeminiModel?.package).toBe(`aisdk:${sdkPackage}`)
     expect((claudeModel?.settings as Record<string, unknown>)?.fetch).toBeUndefined()
     expect(sdkHook).toEqual(expect.any(Function))
-    const rpcRegister = ctx.rpc.register as unknown as { mock: { calls: Array<[unknown, Record<string, (input: unknown) => Promise<unknown>>]> } }
+    const rpcRegister = ctx.rpc.register as unknown as {
+      mock: { calls: Array<[unknown, Record<string, (input: unknown) => Promise<unknown>>]> }
+    }
     expect(rpcRegister.mock.calls).toHaveLength(1)
     expect(rpcRegister.mock.calls[0]?.[0]).toBeDefined()
     const handlers = rpcRegister.mock.calls[0]?.[1]
@@ -195,17 +243,27 @@ describe("V2 Antigravity runtime bridge", () => {
     await expect(call("ping", {})).resolves.toBe("ANTIGRAVITY_RPC_ACCOUNTS_OK")
     expect(integrationMethod).toBeDefined()
     expect(typeof integrationMethod?.refresh).toBe("function")
-    const label = integrationMethod?.label as (credential: { refresh: string; metadata?: Record<string, unknown> }) => string | undefined
+    const label = integrationMethod?.label as (credential: {
+      refresh: string
+      metadata?: Record<string, unknown>
+    }) => string | undefined
     expect(label({ refresh: "old-refresh-token|old-project" })).toBe("old@example.com")
-    expect(label({ refresh: "other-token", metadata: { email: "connected@example.com" } })).toBe("connected@example.com")
+    expect(label({ refresh: "other-token", metadata: { email: "connected@example.com" } })).toBe(
+      "connected@example.com",
+    )
     expect(listMethods).toHaveBeenCalledWith("google")
     expect(removeMethod).toHaveBeenCalledExactlyOnceWith("google", inheritedKey)
     expect(removeMethod.mock.calls[0]?.[1]).toBe(inheritedKey)
-    expect(integrationMethod?.method).toMatchObject({ form: [{
-      key: "accountAction", required: true,
-      description: expect.stringContaining("old@example.com"),
-      options: [{ value: "add" }],
-    }] })
+    expect(integrationMethod?.method).toMatchObject({
+      form: [
+        {
+          key: "accountAction",
+          required: true,
+          description: expect.stringContaining("old@example.com"),
+          options: [{ value: "add" }],
+        },
+      ],
+    })
     expect(integrationMethod?.method).not.toHaveProperty("login")
     expect(integrationMethod?.method).toHaveProperty("form.0.options", [expect.objectContaining({ value: "add" })])
 
@@ -243,11 +301,13 @@ describe("V2 Antigravity runtime bridge", () => {
 
     activeConnection = undefined
     loadAccounts.mockResolvedValue({ version: 4, accounts: [], activeIndex: 0 })
-    await expect(sdkHook?.({
-      package: sdkPackage,
-      model: { id: "antigravity-gemini-3.8-flash-tiered" },
-      options: {},
-    })).rejects.toThrow("Antigravity OAuth is not connected")
+    await expect(
+      sdkHook?.({
+        package: sdkPackage,
+        model: { id: "antigravity-gemini-3.8-flash-tiered" },
+        options: {},
+      }),
+    ).rejects.toThrow("Antigravity OAuth is not connected")
 
     activeConnection = connection
     credential = {
@@ -258,7 +318,15 @@ describe("V2 Antigravity runtime bridge", () => {
     }
     loadAccounts.mockResolvedValue({
       version: 4,
-      accounts: [{ email: "old@example.com", refreshToken: "old-refresh-token", projectId: "old-project", addedAt: 1, lastUsed: 2 }],
+      accounts: [
+        {
+          email: "old@example.com",
+          refreshToken: "old-refresh-token",
+          projectId: "old-project",
+          addedAt: 1,
+          lastUsed: 2,
+        },
+      ],
       activeIndex: 0,
     })
 
@@ -323,7 +391,10 @@ describe("V2 Antigravity runtime bridge", () => {
     expect(updateAccounts).toHaveBeenCalledTimes(2)
     expect(written).toHaveLength(1)
     expect(written[0]).toMatchObject({
-      accounts: [expect.objectContaining({ id: "account-0", refreshToken: "rotated-existing-token" }), ...fullPool.slice(1)],
+      accounts: [
+        expect.objectContaining({ id: "account-0", refreshToken: "rotated-existing-token" }),
+        ...fullPool.slice(1),
+      ],
     })
 
     // Every RPC method output is credential-free even with token material
@@ -332,8 +403,22 @@ describe("V2 Antigravity runtime bridge", () => {
     loadAccounts.mockResolvedValue({
       version: 4,
       accounts: [
-        { id: "acc-one", email: "one@example.com", refreshToken: "secret-refresh-token-one", projectId: "p1", addedAt: 1, lastUsed: 2 },
-        { id: "acc-two", email: "two@example.com", refreshToken: "secret-refresh-token-two", projectId: "p2", addedAt: 2, lastUsed: 3 },
+        {
+          id: "acc-one",
+          email: "one@example.com",
+          refreshToken: "secret-refresh-token-one",
+          projectId: "p1",
+          addedAt: 1,
+          lastUsed: 2,
+        },
+        {
+          id: "acc-two",
+          email: "two@example.com",
+          refreshToken: "secret-refresh-token-two",
+          projectId: "p2",
+          addedAt: 2,
+          lastUsed: 3,
+        },
       ],
       activeIndex: 0,
     })
@@ -349,7 +434,9 @@ describe("V2 Antigravity runtime bridge", () => {
     scanSecrets(await call("quota", { refresh: false }))
     scanSecrets(await call("verify", { id: "acc-one" }))
     scanSecrets(await call("mutate", { id: "acc-one", op: "disable" }))
-    expect(integrationMethod?.method).toMatchObject({ form: [{ description: expect.stringContaining("one@example.com (disabled)") }] })
+    expect(integrationMethod?.method).toMatchObject({
+      form: [{ description: expect.stringContaining("one@example.com (disabled)") }],
+    })
     // Stale ids fail closed without writing.
     const staleWrites = written.length
     const stale = await call("mutate", { id: "acc-missing", op: "select" })
@@ -374,7 +461,8 @@ describe("V2 Antigravity runtime bridge", () => {
     expect(sdkOptions.apiKey).toBe("antigravity-oauth")
     const fetchModel = sdkOptions as { fetch: (input: string, init: RequestInit) => Promise<Response> }
     const payload = JSON.stringify({ contents: [{ role: "user", parts: [{ text: "hello" }] }] })
-    const requestUrl = "https://generativelanguage.googleapis.com/v1beta/models/antigravity-claude-opus-4-6-thinking:generateContent"
+    const requestUrl =
+      "https://generativelanguage.googleapis.com/v1beta/models/antigravity-claude-opus-4-6-thinking:generateContent"
     const requestInit = {
       method: "POST",
       headers: { "content-type": "application/json" },

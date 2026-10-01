@@ -60,7 +60,7 @@ Inferred (likely intent). Details live in the referenced sections.
   the default signature.
 - First functionCall keeps the signature; parallel-call extras stripped;
   replies MUST order all calls before all responses (`FC1+sig, FC2, FR1,
-  FR2` — interleaving is a 400) (Strong + External).
+FR2` — interleaving is a 400) (Strong + External).
 
 ## Recovery and resilience
 
@@ -94,7 +94,7 @@ Inferred (likely intent). Details live in the referenced sections.
 - R-ARCH-PURE-TRANSFORM (Strong, §01): keep `transform/*` pure.
 - `hooks/*` MUST NOT gain auth/quota/storage deps (SHOULD, §01).
 - New code MUST use `getAntigravityHeaders()/getAntigravityVersion()/
-  invalidatePackage()` over deprecated exports (Explicit).
+invalidatePackage()` over deprecated exports (Explicit).
 - `x-goog-user-project` MUST be stripped for all header styles; content
   requests MUST NOT send QuotaUser/Device-Id/Api-Client/Client-Metadata
   (Explicit, §06 items 9–10).

@@ -13,10 +13,7 @@
     "toast_scope": {
       "default": "root_only",
       "type": "string",
-      "enum": [
-        "root_only",
-        "all"
-      ],
+      "enum": ["root_only", "all"],
       "description": "Controls which sessions show toast notifications. 'root_only' (default) shows in root session only, 'all' shows in all sessions."
     },
     "debug": {
@@ -82,12 +79,7 @@
           "description": "Background write interval in seconds."
         }
       },
-      "required": [
-        "enabled",
-        "memory_ttl_seconds",
-        "disk_ttl_seconds",
-        "write_interval_seconds"
-      ],
+      "required": ["enabled", "memory_ttl_seconds", "disk_ttl_seconds", "write_interval_seconds"],
       "additionalProperties": false,
       "description": "Signature cache configuration for persisting thinking block signatures. Only used when keep_thinking is enabled."
     },
@@ -158,11 +150,7 @@
     "account_selection_strategy": {
       "default": "hybrid",
       "type": "string",
-      "enum": [
-        "sticky",
-        "round-robin",
-        "hybrid"
-      ]
+      "enum": ["sticky", "round-robin", "hybrid"]
     },
     "pid_offset_enabled": {
       "default": false,
@@ -175,11 +163,7 @@
     "scheduling_mode": {
       "default": "cache_first",
       "type": "string",
-      "enum": [
-        "cache_first",
-        "balance",
-        "performance_first"
-      ],
+      "enum": ["cache_first", "balance", "performance_first"],
       "description": "Rate limit scheduling strategy. 'cache_first' (default) waits for cooldowns, 'balance' distributes across accounts, 'performance_first' picks fastest available."
     },
     "max_cache_first_wait_seconds": {
@@ -323,11 +307,7 @@
           "maximum": 1000
         }
       },
-      "required": [
-        "max_tokens",
-        "regeneration_rate_per_minute",
-        "initial_tokens"
-      ],
+      "required": ["max_tokens", "regeneration_rate_per_minute", "initial_tokens"],
       "additionalProperties": false
     },
     "auto_update": {

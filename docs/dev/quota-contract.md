@@ -6,16 +6,16 @@ source renders as unknown.
 
 ## Field sources
 
-| DTO field | Source | Notes |
-|---|---|---|
-| `groups.<claude\|gemini-pro\|gemini-flash>.remainingFraction` | `fetchAvailableModels` → `quotaInfo.remainingFraction`, aggregated per group in `src/plugin/quota.ts` (`aggregateQuota`) | Finite `0..1` only. Valid `0` (exhausted) and `1` (full) preserved. |
-| `groups.*.consumedPercent` | Derived: `(1 - remainingFraction) * 100`, rounded to 0.1 | `null` whenever the fraction is unknown. |
-| `groups.*.resetTime` | `fetchAvailableModels` → `quotaInfo.resetTime`, earliest timestamp per group | Parsed to epoch ms; unparseable/missing → `null`. |
-| `checkedAt` | `Date.now()` at check start when the fresh check was usable; otherwise `cachedQuotaUpdatedAt` | The start timestamp orders concurrent checks; failed refreshes retain the last good reading's timestamp. |
-| `freshness` | `staleAfterMs` (default 15 min) vs `cachedQuotaUpdatedAt` | `fresh` \| `stale` \| `unchecked`. |
-| `status` | DTO-level rollup | `ok` \| `error` \| `unknown`. `error` when the attempted check failed (missing result, `status === "error"`, or `quota.error` set); else `ok` when at least one group has a known fraction; else `unknown`. A failed refresh still shows cached values (with `status: "error"`) so partial results survive individual account failures. |
-| `verificationRequired`, `cooldownUntil`, `coolingDown` | Plugin store | Orthogonal to quota; shown alongside it. |
-| `selectedByFamily` | Plugin store family cursors | Which account routes `claude` / `gemini` traffic. |
+| DTO field                                                     | Source                                                                                                                   | Notes                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `groups.<claude\|gemini-pro\|gemini-flash>.remainingFraction` | `fetchAvailableModels` → `quotaInfo.remainingFraction`, aggregated per group in `src/plugin/quota.ts` (`aggregateQuota`) | Finite `0..1` only. Valid `0` (exhausted) and `1` (full) preserved.                                                                                                                                                                                                                                                                     |
+| `groups.*.consumedPercent`                                    | Derived: `(1 - remainingFraction) * 100`, rounded to 0.1                                                                 | `null` whenever the fraction is unknown.                                                                                                                                                                                                                                                                                                |
+| `groups.*.resetTime`                                          | `fetchAvailableModels` → `quotaInfo.resetTime`, earliest timestamp per group                                             | Parsed to epoch ms; unparseable/missing → `null`.                                                                                                                                                                                                                                                                                       |
+| `checkedAt`                                                   | `Date.now()` at check start when the fresh check was usable; otherwise `cachedQuotaUpdatedAt`                            | The start timestamp orders concurrent checks; failed refreshes retain the last good reading's timestamp.                                                                                                                                                                                                                                |
+| `freshness`                                                   | `staleAfterMs` (default 15 min) vs `cachedQuotaUpdatedAt`                                                                | `fresh` \| `stale` \| `unchecked`.                                                                                                                                                                                                                                                                                                      |
+| `status`                                                      | DTO-level rollup                                                                                                         | `ok` \| `error` \| `unknown`. `error` when the attempted check failed (missing result, `status === "error"`, or `quota.error` set); else `ok` when at least one group has a known fraction; else `unknown`. A failed refresh still shows cached values (with `status: "error"`) so partial results survive individual account failures. |
+| `verificationRequired`, `cooldownUntil`, `coolingDown`        | Plugin store                                                                                                             | Orthogonal to quota; shown alongside it.                                                                                                                                                                                                                                                                                                |
+| `selectedByFamily`                                            | Plugin store family cursors                                                                                              | Which account routes `claude` / `gemini` traffic.                                                                                                                                                                                                                                                                                       |
 
 ## Unknown semantics
 
@@ -69,11 +69,11 @@ store does not fall back to the pre-check account pool.
   keeping the `Promise.race` shape, so a hung fetch releases its socket;
   other accounts still resolve independently (partial results).
 
-| Bound | Value | Where |
-|---|---|---|
-| Per-fetch internal timeout | 10 s (`FETCH_TIMEOUT_MS`) | `fetchWithTimeout` in `src/plugin/quota.ts` |
-| Per-account presentation timeout | `timeoutMs`, clamped 1–30 s (default 12 s) | `boundedTimeout` in `src/plugin/account-service.ts` |
-| Staleness threshold | `staleAfterMs` (default 15 min) | `getQuotaPresentation` in `src/plugin/account-service.ts` |
+| Bound                            | Value                                      | Where                                                     |
+| -------------------------------- | ------------------------------------------ | --------------------------------------------------------- |
+| Per-fetch internal timeout       | 10 s (`FETCH_TIMEOUT_MS`)                  | `fetchWithTimeout` in `src/plugin/quota.ts`               |
+| Per-account presentation timeout | `timeoutMs`, clamped 1–30 s (default 12 s) | `boundedTimeout` in `src/plugin/account-service.ts`       |
+| Staleness threshold              | `staleAfterMs` (default 15 min)            | `getQuotaPresentation` in `src/plugin/account-service.ts` |
 
 Timed-out accounts resolve to `undefined` and surface as `error` (or cached
 fallback) without failing the whole refresh.

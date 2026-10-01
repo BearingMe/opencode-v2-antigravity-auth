@@ -2,14 +2,14 @@
 
 ## Major parts
 
-| Part | Paths | Responsibility |
-|---|---|---|
-| Shared identity | `src/constants.ts`, `src/shims.d.ts`, `src/google-sdk.ts` | OAuth client id/secret/scopes/redirect, endpoint orders, header styles, version pinning, hardening prompts, search tuning |
-| Native engine | `src/plugin/engine.ts` | Request execution + rotation loop (sole router), unified OAuth refresh, thinking warmup |
-| V2 bridge | `src/v2-plugin.ts` | V2 `integration/provider/model/aisdk/tool/session/event` transforms; routes via the native engine |
-| OAuth leaf | `src/antigravity/oauth.ts` | PKCE URL build + code exchange + `loadCodeAssist` project discovery |
-| Auto-update | `src/hooks/auto-update-checker/*` | Root-session npm check, toast or pinned rewrite + cache invalidate |
-| Core domains | `src/plugin/*` + `cache/config/core/recovery/stores/transform` | Request transform, schema/thinking utils, accounts/rotation/quota/storage/fingerprint/project/refresh, recovery ×2, streaming, debug/logger, version, images |
+| Part            | Paths                                                          | Responsibility                                                                                                                                               |
+| --------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Shared identity | `src/constants.ts`, `src/shims.d.ts`, `src/google-sdk.ts`      | OAuth client id/secret/scopes/redirect, endpoint orders, header styles, version pinning, hardening prompts, search tuning                                    |
+| Native engine   | `src/plugin/engine.ts`                                         | Request execution + rotation loop (sole router), unified OAuth refresh, thinking warmup                                                                      |
+| V2 bridge       | `src/v2-plugin.ts`                                             | V2 `integration/provider/model/aisdk/tool/session/event` transforms; routes via the native engine                                                            |
+| OAuth leaf      | `src/antigravity/oauth.ts`                                     | PKCE URL build + code exchange + `loadCodeAssist` project discovery                                                                                          |
+| Auto-update     | `src/hooks/auto-update-checker/*`                              | Root-session npm check, toast or pinned rewrite + cache invalidate                                                                                           |
+| Core domains    | `src/plugin/*` + `cache/config/core/recovery/stores/transform` | Request transform, schema/thinking utils, accounts/rotation/quota/storage/fingerprint/project/refresh, recovery ×2, streaming, debug/logger, version, images |
 
 ## Dependency direction (normative)
 
@@ -86,13 +86,13 @@ in `request.ts`, `accounts.ts`, `storage.ts`, `quota.ts`, `project.ts`.
   `transform/gemini.ts` stays for SDK-supplied search tools.
 - Production account UI (`src/tui.ts :: /antigravity` dialog,
   `src/rpc.ts :: AntigravityAccounts` with `list/quota/verify/mutate/
-  deleteAll/ping`) — the interactive management surface sharing the
+deleteAll/ping`) — the interactive management surface sharing the
   `account-service.ts` backend with the legacy tool. `ping` returns
   `ANTIGRAVITY_RPC_ACCOUNTS_OK`.
 - V2 login surface: `google-oauth` integration with a required
-   pre-authorization Add/reconnect selection (one account per command;
-   native Ctrl+C cancellation) +
-   `antigravity_accounts` tool + `/antigravity` dialog +
+  pre-authorization Add/reconnect selection (one account per command;
+  native Ctrl+C cancellation) +
+  `antigravity_accounts` tool + `/antigravity` dialog +
   manual code/URL paste callback.
 
 ## Forbidden relationships

@@ -26,10 +26,10 @@
      (Google Cloud, https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/thinking/thought-signatures)
    - `Gemini 3 developer guide - Interactions API`
      (https://ai.google.dev/gemini-api/docs/gemini-3); `Gemini thinking -
-     Interactions API` (https://ai.google.dev/gemini-api/docs/thinking)
-   Relevance: justifies R-SIG-* rules (preserve/claude-strip/sentinel) and
-   explains why Gemini 3 Pro Image is lenient (no 400) yet still needs
-   round-tripping.
+Interactions API` (https://ai.google.dev/gemini-api/docs/thinking)
+     Relevance: justifies R-SIG-* rules (preserve/claude-strip/sentinel) and
+     explains why Gemini 3 Pro Image is lenient (no 400) yet still needs
+     round-tripping.
 2. OAuth PKCE S256 (IETF RFC 7636). Client generates `code_verifier`,
    sends `code_challenge = BASE64URL(SHA256(verifier))` +
    `code_challenge_method=S256` with the authorize request, and sends the
@@ -38,23 +38,23 @@
    oauth.net PKCE; Auth0 PKCE docs).
    - RFC 7636 (https://datatracker.ietf.org/doc/html/rfc7636)
    - https://oauth.net/2/pkce
-   Relevance: the plugin's `generatePKCE → authorize → decodeState →
-   code_verifier exchange` flow is a standard application of this contract.
-   Note the project additionally sends its confidential `client_secret` in
-   the exchange (CLI-spoofing behavior, not the public-client PKCE norm).
+     Relevance: the plugin's `generatePKCE → authorize → decodeState →
+code_verifier exchange` flow is a standard application of this contract.
+     Note the project additionally sends its confidential `client_secret` in
+     the exchange (CLI-spoofing behavior, not the public-client PKCE norm).
 3. OpenCode V2 plugin API (beta). Plugins run in-process; documented hooks
    include `ctx.aisdk.hook("sdk", cb)`, `ctx.provider/model/integration/tool/session/
-   event` transforms. V2 API explicitly "may change before stable".
+event` transforms. V2 API explicitly "may change before stable".
    - `Overview | OpenCode` (https://opencode.ai/v2/docs/build/plugins)
    - `Effect - opencode/plugin`
      (https://opencode.ai/v2/docs/build/plugins/effect)
    - `Plugins - OpenCode` (https://opencode.ai/docs/plugins)
-   Relevance: the V2 bridge's reliance on `aisdk.hook("sdk")`,
-   `provider.transform`, `model.transform`, `integration.transform`,
-   `tool.transform`, `session.hook`, `event.subscribe` inherits beta
-   instability. This codebase (pinned `@opencode/plugin` / `@opencode/schema`
-   2.0.18) uses `provider.transform` / `model.transform`; treat any upstream
-   naming drift as version-scoped, not a violation.
+     Relevance: the V2 bridge's reliance on `aisdk.hook("sdk")`,
+     `provider.transform`, `model.transform`, `integration.transform`,
+     `tool.transform`, `session.hook`, `event.subscribe` inherits beta
+     instability. This codebase (pinned `@opencode/plugin` / `@opencode/schema`
+     2.0.18) uses `provider.transform` / `model.transform`; treat any upstream
+     naming drift as version-scoped, not a violation.
 
 ## Testing guarantees (from analysis)
 
@@ -67,9 +67,9 @@
   list purity, blocked→disabled+URL, ok passthrough, error-without-disable.
 - `v2-plugin.setup.test.ts`: full mocked V2 setup (registration, label,
   API-key passthrough, unauthenticated throw, authorize→persist, SDK route
-  + `apiKey="antigravity-oauth"`, loader-missing/reject errors, decoded
-  JSON body to routed fetch, per-session child tracker with duplicate-safe
-  behavior at capacity).
+  - `apiKey="antigravity-oauth"`, loader-missing/reject errors, decoded
+    JSON body to routed fetch, per-session child tracker with duplicate-safe
+    behavior at capacity).
 - `plugin/*` + subdirs: colocated Vitest files covering model
   resolution, schema sanitization, cross-model sanitizer, quota fallback
   (antigravity-first), rotation/hybrid selection, recovery,
@@ -146,7 +146,7 @@
    (fail-closed only when all-over with valid resetTime). Deliberate
    availability bias; changing to fail-closed needs product decision.
 6. Deprecated `ANTIGRAVITY_HEADERS / ANTIGRAVITY_VERSION / quota_fallback /
-   invalidateCache` remain exported. New code MUST use
+invalidateCache` remain exported. New code MUST use
    `getAntigravityHeaders() / getAntigravityVersion() / invalidatePackage()`.
 7. D-RETRY-GLOBAL (observed limitation): `ctx.session.hook("retry")` in
    `src/v2-plugin.ts` is provider-agnostic — any session whose error
@@ -195,13 +195,13 @@
   `src/google-sdk.ts`, `src/shims.d.ts`
 - OAuth: `src/antigravity/oauth.ts`
 - Update: `src/hooks/auto-update-checker/{index,checker,cache,constants,
-  types,logging}.ts` + `checker.test.ts`, `index.test.ts`
+types,logging}.ts` + `checker.test.ts`, `index.test.ts`
 - Core: `src/plugin/{auth,token,cache,request,request-helpers,accounts,
-  account-service,rotation,quota,storage,fingerprint,project,refresh-queue,
-  recovery,thinking-recovery,errors,debug,logger,logging-utils,verify,
-  verification,version,image-saver,types}.ts`
+account-service,rotation,quota,storage,fingerprint,project,refresh-queue,
+recovery,thinking-recovery,errors,debug,logger,logging-utils,verify,
+verification,version,image-saver,types}.ts`
 - Subdirs: `src/plugin/{cache,config,core:streaming,recovery,stores,
-  transform}/*`
+transform}/*`
 - Tests: `src/constants.test.ts`, `src/v2-plugin.test.ts`,
   `src/v2-plugin.accounts.test.ts`, `src/v2-plugin.setup.test.ts` +
   colocated `src/plugin/**/*.test.ts`

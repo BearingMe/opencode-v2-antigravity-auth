@@ -7,21 +7,21 @@ against live traffic before treating any field as stable.
 
 ## Endpoints
 
-| Environment | URL | Status (last observed 2025-12-13) |
-|-------------|-----|-----------------------------------|
-| Daily (sandbox) | `https://daily-cloudcode-pa.sandbox.googleapis.com` | Active |
-| Production | `https://cloudcode-pa.googleapis.com` | Active |
+| Environment        | URL                                                    | Status (last observed 2025-12-13)                                           |
+| ------------------ | ------------------------------------------------------ | --------------------------------------------------------------------------- |
+| Daily (sandbox)    | `https://daily-cloudcode-pa.sandbox.googleapis.com`    | Active                                                                      |
+| Production         | `https://cloudcode-pa.googleapis.com`                  | Active                                                                      |
 | Autopush (sandbox) | `https://autopush-cloudcode-pa.sandbox.googleapis.com` | Unavailable — removed from the plugin; do not restore without live evidence |
 
 Request fallback order is daily → prod. `loadCodeAssist` project discovery
 probes load endpoints plus fallbacks.
 
-| Action | Path |
-|--------|------|
-| Generate content | `/v1internal:generateContent` |
-| Stream generate | `/v1internal:streamGenerateContent?alt=sse` |
-| Load code assist | `/v1internal:loadCodeAssist` |
-| Onboard user | `/v1internal:onboardUser` |
+| Action           | Path                                        |
+| ---------------- | ------------------------------------------- |
+| Generate content | `/v1internal:generateContent`               |
+| Stream generate  | `/v1internal:streamGenerateContent?alt=sse` |
+| Load code assist | `/v1internal:loadCodeAssist`                |
+| Onboard user     | `/v1internal:onboardUser`                   |
 
 ## Auth
 

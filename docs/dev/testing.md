@@ -33,16 +33,16 @@ No linter or formatter is configured; style is enforced by convention
 - `rpc-transport.test.ts`: Effect-codec mirror of handler returns (host has
   no `@opencode/protocol` here); guards the omit-`undefined` transport rule.
 - `tui-behavior.test.ts`: pure TUI gates (`isInvalidRpcResponse`,
-   `isStaleMutate` — stale `{ ok: false }` takes the stale path, never the
-   success toast), plus deferred missing-account notice acknowledgement,
-   replacement, and unload regressions.
+  `isStaleMutate` — stale `{ ok: false }` takes the stale path, never the
+  success toast), plus deferred missing-account notice acknowledgement,
+  replacement, and unload regressions.
 - `tui-quota-controller.test.ts`: overlap protection, returned error status,
   unexpected rejection/retry, late-result disposal, and navigation outcomes.
 - `test/tui-quota-render.test.ts`: native Bun/OpenTUI rendering of the built
   account list verifies single-cell dot colors, the shared legend/login hint,
-   disabled text fallback, search/no-match, readable light-theme input colors,
-   selection, and Esc. Missing-account notice rendering and Enter/Esc commands
-   are also checked. The built quota
+  disabled text fallback, search/no-match, readable light-theme input colors,
+  selection, and Esc. Missing-account notice rendering and Enter/Esc commands
+  are also checked. The built quota
   view (not mocked JSX): auto-refresh, loading, bar changes, failed-check
   retention, disabled accounts, full-width bars, aligned metadata, resizing,
   narrow layout, refresh-only footer, Esc command, and cleanup. The browser

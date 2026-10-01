@@ -75,8 +75,7 @@ export function extractVerificationErrorDetails(bodyText: string): VerificationE
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
     try {
       payloads.push(JSON.parse(trimmed))
-    } catch {
-    }
+    } catch {}
   }
 
   for (const rawLine of decodedBody.split("\n")) {

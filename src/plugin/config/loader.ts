@@ -1,6 +1,6 @@
 /**
  * Configuration loader for opencode-v2-antigravity-auth plugin.
- * 
+ *
  * Loads config from files.
  * Priority (lowest to highest):
  * 1. Schema defaults
@@ -9,10 +9,11 @@
  * 4. Environment variables (OPENCODE_ANTIGRAVITY_*)
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import { homedir } from "node:os";
-import type { ZodType } from "zod";
+import { existsSync, readFileSync } from "node:fs"
+import { join } from "node:path"
+import { homedir } from "node:os"
+import type { ZodType } from "zod"
+import { createLogger } from "../logger"
 import {
   AccountSelectionStrategySchema,
   AntigravityConfigSchema,
@@ -20,10 +21,9 @@ import {
   SchedulingModeSchema,
   ToastScopeSchema,
   type AntigravityConfig,
-} from "./schema";
-import { createLogger } from "../logger";
+} from "./schema"
 
-const log = createLogger("config");
+const log = createLogger("config")
 
 // =============================================================================
 // Path Utilities
@@ -37,26 +37,26 @@ const log = createLogger("config");
 function getConfigDir(): string {
   // 1. Check for explicit override via env var
   if (process.env.OPENCODE_CONFIG_DIR) {
-    return process.env.OPENCODE_CONFIG_DIR;
+    return process.env.OPENCODE_CONFIG_DIR
   }
 
   // 2. Use ~/.config/opencode on all platforms (including Windows)
-  const xdgConfig = process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
-  return join(xdgConfig, "opencode");
+  const xdgConfig = process.env.XDG_CONFIG_HOME || join(homedir(), ".config")
+  return join(xdgConfig, "opencode")
 }
 
 /**
  * Get the user-level config file path.
  */
 export function getUserConfigPath(): string {
-  return join(getConfigDir(), "antigravity.json");
+  return join(getConfigDir(), "antigravity.json")
 }
 
 /**
  * Get the project-level config file path.
  */
 export function getProjectConfigPath(directory: string): string {
-  return join(directory, ".opencode", "antigravity.json");
+  return join(directory, ".opencode", "antigravity.json")
 }
 
 // =============================================================================
@@ -69,41 +69,38 @@ export function getProjectConfigPath(directory: string): string {
 function loadConfigFile(path: string): Partial<AntigravityConfig> | null {
   try {
     if (!existsSync(path)) {
-      return null;
+      return null
     }
 
-    const content = readFileSync(path, "utf-8");
-    const rawConfig = JSON.parse(content);
+    const content = readFileSync(path, "utf-8")
+    const rawConfig = JSON.parse(content)
 
     // Validate with Zod (partial - we'll merge with defaults later)
-    const result = AntigravityConfigSchema.partial().safeParse(rawConfig);
+    const result = AntigravityConfigSchema.partial().safeParse(rawConfig)
 
     if (!result.success) {
       log.warn("Config validation error", {
         path,
-        issues: result.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join(", "),
-      });
-      return null;
+        issues: result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(", "),
+      })
+      return null
     }
 
-    return result.data;
+    return result.data
   } catch (error) {
     if (error instanceof SyntaxError) {
-      log.warn("Invalid JSON in config file", { path, error: error.message });
+      log.warn("Invalid JSON in config file", { path, error: error.message })
     } else {
-      log.warn("Failed to load config file", { path, error: String(error) });
+      log.warn("Failed to load config file", { path, error: String(error) })
     }
-    return null;
+    return null
   }
 }
 
 /**
  * Deep merge two config objects, with override taking precedence.
  */
-function mergeConfigs(
-  base: AntigravityConfig,
-  override: Partial<AntigravityConfig>
-): AntigravityConfig {
+function mergeConfigs(base: AntigravityConfig, override: Partial<AntigravityConfig>): AntigravityConfig {
   return {
     ...base,
     ...override,
@@ -114,7 +111,7 @@ function mergeConfigs(
           ...override.signature_cache,
         }
       : base.signature_cache,
-  };
+  }
 }
 
 // =============================================================================
@@ -127,17 +124,17 @@ function mergeConfigs(
  */
 function parseEnvBoolean(raw: string | undefined, name: string): boolean | undefined {
   if (raw === undefined || raw.trim().length === 0) {
-    return undefined;
+    return undefined
   }
-  const normalized = raw.trim().toLowerCase();
+  const normalized = raw.trim().toLowerCase()
   if (normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on") {
-    return true;
+    return true
   }
   if (normalized === "0" || normalized === "false" || normalized === "no" || normalized === "off") {
-    return false;
+    return false
   }
-  log.warn("Ignoring env override with unrecognized boolean value", { name });
-  return undefined;
+  log.warn("Ignoring env override with unrecognized boolean value", { name })
+  return undefined
 }
 
 /**
@@ -146,14 +143,14 @@ function parseEnvBoolean(raw: string | undefined, name: string): boolean | undef
  */
 function parseEnvEnum<T>(raw: string | undefined, name: string, schema: ZodType<T>): T | undefined {
   if (raw === undefined || raw.trim().length === 0) {
-    return undefined;
+    return undefined
   }
-  const result = schema.safeParse(raw.trim());
+  const result = schema.safeParse(raw.trim())
   if (result.success) {
-    return result.data;
+    return result.data
   }
-  log.warn("Ignoring env override with invalid value", { name, value: raw });
-  return undefined;
+  log.warn("Ignoring env override with invalid value", { name, value: raw })
+  return undefined
 }
 
 /**
@@ -162,17 +159,32 @@ function parseEnvEnum<T>(raw: string | undefined, name: string, schema: ZodType<
  * typo can never corrupt the resolved config.
  */
 function applyEnvOverrides(config: AntigravityConfig): AntigravityConfig {
-  const env = process.env;
-  const quietMode = parseEnvBoolean(env.OPENCODE_ANTIGRAVITY_QUIET, "OPENCODE_ANTIGRAVITY_QUIET");
-  const toastScope = parseEnvEnum(env.OPENCODE_ANTIGRAVITY_TOAST_SCOPE, "OPENCODE_ANTIGRAVITY_TOAST_SCOPE", ToastScopeSchema);
-  const debug = parseEnvBoolean(env.OPENCODE_ANTIGRAVITY_DEBUG, "OPENCODE_ANTIGRAVITY_DEBUG");
-  const debugTui = parseEnvBoolean(env.OPENCODE_ANTIGRAVITY_DEBUG_TUI, "OPENCODE_ANTIGRAVITY_DEBUG_TUI");
-  const keepThinking = parseEnvBoolean(env.OPENCODE_ANTIGRAVITY_KEEP_THINKING, "OPENCODE_ANTIGRAVITY_KEEP_THINKING");
-  const accountSelectionStrategy = parseEnvEnum(env.OPENCODE_ANTIGRAVITY_ACCOUNT_SELECTION_STRATEGY, "OPENCODE_ANTIGRAVITY_ACCOUNT_SELECTION_STRATEGY", AccountSelectionStrategySchema);
-  const pidOffsetEnabled = parseEnvBoolean(env.OPENCODE_ANTIGRAVITY_PID_OFFSET_ENABLED, "OPENCODE_ANTIGRAVITY_PID_OFFSET_ENABLED");
-  const schedulingMode = parseEnvEnum(env.OPENCODE_ANTIGRAVITY_SCHEDULING_MODE, "OPENCODE_ANTIGRAVITY_SCHEDULING_MODE", SchedulingModeSchema);
-  const rawLogDir = env.OPENCODE_ANTIGRAVITY_LOG_DIR;
-  const logDir = rawLogDir !== undefined && rawLogDir.trim().length > 0 ? rawLogDir.trim() : undefined;
+  const env = process.env
+  const quietMode = parseEnvBoolean(env.OPENCODE_ANTIGRAVITY_QUIET, "OPENCODE_ANTIGRAVITY_QUIET")
+  const toastScope = parseEnvEnum(
+    env.OPENCODE_ANTIGRAVITY_TOAST_SCOPE,
+    "OPENCODE_ANTIGRAVITY_TOAST_SCOPE",
+    ToastScopeSchema,
+  )
+  const debug = parseEnvBoolean(env.OPENCODE_ANTIGRAVITY_DEBUG, "OPENCODE_ANTIGRAVITY_DEBUG")
+  const debugTui = parseEnvBoolean(env.OPENCODE_ANTIGRAVITY_DEBUG_TUI, "OPENCODE_ANTIGRAVITY_DEBUG_TUI")
+  const keepThinking = parseEnvBoolean(env.OPENCODE_ANTIGRAVITY_KEEP_THINKING, "OPENCODE_ANTIGRAVITY_KEEP_THINKING")
+  const accountSelectionStrategy = parseEnvEnum(
+    env.OPENCODE_ANTIGRAVITY_ACCOUNT_SELECTION_STRATEGY,
+    "OPENCODE_ANTIGRAVITY_ACCOUNT_SELECTION_STRATEGY",
+    AccountSelectionStrategySchema,
+  )
+  const pidOffsetEnabled = parseEnvBoolean(
+    env.OPENCODE_ANTIGRAVITY_PID_OFFSET_ENABLED,
+    "OPENCODE_ANTIGRAVITY_PID_OFFSET_ENABLED",
+  )
+  const schedulingMode = parseEnvEnum(
+    env.OPENCODE_ANTIGRAVITY_SCHEDULING_MODE,
+    "OPENCODE_ANTIGRAVITY_SCHEDULING_MODE",
+    SchedulingModeSchema,
+  )
+  const rawLogDir = env.OPENCODE_ANTIGRAVITY_LOG_DIR
+  const logDir = rawLogDir !== undefined && rawLogDir.trim().length > 0 ? rawLogDir.trim() : undefined
   return {
     ...config,
     ...(quietMode !== undefined ? { quiet_mode: quietMode } : {}),
@@ -184,7 +196,7 @@ function applyEnvOverrides(config: AntigravityConfig): AntigravityConfig {
     ...(accountSelectionStrategy !== undefined ? { account_selection_strategy: accountSelectionStrategy } : {}),
     ...(pidOffsetEnabled !== undefined ? { pid_offset_enabled: pidOffsetEnabled } : {}),
     ...(schedulingMode !== undefined ? { scheduling_mode: schedulingMode } : {}),
-  };
+  }
 }
 
 // =============================================================================
@@ -193,51 +205,51 @@ function applyEnvOverrides(config: AntigravityConfig): AntigravityConfig {
 
 /**
  * Load the complete configuration.
- * 
+ *
  * @param directory - The project directory (for project-level config)
  * @returns Fully resolved configuration
  */
 export function loadConfig(directory: string): AntigravityConfig {
   // Start with defaults
-  let config: AntigravityConfig = { ...DEFAULT_CONFIG };
+  let config: AntigravityConfig = { ...DEFAULT_CONFIG }
 
   // Load user config file (if exists)
-  const userConfigPath = getUserConfigPath();
-  const userConfig = loadConfigFile(userConfigPath);
+  const userConfigPath = getUserConfigPath()
+  const userConfig = loadConfigFile(userConfigPath)
   if (userConfig) {
-    config = mergeConfigs(config, userConfig);
+    config = mergeConfigs(config, userConfig)
   }
 
   // Load project config file (if exists) - overrides user config
-  const projectConfigPath = getProjectConfigPath(directory);
-  const projectConfig = loadConfigFile(projectConfigPath);
+  const projectConfigPath = getProjectConfigPath(directory)
+  const projectConfig = loadConfigFile(projectConfigPath)
   if (projectConfig) {
-    config = mergeConfigs(config, projectConfig);
+    config = mergeConfigs(config, projectConfig)
   }
 
-  return applyEnvOverrides(config);
+  return applyEnvOverrides(config)
 }
 
 /**
  * Check if a config file exists at the given path.
  */
 export function configExists(path: string): boolean {
-  return existsSync(path);
+  return existsSync(path)
 }
 
 /**
  * Get the default logs directory.
  */
 export function getDefaultLogsDir(): string {
-  return join(getConfigDir(), "antigravity-logs");
+  return join(getConfigDir(), "antigravity-logs")
 }
 
-let runtimeConfig: AntigravityConfig | null = null;
+let runtimeConfig: AntigravityConfig | null = null
 
 export function initRuntimeConfig(config: AntigravityConfig): void {
-  runtimeConfig = config;
+  runtimeConfig = config
 }
 
 export function getKeepThinking(): boolean {
-  return runtimeConfig?.keep_thinking ?? false;
+  return runtimeConfig?.keep_thinking ?? false
 }
