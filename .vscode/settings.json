@@ -1,0 +1,9 @@
+{
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "README.md": "*.md",
+    "package.json": "*.json, bun.lock",
+    "prettier.config.mjs": "*.config.mjs, *.config.cjs, *.config.js, *.config.json",
+    ".gitignore": ".*ignore"
+  }
+}
