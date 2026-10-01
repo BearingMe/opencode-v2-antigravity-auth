@@ -65,9 +65,13 @@ updateAccounts.mockImplementation(
 )
 
 beforeEach(() => {
+  vi.clearAllMocks()
   written.length = 0
 })
 
+/**
+ * Creates an AccountMetadata fixture for testing.
+ */
 function account(overrides: Record<string, unknown> = {}) {
   return {
     email: "user@example.com",
@@ -80,6 +84,9 @@ function account(overrides: Record<string, unknown> = {}) {
   }
 }
 
+/**
+ * Creates an AccountStorageV4 fixture for testing.
+ */
 function storage(
   accounts: Array<ReturnType<typeof account>>,
   activeIndex = 0,
@@ -100,7 +107,6 @@ const baseAccounts = () => [
 
 describe("listAccounts", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
     loadAccounts.mockResolvedValue(storage(baseAccounts(), 1))
   })
 
@@ -166,7 +172,6 @@ describe("resolveAccountTarget", () => {
 
 describe("checkQuota", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
     loadAccounts.mockResolvedValue(storage(baseAccounts(), 0))
     checkAccountsQuota.mockResolvedValue([
       { index: 0, email: "one@example.com", status: "ok", quota: { groups: {}, modelCount: 0 } },
@@ -224,7 +229,6 @@ describe("checkQuota", () => {
 
 describe("getQuotaPresentation", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
     loadAccounts.mockResolvedValue(storage(baseAccounts(), 0, { claude: 0, gemini: 1 }))
     checkAccountsQuota.mockResolvedValue([])
   })
@@ -641,7 +645,6 @@ describe("getQuotaPresentation", () => {
 
 describe("verifyAccount", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
     loadAccounts.mockResolvedValue(storage(baseAccounts(), 1))
     verifyAccountAccess.mockResolvedValue({
       status: "blocked",
@@ -724,7 +727,6 @@ describe("verifyAccount", () => {
 
 describe("mutateAccount", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
     loadAccounts.mockResolvedValue(storage(baseAccounts(), 1, { claude: 1, gemini: 1 }))
   })
 
@@ -824,7 +826,6 @@ describe("mutateAccount", () => {
 
 describe("tombstones", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
     loadAccounts.mockResolvedValue(storage(baseAccounts(), 1, { claude: 1, gemini: 1 }))
   })
 
@@ -888,7 +889,6 @@ describe("deleteAllAccounts", () => {
 
 describe("persistOAuthAccount", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
     loadAccounts.mockResolvedValue(storage(baseAccounts(), 0))
   })
 
@@ -985,7 +985,6 @@ describe("persistOAuthAccount", () => {
 
 describe("persistRefreshRotation", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
     loadAccounts.mockResolvedValue(storage(baseAccounts(), 0))
   })
 
@@ -1023,10 +1022,6 @@ describe("persistRefreshRotation", () => {
 })
 
 describe("legacy tool adapter redaction", () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
   it("never serializes refresh tokens into tool content", async () => {
     const setAuth = vi.fn()
     const invalidateFetch = vi.fn()
@@ -1059,7 +1054,6 @@ describe("legacy tool adapter redaction", () => {
 
 describe("legacy tool adapter parity (check_quota, verify, delete_all)", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
     loadAccounts.mockResolvedValue(storage(baseAccounts(), 0))
   })
 

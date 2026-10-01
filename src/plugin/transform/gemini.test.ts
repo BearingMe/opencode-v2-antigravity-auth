@@ -14,6 +14,33 @@ import {
 } from "./gemini"
 import type { RequestPayload } from "./types"
 
+/**
+ * Builds a Gemini tool payload containing function definitions.
+ */
+function createFunctionTool(name: string, description?: string, inputSchema?: Record<string, unknown>) {
+  return {
+    function: {
+      name,
+      ...(description ? { description } : {}),
+      ...(inputSchema ? { input_schema: inputSchema } : {}),
+    },
+  }
+}
+
+/**
+ * Builds a request payload holding Gemini contents and optional tools or extra config.
+ */
+function createGeminiPayload(
+  options: { contents?: unknown[]; tools?: unknown[]; [key: string]: unknown } = {},
+): RequestPayload {
+  const { contents = [], tools, ...rest } = options
+  const payload: RequestPayload = { contents, ...rest }
+  if (tools !== undefined) {
+    payload.tools = tools
+  }
+  return payload
+}
+
 describe("transform/gemini", () => {
   describe("isGeminiModel", () => {
     it("returns true for gemini-pro", () => {
@@ -219,7 +246,7 @@ describe("transform/gemini", () => {
 
   describe("normalizeGeminiTools", () => {
     it("returns empty debug info when tools is not an array", () => {
-      const payload: RequestPayload = { contents: [] }
+      const payload = createGeminiPayload()
       const result = normalizeGeminiTools(payload)
       expect(result).toEqual({
         toolDebugMissing: 0,
@@ -237,18 +264,11 @@ describe("transform/gemini", () => {
     })
 
     it("normalizes tool with function.input_schema", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [
-          {
-            function: {
-              name: "test_tool",
-              description: "A test tool",
-              input_schema: { type: "object", properties: { foo: { type: "string" } } },
-            },
-          },
+          createFunctionTool("test_tool", "A test tool", { type: "object", properties: { foo: { type: "string" } } }),
         ],
-      }
+      })
       const result = normalizeGeminiTools(payload)
       expect(result.toolDebugMissing).toBe(0)
       expect(result.toolDebugSummaries).toHaveLength(1)
@@ -256,8 +276,7 @@ describe("transform/gemini", () => {
     })
 
     it("normalizes tool with function.parameters", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [
           {
             function: {
@@ -267,32 +286,22 @@ describe("transform/gemini", () => {
             },
           },
         ],
-      }
+      })
       const result = normalizeGeminiTools(payload)
       expect(result.toolDebugMissing).toBe(0)
     })
 
     it("creates custom from function and strips it for Gemini", () => {
-      const payload: RequestPayload = {
-        contents: [],
-        tools: [
-          {
-            function: {
-              name: "my_func",
-              description: "My function",
-              input_schema: { type: "object" },
-            },
-          },
-        ],
-      }
+      const payload = createGeminiPayload({
+        tools: [createFunctionTool("my_func", "My function", { type: "object" })],
+      })
       normalizeGeminiTools(payload)
       expect((payload.tools as unknown[])[0]).not.toHaveProperty("custom")
       expect((payload.tools as unknown[])[0]).toHaveProperty("function")
     })
 
     it("creates custom when both function and custom are missing", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [
           {
             name: "standalone_tool",
@@ -300,32 +309,26 @@ describe("transform/gemini", () => {
             parameters: { type: "object", properties: {} },
           },
         ],
-      }
+      })
       normalizeGeminiTools(payload)
       expect((payload.tools as unknown[])[0]).not.toHaveProperty("custom")
     })
 
     it("counts missing schemas", () => {
-      const payload: RequestPayload = {
-        contents: [],
-        tools: [
-          { name: "tool1" },
-          { name: "tool2" },
-          { function: { name: "tool3", input_schema: { type: "object" } } },
-        ],
-      }
+      const payload = createGeminiPayload({
+        tools: [{ name: "tool1" }, { name: "tool2" }, createFunctionTool("tool3", undefined, { type: "object" })],
+      })
       const result = normalizeGeminiTools(payload)
       expect(result.toolDebugMissing).toBe(2)
     })
 
     it("generates debug summaries for each tool", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [
-          { function: { name: "t1", input_schema: { type: "object" } } },
-          { function: { name: "t2", input_schema: { type: "object" } } },
+          createFunctionTool("t1", undefined, { type: "object" }),
+          createFunctionTool("t2", undefined, { type: "object" }),
         ],
-      }
+      })
       const result = normalizeGeminiTools(payload)
       expect(result.toolDebugSummaries).toHaveLength(2)
       expect(result.toolDebugSummaries[0]).toContain("idx=0")
@@ -333,17 +336,15 @@ describe("transform/gemini", () => {
     })
 
     it("uses default tool name when name is missing", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [{}],
-      }
+      })
       const result = normalizeGeminiTools(payload)
       expect(result.toolDebugSummaries[0]).toContain("idx=0")
     })
 
     it("extracts schema from custom.input_schema", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [
           {
             custom: {
@@ -352,21 +353,20 @@ describe("transform/gemini", () => {
             },
           },
         ],
-      }
+      })
       normalizeGeminiTools(payload)
       expect((payload.tools as unknown[])[0]).not.toHaveProperty("custom")
     })
 
     it("extracts schema from inputSchema (camelCase)", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [
           {
             name: "camel_tool",
             inputSchema: { type: "object", properties: { y: { type: "boolean" } } },
           },
         ],
-      }
+      })
       normalizeGeminiTools(payload)
       expect((payload.tools as unknown[])[0]).not.toHaveProperty("custom")
     })
@@ -447,10 +447,9 @@ describe("transform/gemini", () => {
     })
 
     it("normalizes tools and returns debug info", () => {
-      const payload: RequestPayload = {
-        contents: [],
-        tools: [{ function: { name: "tool1", input_schema: { type: "object" } } }, { name: "tool2" }],
-      }
+      const payload = createGeminiPayload({
+        tools: [createFunctionTool("tool1", undefined, { type: "object" }), { name: "tool2" }],
+      })
       const result = applyGeminiTransforms(payload, {
         model: "gemini-2.5-flash",
       })
@@ -459,7 +458,7 @@ describe("transform/gemini", () => {
     })
 
     it("defaults includeThoughts to true when not specified", () => {
-      const payload: RequestPayload = { contents: [] }
+      const payload = createGeminiPayload()
       applyGeminiTransforms(payload, {
         model: "gemini-3-pro-low",
         tierThinkingLevel: "low",
@@ -470,7 +469,7 @@ describe("transform/gemini", () => {
     })
 
     it("respects includeThoughts false", () => {
-      const payload: RequestPayload = { contents: [] }
+      const payload = createGeminiPayload()
       applyGeminiTransforms(payload, {
         model: "gemini-3-pro-high",
         tierThinkingLevel: "high",
@@ -481,7 +480,7 @@ describe("transform/gemini", () => {
     })
 
     it("handles Gemini 2.5 without tierThinkingBudget or normalizedThinking.thinkingBudget", () => {
-      const payload: RequestPayload = { contents: [] }
+      const payload = createGeminiPayload()
       applyGeminiTransforms(payload, {
         model: "gemini-2.5-pro",
         normalizedThinking: { includeThoughts: true },
@@ -494,7 +493,7 @@ describe("transform/gemini", () => {
 
     describe("Google Search (Grounding)", () => {
       it("injects googleSearch tool when mode is 'auto'", () => {
-        const payload: RequestPayload = { contents: [], tools: [] }
+        const payload = createGeminiPayload({ tools: [] })
         applyGeminiTransforms(payload, {
           model: "gemini-3-pro",
           googleSearch: { mode: "auto" },
@@ -507,7 +506,7 @@ describe("transform/gemini", () => {
       })
 
       it("ignores threshold value (deprecated in new API)", () => {
-        const payload: RequestPayload = { contents: [] }
+        const payload = createGeminiPayload()
         applyGeminiTransforms(payload, {
           model: "gemini-3-flash",
           googleSearch: { mode: "auto", threshold: 0.7 },
@@ -519,7 +518,7 @@ describe("transform/gemini", () => {
       })
 
       it("works without threshold specified", () => {
-        const payload: RequestPayload = { contents: [] }
+        const payload = createGeminiPayload()
         applyGeminiTransforms(payload, {
           model: "gemini-3-pro",
           googleSearch: { mode: "auto" },
@@ -530,7 +529,7 @@ describe("transform/gemini", () => {
       })
 
       it("does not inject search tool when mode is 'off'", () => {
-        const payload: RequestPayload = { contents: [], tools: [] }
+        const payload = createGeminiPayload({ tools: [] })
         applyGeminiTransforms(payload, {
           model: "gemini-3-pro",
           googleSearch: { mode: "off" },
@@ -540,7 +539,7 @@ describe("transform/gemini", () => {
       })
 
       it("does not inject search tool when googleSearch is undefined", () => {
-        const payload: RequestPayload = { contents: [], tools: [] }
+        const payload = createGeminiPayload({ tools: [] })
         applyGeminiTransforms(payload, {
           model: "gemini-3-pro",
         })
@@ -549,10 +548,9 @@ describe("transform/gemini", () => {
       })
 
       it("appends search tool to existing tools array", () => {
-        const payload: RequestPayload = {
-          contents: [],
-          tools: [{ function: { name: "existing_tool", input_schema: { type: "object" } } }],
-        }
+        const payload = createGeminiPayload({
+          tools: [createFunctionTool("existing_tool", undefined, { type: "object" })],
+        })
         applyGeminiTransforms(payload, {
           model: "gemini-3-pro",
           googleSearch: { mode: "auto" },
@@ -564,7 +562,7 @@ describe("transform/gemini", () => {
       })
 
       it("search tool is not normalized (skipped by normalizeGeminiTools)", () => {
-        const payload: RequestPayload = { contents: [] }
+        const payload = createGeminiPayload()
         applyGeminiTransforms(payload, {
           model: "gemini-3-pro",
           googleSearch: { mode: "auto" },
@@ -955,24 +953,17 @@ describe("transform/gemini", () => {
 
   describe("normalizeGeminiTools schema transformation", () => {
     it("transforms tool schemas to Gemini format with uppercase types", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [
-          {
-            function: {
-              name: "test_tool",
-              description: "A test tool",
-              input_schema: {
-                type: "object",
-                properties: {
-                  name: { type: "string" },
-                  count: { type: "number" },
-                },
-              },
+          createFunctionTool("test_tool", "A test tool", {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              count: { type: "number" },
             },
-          },
+          }),
         ],
-      }
+      })
       normalizeGeminiTools(payload)
 
       const tool = (payload.tools as unknown[])[0] as Record<string, unknown>
@@ -986,21 +977,15 @@ describe("transform/gemini", () => {
     })
 
     it("removes additionalProperties from tool schemas", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [
-          {
-            function: {
-              name: "strict_tool",
-              input_schema: {
-                type: "object",
-                properties: {},
-                additionalProperties: false,
-              },
-            },
-          },
+          createFunctionTool("strict_tool", undefined, {
+            type: "object",
+            properties: {},
+            additionalProperties: false,
+          }),
         ],
-      }
+      })
       normalizeGeminiTools(payload)
 
       const tool = (payload.tools as unknown[])[0] as Record<string, unknown>
@@ -1012,10 +997,9 @@ describe("transform/gemini", () => {
     })
 
     it("uses uppercase placeholder schema for tools without schemas", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [{ name: "schema_less_tool" }],
-      }
+      })
       const result = normalizeGeminiTools(payload)
 
       expect(result.toolDebugMissing).toBe(1)
@@ -1032,8 +1016,7 @@ describe("transform/gemini", () => {
 
   describe("wrapToolsAsFunctionDeclarations (fixes #203, #206)", () => {
     it("wraps tools in functionDeclarations format", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [
           {
             name: "read_file",
@@ -1041,7 +1024,7 @@ describe("transform/gemini", () => {
             parameters: { type: "OBJECT", properties: { path: { type: "STRING" } } },
           },
         ],
-      }
+      })
       wrapToolsAsFunctionDeclarations(payload)
 
       const tools = payload.tools as Array<Record<string, unknown>>
@@ -1057,18 +1040,9 @@ describe("transform/gemini", () => {
     })
 
     it("extracts schema from function.input_schema", () => {
-      const payload: RequestPayload = {
-        contents: [],
-        tools: [
-          {
-            function: {
-              name: "test_fn",
-              description: "Test function",
-              input_schema: { type: "OBJECT", properties: {} },
-            },
-          },
-        ],
-      }
+      const payload = createGeminiPayload({
+        tools: [createFunctionTool("test_fn", "Test function", { type: "OBJECT", properties: {} })],
+      })
       wrapToolsAsFunctionDeclarations(payload)
 
       const tools = payload.tools as Array<Record<string, unknown>>
@@ -1078,8 +1052,7 @@ describe("transform/gemini", () => {
     })
 
     it("extracts schema from custom.input_schema", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [
           {
             custom: {
@@ -1089,7 +1062,7 @@ describe("transform/gemini", () => {
             },
           },
         ],
-      }
+      })
       wrapToolsAsFunctionDeclarations(payload)
 
       const tools = payload.tools as Array<Record<string, unknown>>
@@ -1099,10 +1072,9 @@ describe("transform/gemini", () => {
     })
 
     it("preserves googleSearch tools as passthrough (new API)", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [{ name: "tool1", parameters: { type: "OBJECT", properties: {} } }, { googleSearch: {} }],
-      }
+      })
       wrapToolsAsFunctionDeclarations(payload)
 
       const tools = payload.tools as Array<Record<string, unknown>>
@@ -1112,8 +1084,7 @@ describe("transform/gemini", () => {
     })
 
     it("preserves googleSearchRetrieval tools as passthrough (legacy API)", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [
           { name: "tool1", parameters: { type: "OBJECT", properties: {} } },
           {
@@ -1122,7 +1093,7 @@ describe("transform/gemini", () => {
             },
           },
         ],
-      }
+      })
       wrapToolsAsFunctionDeclarations(payload)
 
       const tools = payload.tools as Array<Record<string, unknown>>
@@ -1132,10 +1103,9 @@ describe("transform/gemini", () => {
     })
 
     it("preserves codeExecution tools as passthrough", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [{ name: "tool1", parameters: { type: "OBJECT", properties: {} } }, { codeExecution: {} }],
-      }
+      })
       wrapToolsAsFunctionDeclarations(payload)
 
       const tools = payload.tools as Array<Record<string, unknown>>
@@ -1145,15 +1115,14 @@ describe("transform/gemini", () => {
     })
 
     it("merges existing functionDeclarations into output", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [
           {
             functionDeclarations: [{ name: "existing", description: "Existing fn", parameters: { type: "OBJECT" } }],
           },
           { name: "new_tool", parameters: { type: "OBJECT", properties: {} } },
         ],
-      }
+      })
       wrapToolsAsFunctionDeclarations(payload)
 
       const tools = payload.tools as Array<Record<string, unknown>>
@@ -1165,14 +1134,13 @@ describe("transform/gemini", () => {
     })
 
     it("handles multiple tools correctly", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [
           { name: "tool1", description: "First", parameters: { type: "OBJECT" } },
           { name: "tool2", description: "Second", parameters: { type: "OBJECT" } },
           { name: "tool3", description: "Third", parameters: { type: "OBJECT" } },
         ],
-      }
+      })
       wrapToolsAsFunctionDeclarations(payload)
 
       const tools = payload.tools as Array<Record<string, unknown>>
@@ -1183,10 +1151,9 @@ describe("transform/gemini", () => {
     })
 
     it("provides default schema when no schema found", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [{ name: "no_schema_tool" }],
-      }
+      })
       wrapToolsAsFunctionDeclarations(payload)
 
       const tools = payload.tools as Array<Record<string, unknown>>
@@ -1195,10 +1162,9 @@ describe("transform/gemini", () => {
     })
 
     it("generates default name when missing", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [{ description: "Anonymous tool", parameters: { type: "OBJECT" } }],
-      }
+      })
       wrapToolsAsFunctionDeclarations(payload)
 
       const tools = payload.tools as Array<Record<string, unknown>>
@@ -1207,13 +1173,13 @@ describe("transform/gemini", () => {
     })
 
     it("does nothing when tools is empty", () => {
-      const payload: RequestPayload = { contents: [], tools: [] }
+      const payload = createGeminiPayload({ tools: [] })
       wrapToolsAsFunctionDeclarations(payload)
       expect(payload.tools).toEqual([])
     })
 
     it("does nothing when tools is undefined", () => {
-      const payload: RequestPayload = { contents: [] }
+      const payload = createGeminiPayload()
       wrapToolsAsFunctionDeclarations(payload)
       expect(payload.tools).toBeUndefined()
     })
@@ -1420,18 +1386,9 @@ describe("transform/gemini", () => {
 
   describe("applyGeminiTransforms - full integration", () => {
     it("wraps tools in functionDeclarations after normalization", () => {
-      const payload: RequestPayload = {
-        contents: [],
-        tools: [
-          {
-            function: {
-              name: "test_tool",
-              description: "A test",
-              input_schema: { type: "object", properties: { x: { type: "string" } } },
-            },
-          },
-        ],
-      }
+      const payload = createGeminiPayload({
+        tools: [createFunctionTool("test_tool", "A test", { type: "object", properties: { x: { type: "string" } } })],
+      })
 
       applyGeminiTransforms(payload, { model: "gemini-3-pro" })
 
@@ -1451,10 +1408,9 @@ describe("transform/gemini", () => {
     })
 
     it("handles mixed tools and googleSearch", () => {
-      const payload: RequestPayload = {
-        contents: [],
+      const payload = createGeminiPayload({
         tools: [{ name: "my_tool", parameters: { type: "object" } }],
-      }
+      })
 
       applyGeminiTransforms(payload, {
         model: "gemini-3-pro",

@@ -20,6 +20,9 @@ import {
 
 let configDir = ""
 
+/**
+ * Creates an AccountMetadataV3 fixture for seeding storage.
+ */
 function seedAccount(overrides: Partial<AccountMetadataV3> & { refreshToken: string }): AccountMetadataV3 {
   return {
     addedAt: 1,
@@ -29,6 +32,20 @@ function seedAccount(overrides: Partial<AccountMetadataV3> & { refreshToken: str
   }
 }
 
+/**
+ * Creates an AccountStorageV4 snapshot fixture.
+ */
+function storedPool(accounts: AccountMetadataV3[] = [], activeIndex = 0): AccountStorageV4 {
+  return {
+    version: 4,
+    accounts,
+    activeIndex,
+  }
+}
+
+/**
+ * Seeds accounts into persistent storage through updateAccounts.
+ */
 async function seedStore(accounts: AccountMetadataV3[]): Promise<void> {
   await updateAccounts((current) => ({
     storage: { ...current, accounts: [...accounts] },
@@ -67,7 +84,7 @@ describe("account tombstones", () => {
 
     // Simulate a stale snapshot (e.g. an in-memory manager loaded before
     // the delete) persisted through the merging save path.
-    const stale: AccountStorageV4 = { version: 4, accounts: baseSeed(), activeIndex: 0 }
+    const stale = storedPool(baseSeed())
     await saveAccounts(stale)
 
     const reloaded = await loadAccounts()
@@ -132,11 +149,7 @@ describe("account tombstones", () => {
 
     await mutateAccount({ index: 0 }, "delete")
 
-    const stale: AccountStorageV4 = {
-      version: 4,
-      accounts: [seedAccount({ email: "legacy@example.com", refreshToken: "legacy-token" })],
-      activeIndex: 0,
-    }
+    const stale = storedPool([seedAccount({ email: "legacy@example.com", refreshToken: "legacy-token" })])
     await saveAccounts(stale)
 
     const reloaded = await loadAccounts()
@@ -198,7 +211,7 @@ describe("account tombstones", () => {
     expect((await loadAccounts())?.removedAccounts).toHaveLength(1)
 
     // Stale snapshot from before the delete: no removedAccounts at all.
-    const stale: AccountStorageV4 = { version: 4, accounts: baseSeed(), activeIndex: 0 }
+    const stale = storedPool(baseSeed())
     await saveAccountsReplace(stale)
 
     const reloaded = await loadAccounts()
@@ -210,7 +223,7 @@ describe("account tombstones", () => {
     await mutateAccount({ index: 0 }, "delete")
     expect((await loadAccounts())?.removedAccounts).toHaveLength(1)
 
-    const stale: AccountStorageV4 = { version: 4, accounts: baseSeed(), activeIndex: 0 }
+    const stale = storedPool(baseSeed())
     await saveAccountsReplace(stale, { clearTombstones: true })
 
     const reloaded = await loadAccounts()
@@ -237,9 +250,7 @@ describe("account tombstones", () => {
     const storePath = getStoragePath()
     const before = await readFile(storePath, "utf-8")
     await writeFile(storePath, "{corrupt-json")
-    await expect(saveAccounts({ version: 4, accounts: [], activeIndex: 0 })).rejects.toThrow(
-      AccountStoreUnreadableError,
-    )
+    await expect(saveAccounts(storedPool())).rejects.toThrow(AccountStoreUnreadableError)
     expect(await readFile(storePath, "utf-8")).toBe("{corrupt-json")
     await writeFile(storePath, before)
   })
@@ -248,9 +259,7 @@ describe("account tombstones", () => {
     const storePath = getStoragePath()
     const before = await readFile(storePath, "utf-8")
     await writeFile(storePath, "{corrupt-json")
-    await expect(saveAccountsReplace({ version: 4, accounts: [], activeIndex: 0 })).rejects.toThrow(
-      AccountStoreUnreadableError,
-    )
+    await expect(saveAccountsReplace(storedPool())).rejects.toThrow(AccountStoreUnreadableError)
     expect(await readFile(storePath, "utf-8")).toBe("{corrupt-json")
     await writeFile(storePath, before)
     expect((await loadAccounts())?.accounts).toHaveLength(2)
@@ -261,7 +270,7 @@ describe("account tombstones", () => {
     const before = await readFile(storePath, "utf-8")
     const future = JSON.stringify({ version: 999, accounts: [], activeIndex: 0 })
     await writeFile(storePath, future)
-    const empty: AccountStorageV4 = { version: 4, accounts: [], activeIndex: 0 }
+    const empty = storedPool()
     await expect(
       updateAccounts((current) => ({ storage: { ...current, accounts: [] }, result: undefined })),
     ).rejects.toThrow(AccountStoreUnreadableError)

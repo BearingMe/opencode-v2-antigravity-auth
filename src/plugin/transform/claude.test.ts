@@ -13,6 +13,41 @@ import {
 } from "./claude"
 import type { RequestPayload } from "./types"
 
+/**
+ * Builds an Anthropic / Claude function tool definition.
+ */
+function createClaudeFunctionTool(name: string, description?: string, parameters?: Record<string, unknown>) {
+  return {
+    function: {
+      name,
+      ...(description ? { description } : {}),
+      ...(parameters ? { parameters } : {}),
+    },
+  }
+}
+
+/**
+ * Builds a Claude content message block.
+ */
+function createClaudeMessage(role: "user" | "assistant", content: unknown[] | string) {
+  return {
+    role,
+    content,
+  }
+}
+
+/**
+ * Builds a Claude payload with default options.
+ */
+function createClaudePayload(options: { tools?: unknown[]; [key: string]: unknown } = {}): RequestPayload {
+  const { tools, ...rest } = options
+  const payload: RequestPayload = { ...rest }
+  if (tools !== undefined) {
+    payload.tools = tools
+  }
+  return payload
+}
+
 describe("isClaudeModel", () => {
   it("returns true for claude model names", () => {
     expect(isClaudeModel("claude-sonnet-4-5")).toBe(true)
@@ -329,7 +364,7 @@ describe("appendClaudeThinkingHint", () => {
   describe("with no systemInstruction", () => {
     it("creates systemInstruction when contents array exists", () => {
       const payload: RequestPayload = {
-        contents: [{ role: "user", parts: [{ text: "Hello" }] }],
+        contents: [createClaudeMessage("user", [{ text: "Hello" }])],
       }
       appendClaudeThinkingHint(payload)
 
@@ -376,7 +411,7 @@ describe("normalizeClaudeTools", () => {
 
   describe("functionDeclarations format", () => {
     it("normalizes tools with functionDeclarations array", () => {
-      const payload: RequestPayload = {
+      const payload = createClaudePayload({
         tools: [
           {
             functionDeclarations: [
@@ -394,7 +429,7 @@ describe("normalizeClaudeTools", () => {
             ],
           },
         ],
-      }
+      })
 
       const result = normalizeClaudeTools(payload, identityClean)
 
@@ -408,7 +443,7 @@ describe("normalizeClaudeTools", () => {
     })
 
     it("handles multiple functionDeclarations", () => {
-      const payload: RequestPayload = {
+      const payload = createClaudePayload({
         tools: [
           {
             functionDeclarations: [
@@ -417,7 +452,7 @@ describe("normalizeClaudeTools", () => {
             ],
           },
         ],
-      }
+      })
 
       normalizeClaudeTools(payload, identityClean)
 
@@ -428,23 +463,19 @@ describe("normalizeClaudeTools", () => {
 
   describe("function/custom format", () => {
     it("normalizes OpenAI-style function tools", () => {
-      const payload: RequestPayload = {
+      const payload = createClaudePayload({
         tools: [
           {
             type: "function",
-            function: {
-              name: "search",
-              description: "Search the web",
-              parameters: {
-                type: "object",
-                properties: {
-                  query: { type: "string" },
-                },
+            ...createClaudeFunctionTool("search", "Search the web", {
+              type: "object",
+              properties: {
+                query: { type: "string" },
               },
-            },
+            }),
           },
         ],
-      }
+      })
 
       const result = normalizeClaudeTools(payload, identityClean)
 
@@ -455,7 +486,7 @@ describe("normalizeClaudeTools", () => {
     })
 
     it("normalizes custom-style tools", () => {
-      const payload: RequestPayload = {
+      const payload = createClaudePayload({
         tools: [
           {
             custom: {
@@ -468,7 +499,7 @@ describe("normalizeClaudeTools", () => {
             },
           },
         ],
-      }
+      })
 
       const result = normalizeClaudeTools(payload, identityClean)
 
@@ -476,7 +507,7 @@ describe("normalizeClaudeTools", () => {
     })
 
     it("normalizes tools with top-level name/parameters", () => {
-      const payload: RequestPayload = {
+      const payload = createClaudePayload({
         tools: [
           {
             name: "direct_tool",
@@ -487,7 +518,7 @@ describe("normalizeClaudeTools", () => {
             },
           },
         ],
-      }
+      })
 
       normalizeClaudeTools(payload, identityClean)
 
@@ -498,16 +529,9 @@ describe("normalizeClaudeTools", () => {
 
   describe("schema normalization", () => {
     it("adds placeholder when schema is missing", () => {
-      const payload: RequestPayload = {
-        tools: [
-          {
-            function: {
-              name: "no_schema_tool",
-              description: "Tool without schema",
-            },
-          },
-        ],
-      }
+      const payload = createClaudePayload({
+        tools: [createClaudeFunctionTool("no_schema_tool", "Tool without schema")],
+      })
 
       const result = normalizeClaudeTools(payload, identityClean)
 
@@ -521,16 +545,9 @@ describe("normalizeClaudeTools", () => {
     })
 
     it("adds placeholder when schema has no properties", () => {
-      const payload: RequestPayload = {
-        tools: [
-          {
-            function: {
-              name: "empty_schema_tool",
-              parameters: { type: "object" },
-            },
-          },
-        ],
-      }
+      const payload = createClaudePayload({
+        tools: [createClaudeFunctionTool("empty_schema_tool", undefined, { type: "object" })],
+      })
 
       normalizeClaudeTools(payload, identityClean)
 
@@ -540,21 +557,16 @@ describe("normalizeClaudeTools", () => {
     })
 
     it("preserves existing properties", () => {
-      const payload: RequestPayload = {
+      const payload = createClaudePayload({
         tools: [
-          {
-            function: {
-              name: "has_props_tool",
-              parameters: {
-                type: "object",
-                properties: {
-                  existingProp: { type: "string" },
-                },
-              },
+          createClaudeFunctionTool("has_props_tool", undefined, {
+            type: "object",
+            properties: {
+              existingProp: { type: "string" },
             },
-          },
+          }),
         ],
-      }
+      })
 
       normalizeClaudeTools(payload, identityClean)
 
@@ -565,20 +577,15 @@ describe("normalizeClaudeTools", () => {
     })
 
     it("cleans schema using provided function", () => {
-      const payload: RequestPayload = {
+      const payload = createClaudePayload({
         tools: [
-          {
-            function: {
-              name: "needs_cleaning",
-              parameters: {
-                $schema: "http://json-schema.org/draft-07/schema#",
-                type: "object",
-                properties: { arg: { type: "string" } },
-              },
-            },
-          },
+          createClaudeFunctionTool("needs_cleaning", undefined, {
+            $schema: "http://json-schema.org/draft-07/schema#",
+            type: "object",
+            properties: { arg: { type: "string" } },
+          }),
         ],
-      }
+      })
 
       normalizeClaudeTools(payload, realClean)
 
@@ -591,16 +598,14 @@ describe("normalizeClaudeTools", () => {
 
   describe("tool name sanitization", () => {
     it("removes special characters from tool names", () => {
-      const payload: RequestPayload = {
+      const payload = createClaudePayload({
         tools: [
-          {
-            function: {
-              name: "tool@with#special$chars!",
-              parameters: { type: "object", properties: { x: { type: "string" } } },
-            },
-          },
+          createClaudeFunctionTool("tool@with#special$chars!", undefined, {
+            type: "object",
+            properties: { x: { type: "string" } },
+          }),
         ],
-      }
+      })
 
       normalizeClaudeTools(payload, identityClean)
 
@@ -610,16 +615,11 @@ describe("normalizeClaudeTools", () => {
 
     it("truncates long tool names to 64 characters", () => {
       const longName = "a".repeat(100)
-      const payload: RequestPayload = {
+      const payload = createClaudePayload({
         tools: [
-          {
-            function: {
-              name: longName,
-              parameters: { type: "object", properties: { x: { type: "string" } } },
-            },
-          },
+          createClaudeFunctionTool(longName, undefined, { type: "object", properties: { x: { type: "string" } } }),
         ],
-      }
+      })
 
       normalizeClaudeTools(payload, identityClean)
 
@@ -628,7 +628,7 @@ describe("normalizeClaudeTools", () => {
     })
 
     it("generates name when missing", () => {
-      const payload: RequestPayload = {
+      const payload = createClaudePayload({
         tools: [
           {
             function: {
@@ -637,7 +637,7 @@ describe("normalizeClaudeTools", () => {
             },
           },
         ],
-      }
+      })
 
       normalizeClaudeTools(payload, identityClean)
 

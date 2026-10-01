@@ -15,7 +15,7 @@ vi.mock("node:fs", () => fsMock)
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-describe("isLocalDevMode / getLocalDevPath", () => {
+describe("update-checker", () => {
   beforeEach(() => {
     vi.resetAllMocks()
     fsMock.existsSync.mockReturnValue(false)
@@ -25,96 +25,93 @@ describe("isLocalDevMode / getLocalDevPath", () => {
     vi.restoreAllMocks()
   })
 
-  it("returns false when no config files exist", async () => {
-    const { isLocalDevMode } = await import("./checker")
-    expect(isLocalDevMode("/some/project")).toBe(false)
-  })
+  describe("isLocalDevMode / getLocalDevPath", () => {
+    it("returns false when no config files exist", async () => {
+      const { isLocalDevMode } = await import("./checker")
+      expect(isLocalDevMode("/some/project")).toBe(false)
+    })
 
-  it("returns null from getLocalDevPath when no config exists", async () => {
-    const { getLocalDevPath } = await import("./checker")
-    expect(getLocalDevPath("/some/project")).toBeNull()
-  })
+    it("returns null from getLocalDevPath when no config exists", async () => {
+      const { getLocalDevPath } = await import("./checker")
+      expect(getLocalDevPath("/some/project")).toBeNull()
+    })
 
-  it("returns null when config has no matching file:// plugin entry", async () => {
-    const { getLocalDevPath } = await import("./checker")
-    fsMock.existsSync.mockImplementation((p: string) => p.endsWith("opencode.json"))
-    fsMock.readFileSync.mockReturnValue(JSON.stringify({ plugin: ["some-other-plugin@1.0.0"] }))
-    expect(getLocalDevPath("/project")).toBeNull()
-  })
+    it("returns null when config has no matching file:// plugin entry", async () => {
+      const { getLocalDevPath } = await import("./checker")
+      fsMock.existsSync.mockImplementation((p: string) => p.endsWith("opencode.json"))
+      fsMock.readFileSync.mockReturnValue(JSON.stringify({ plugin: ["some-other-plugin@1.0.0"] }))
+      expect(getLocalDevPath("/project")).toBeNull()
+    })
 
-  it("returns path when config contains a file:// entry for the package", async () => {
-    const { getLocalDevPath } = await import("./checker")
-    fsMock.existsSync.mockImplementation((p: string) => p.endsWith("opencode.json"))
-    fsMock.readFileSync.mockReturnValue(
-      JSON.stringify({
-        plugin: ["file:///home/user/opencode-v2-antigravity-auth/dist/plugin.js"],
-      }),
-    )
-    const result = getLocalDevPath("/project")
-    expect(result).toContain("opencode-v2-antigravity-auth")
-  })
+    it("returns path when config contains a file:// entry for the package", async () => {
+      const { getLocalDevPath } = await import("./checker")
+      fsMock.existsSync.mockImplementation((p: string) => p.endsWith("opencode.json"))
+      fsMock.readFileSync.mockReturnValue(
+        JSON.stringify({
+          plugin: ["file:///home/user/opencode-v2-antigravity-auth/dist/plugin.js"],
+        }),
+      )
+      const result = getLocalDevPath("/project")
+      expect(result).toContain("opencode-v2-antigravity-auth")
+    })
 
-  it("handles JSONC config with comments and trailing commas", async () => {
-    const { getLocalDevPath } = await import("./checker")
-    fsMock.existsSync.mockImplementation((p: string) => p.endsWith("opencode.jsonc"))
-    fsMock.readFileSync.mockReturnValue(
-      `{
+    it("handles JSONC config with comments and trailing commas", async () => {
+      const { getLocalDevPath } = await import("./checker")
+      fsMock.existsSync.mockImplementation((p: string) => p.endsWith("opencode.jsonc"))
+      fsMock.readFileSync.mockReturnValue(
+        `{
         // dev plugin
         "plugin": [
           "file:///home/user/opencode-v2-antigravity-auth/dist/plugin.js",
         ]
       }`,
-    )
-    const result = getLocalDevPath("/project")
-    expect(result).toContain("opencode-v2-antigravity-auth")
+      )
+      const result = getLocalDevPath("/project")
+      expect(result).toContain("opencode-v2-antigravity-auth")
+    })
+
+    it("returns null and does not throw when config file is malformed JSON", async () => {
+      const { getLocalDevPath } = await import("./checker")
+      fsMock.existsSync.mockReturnValue(true)
+      fsMock.readFileSync.mockReturnValue("{ not valid json !!!}")
+      expect(() => getLocalDevPath("/project")).not.toThrow()
+      expect(getLocalDevPath("/project")).toBeNull()
+    })
   })
 
-  it("returns null and does not throw when config file is malformed JSON", async () => {
-    const { getLocalDevPath } = await import("./checker")
-    fsMock.existsSync.mockReturnValue(true)
-    fsMock.readFileSync.mockReturnValue("{ not valid json !!!}")
-    expect(() => getLocalDevPath("/project")).not.toThrow()
-    expect(getLocalDevPath("/project")).toBeNull()
-  })
-})
+  describe("findPluginEntry", () => {
+    it("returns null when no config files exist", async () => {
+      const { findPluginEntry } = await import("./checker")
+      expect(findPluginEntry("/project")).toBeNull()
+    })
 
-describe("findPluginEntry", () => {
-  beforeEach(() => {
-    vi.resetAllMocks()
-    fsMock.existsSync.mockReturnValue(false)
-  })
+    it("returns entry with isPinned=false for bare package name", async () => {
+      const { findPluginEntry } = await import("./checker")
+      fsMock.existsSync.mockImplementation((p: string) => p.endsWith("opencode.json"))
+      fsMock.readFileSync.mockReturnValue(JSON.stringify({ plugin: ["opencode-v2-antigravity-auth"] }))
+      const result = findPluginEntry("/project")
+      expect(result).not.toBeNull()
+      expect(result!.isPinned).toBe(false)
+      expect(result!.pinnedVersion).toBeNull()
+    })
 
-  it("returns null when no config files exist", async () => {
-    const { findPluginEntry } = await import("./checker")
-    expect(findPluginEntry("/project")).toBeNull()
-  })
+    it("returns entry with isPinned=true for versioned package", async () => {
+      const { findPluginEntry } = await import("./checker")
+      fsMock.existsSync.mockImplementation((p: string) => p.endsWith("opencode.json"))
+      fsMock.readFileSync.mockReturnValue(JSON.stringify({ plugin: ["opencode-v2-antigravity-auth@1.5.0"] }))
+      const result = findPluginEntry("/project")
+      expect(result).not.toBeNull()
+      expect(result!.isPinned).toBe(true)
+      expect(result!.pinnedVersion).toBe("1.5.0")
+    })
 
-  it("returns entry with isPinned=false for bare package name", async () => {
-    const { findPluginEntry } = await import("./checker")
-    fsMock.existsSync.mockImplementation((p: string) => p.endsWith("opencode.json"))
-    fsMock.readFileSync.mockReturnValue(JSON.stringify({ plugin: ["opencode-v2-antigravity-auth"] }))
-    const result = findPluginEntry("/project")
-    expect(result).not.toBeNull()
-    expect(result!.isPinned).toBe(false)
-    expect(result!.pinnedVersion).toBeNull()
-  })
-
-  it("returns entry with isPinned=true for versioned package", async () => {
-    const { findPluginEntry } = await import("./checker")
-    fsMock.existsSync.mockImplementation((p: string) => p.endsWith("opencode.json"))
-    fsMock.readFileSync.mockReturnValue(JSON.stringify({ plugin: ["opencode-v2-antigravity-auth@1.5.0"] }))
-    const result = findPluginEntry("/project")
-    expect(result).not.toBeNull()
-    expect(result!.isPinned).toBe(true)
-    expect(result!.pinnedVersion).toBe("1.5.0")
-  })
-
-  it("returns isPinned=false for @latest entry", async () => {
-    const { findPluginEntry } = await import("./checker")
-    fsMock.existsSync.mockImplementation((p: string) => p.endsWith("opencode.json"))
-    fsMock.readFileSync.mockReturnValue(JSON.stringify({ plugin: ["opencode-v2-antigravity-auth@latest"] }))
-    const result = findPluginEntry("/project")
-    expect(result!.isPinned).toBe(false)
-    expect(result!.pinnedVersion).toBeNull()
+    it("returns isPinned=false for @latest entry", async () => {
+      const { findPluginEntry } = await import("./checker")
+      fsMock.existsSync.mockImplementation((p: string) => p.endsWith("opencode.json"))
+      fsMock.readFileSync.mockReturnValue(JSON.stringify({ plugin: ["opencode-v2-antigravity-auth@latest"] }))
+      const result = findPluginEntry("/project")
+      expect(result!.isPinned).toBe(false)
+      expect(result!.pinnedVersion).toBeNull()
+    })
   })
 })

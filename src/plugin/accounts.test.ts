@@ -10,10 +10,23 @@ import {
   resolveQuotaGroup,
 } from "./accounts"
 import { updateAccounts } from "./storage"
-import type { AccountStorageV4 } from "./storage"
+import type { AccountMetadataV3, AccountStorageV4 } from "./storage"
 import type { OAuthAuthDetails } from "./types"
 
 const { writtenStores } = vi.hoisted(() => ({ writtenStores: [] as AccountStorageV4[] }))
+
+/**
+ * Creates an AccountMetadataV3 fixture with default test fields.
+ */
+function accountEntry(overrides: Partial<AccountMetadataV3> = {}): AccountMetadataV3 {
+  return {
+    refreshToken: "r1",
+    projectId: "p1",
+    addedAt: 1,
+    lastUsed: 0,
+    ...overrides,
+  }
+}
 
 // Mock storage to prevent test data from leaking to real config files
 vi.mock("./storage", async (importOriginal) => {
@@ -99,10 +112,7 @@ describe("AccountManager", () => {
   it("returns current account when not rate-limited for family", () => {
     const stored: AccountStorageV4 = {
       version: 4,
-      accounts: [
-        { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-        { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-      ],
+      accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2" })],
       activeIndex: 0,
     }
 
@@ -118,10 +128,7 @@ describe("AccountManager", () => {
   it("switches to next account when current is rate-limited for family", () => {
     const stored: AccountStorageV4 = {
       version: 4,
-      accounts: [
-        { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-        { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-      ],
+      accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2" })],
       activeIndex: 0,
     }
 
@@ -138,10 +145,7 @@ describe("AccountManager", () => {
   it("returns null when all accounts are rate-limited for family", () => {
     const stored: AccountStorageV4 = {
       version: 4,
-      accounts: [
-        { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-        { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-      ],
+      accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2" })],
       activeIndex: 0,
     }
 
@@ -161,7 +165,7 @@ describe("AccountManager", () => {
 
     const stored: AccountStorageV4 = {
       version: 4,
-      accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+      accounts: [accountEntry()],
       activeIndex: 0,
     }
 
@@ -181,10 +185,7 @@ describe("AccountManager", () => {
 
     const stored: AccountStorageV4 = {
       version: 4,
-      accounts: [
-        { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-        { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-      ],
+      accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2" })],
       activeIndex: 0,
     }
 
@@ -201,7 +202,7 @@ describe("AccountManager", () => {
   it("tracks rate limits per model family independently", () => {
     const stored: AccountStorageV4 = {
       version: 4,
-      accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+      accounts: [accountEntry()],
       activeIndex: 0,
     }
 
@@ -228,10 +229,7 @@ describe("AccountManager", () => {
 
     const stored: AccountStorageV4 = {
       version: 4,
-      accounts: [
-        { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-        { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-      ],
+      accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2" })],
       activeIndex: 0,
     }
 
@@ -263,9 +261,9 @@ describe("AccountManager", () => {
     const stored: AccountStorageV4 = {
       version: 4,
       accounts: [
-        { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-        { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-        { refreshToken: "r3", projectId: "p3", addedAt: 1, lastUsed: 0 },
+        accountEntry(),
+        accountEntry({ refreshToken: "r2", projectId: "p2" }),
+        accountEntry({ refreshToken: "r3", projectId: "p3" }),
       ],
       activeIndex: 1,
     }
@@ -293,10 +291,7 @@ describe("AccountManager", () => {
 
     const stored: AccountStorageV4 = {
       version: 4,
-      accounts: [
-        { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-        { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-      ],
+      accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2" })],
       activeIndex: 0,
     }
 
@@ -315,7 +310,7 @@ describe("AccountManager", () => {
 
     const stored: AccountStorageV4 = {
       version: 4,
-      accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+      accounts: [accountEntry()],
       activeIndex: 0,
     }
 
@@ -336,7 +331,7 @@ describe("AccountManager", () => {
     it("tracks rate limits separately for each header style", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -352,7 +347,7 @@ describe("AccountManager", () => {
     it("getAvailableHeaderStyle returns antigravity first for Gemini", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -365,7 +360,7 @@ describe("AccountManager", () => {
     it("getAvailableHeaderStyle returns gemini-cli when antigravity is rate-limited", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -380,7 +375,7 @@ describe("AccountManager", () => {
     it("getAvailableHeaderStyle returns null when both header styles are rate-limited", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -396,7 +391,7 @@ describe("AccountManager", () => {
     it("getAvailableHeaderStyle always returns antigravity for Claude", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -409,7 +404,7 @@ describe("AccountManager", () => {
     it("getAvailableHeaderStyle returns null for Claude when rate-limited", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -427,7 +422,7 @@ describe("AccountManager", () => {
 
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -451,7 +446,7 @@ describe("AccountManager", () => {
 
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -472,10 +467,7 @@ describe("AccountManager", () => {
     it("tracks current account independently per model family", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-          { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-        ],
+        accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2" })],
         activeIndex: 0,
       }
 
@@ -497,9 +489,9 @@ describe("AccountManager", () => {
       const stored: AccountStorageV4 = {
         version: 4,
         accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-          { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-          { refreshToken: "r3", projectId: "p3", addedAt: 1, lastUsed: 0 },
+          accountEntry(),
+          accountEntry({ refreshToken: "r2", projectId: "p2" }),
+          accountEntry({ refreshToken: "r3", projectId: "p3" }),
         ],
         activeIndex: 0,
       }
@@ -524,10 +516,7 @@ describe("AccountManager", () => {
     it("persists per-family indices to storage", async () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-          { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-        ],
+        accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2" })],
         activeIndex: 0,
       }
 
@@ -545,9 +534,9 @@ describe("AccountManager", () => {
       const stored: AccountStorageV4 = {
         version: 4,
         accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-          { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-          { refreshToken: "r3", projectId: "p3", addedAt: 1, lastUsed: 0 },
+          accountEntry(),
+          accountEntry({ refreshToken: "r2", projectId: "p2" }),
+          accountEntry({ refreshToken: "r3", projectId: "p3" }),
         ],
         activeIndex: 0,
         activeIndexByFamily: {
@@ -565,10 +554,7 @@ describe("AccountManager", () => {
     it("falls back to activeIndex when activeIndexByFamily is not present", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-          { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-        ],
+        accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2" })],
         activeIndex: 1,
       }
 
@@ -583,7 +569,7 @@ describe("AccountManager", () => {
     it("marks account as cooling down with reason", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -601,7 +587,7 @@ describe("AccountManager", () => {
 
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -620,7 +606,7 @@ describe("AccountManager", () => {
     it("clearAccountCooldown removes cooldown state", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -637,10 +623,7 @@ describe("AccountManager", () => {
     it("cooling down account is skipped in getCurrentOrNextForFamily", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-          { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-        ],
+        accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2" })],
         activeIndex: 0,
       }
 
@@ -656,7 +639,7 @@ describe("AccountManager", () => {
     it("cooldown is independent from rate limits", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -676,10 +659,7 @@ describe("AccountManager", () => {
       it("returns same account on consecutive calls", () => {
         const stored: AccountStorageV4 = {
           version: 4,
-          accounts: [
-            { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-            { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-          ],
+          accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2" })],
           activeIndex: 0,
         }
 
@@ -697,10 +677,7 @@ describe("AccountManager", () => {
       it("switches account only when current is rate-limited", () => {
         const stored: AccountStorageV4 = {
           version: 4,
-          accounts: [
-            { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-            { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-          ],
+          accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2" })],
           activeIndex: 0,
         }
 
@@ -721,9 +698,9 @@ describe("AccountManager", () => {
         const stored: AccountStorageV4 = {
           version: 4,
           accounts: [
-            { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-            { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-            { refreshToken: "r3", projectId: "p3", addedAt: 1, lastUsed: 0 },
+            accountEntry(),
+            accountEntry({ refreshToken: "r2", projectId: "p2" }),
+            accountEntry({ refreshToken: "r3", projectId: "p3" }),
           ],
           activeIndex: 0,
         }
@@ -743,9 +720,9 @@ describe("AccountManager", () => {
         const stored: AccountStorageV4 = {
           version: 4,
           accounts: [
-            { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-            { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-            { refreshToken: "r3", projectId: "p3", addedAt: 1, lastUsed: 0 },
+            accountEntry(),
+            accountEntry({ refreshToken: "r2", projectId: "p2" }),
+            accountEntry({ refreshToken: "r3", projectId: "p3" }),
           ],
           activeIndex: 0,
         }
@@ -767,9 +744,9 @@ describe("AccountManager", () => {
         const stored: AccountStorageV4 = {
           version: 4,
           accounts: [
-            { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-            { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-            { refreshToken: "r3", projectId: "p3", addedAt: 1, lastUsed: 0 },
+            accountEntry(),
+            accountEntry({ refreshToken: "r2", projectId: "p2" }),
+            accountEntry({ refreshToken: "r3", projectId: "p3" }),
           ],
           activeIndex: 0,
         }
@@ -789,10 +766,7 @@ describe("AccountManager", () => {
       it("continues to return valid accounts after all touched", () => {
         const stored: AccountStorageV4 = {
           version: 4,
-          accounts: [
-            { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-            { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-          ],
+          accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2" })],
           activeIndex: 0,
         }
 
@@ -816,9 +790,9 @@ describe("AccountManager", () => {
         const stored: AccountStorageV4 = {
           version: 4,
           accounts: [
-            { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-            { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-            { refreshToken: "r3", projectId: "p3", addedAt: 1, lastUsed: 0 },
+            accountEntry(),
+            accountEntry({ refreshToken: "r2", projectId: "p2" }),
+            accountEntry({ refreshToken: "r3", projectId: "p3" }),
           ],
           activeIndex: 0,
         }
@@ -833,10 +807,7 @@ describe("AccountManager", () => {
       it("skips rate-limited accounts", () => {
         const stored: AccountStorageV4 = {
           version: 4,
-          accounts: [
-            { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-            { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-          ],
+          accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2" })],
           activeIndex: 0,
         }
 
@@ -851,10 +822,7 @@ describe("AccountManager", () => {
       it("skips cooling down accounts", () => {
         const stored: AccountStorageV4 = {
           version: 4,
-          accounts: [
-            { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-            { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-          ],
+          accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2" })],
           activeIndex: 0,
         }
 
@@ -872,7 +840,7 @@ describe("AccountManager", () => {
 
         const stored: AccountStorageV4 = {
           version: 4,
-          accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+          accounts: [accountEntry()],
           activeIndex: 0,
         }
 
@@ -888,10 +856,7 @@ describe("AccountManager", () => {
 
         const stored: AccountStorageV4 = {
           version: 4,
-          accounts: [
-            { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-            { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-          ],
+          accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2" })],
           activeIndex: 0,
         }
 
@@ -912,7 +877,7 @@ describe("AccountManager", () => {
 
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -927,7 +892,7 @@ describe("AccountManager", () => {
     it("isFreshForQuota returns true for untouched accounts", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -943,7 +908,7 @@ describe("AccountManager", () => {
 
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -961,7 +926,7 @@ describe("AccountManager", () => {
 
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -982,7 +947,7 @@ describe("AccountManager", () => {
     it("initializes consecutiveFailures as undefined", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -995,7 +960,7 @@ describe("AccountManager", () => {
     it("can increment and reset consecutiveFailures", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1017,10 +982,7 @@ describe("AccountManager", () => {
     it("skips account when requested headerStyle is rate-limited even if other style is available", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-          { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-        ],
+        accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2" })],
         activeIndex: 0,
         activeIndexByFamily: { claude: 0, gemini: 0 },
       }
@@ -1053,10 +1015,7 @@ describe("AccountManager", () => {
     it("returns same account when a different headerStyle is rate-limited", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-          { refreshToken: "r2", projectId: "p2", addedAt: 1, lastUsed: 0 },
-        ],
+        accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2" })],
         activeIndex: 0,
         activeIndexByFamily: { claude: 0, gemini: 0 },
       }
@@ -1086,7 +1045,7 @@ describe("AccountManager", () => {
 
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1111,7 +1070,7 @@ describe("AccountManager", () => {
 
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1135,7 +1094,7 @@ describe("AccountManager", () => {
 
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1162,7 +1121,7 @@ describe("AccountManager", () => {
 
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1249,7 +1208,7 @@ describe("AccountManager", () => {
 
         const stored: AccountStorageV4 = {
           version: 4,
-          accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+          accounts: [accountEntry()],
           activeIndex: 0,
         }
 
@@ -1277,7 +1236,7 @@ describe("AccountManager", () => {
 
         const stored: AccountStorageV4 = {
           version: 4,
-          accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+          accounts: [accountEntry()],
           activeIndex: 0,
         }
 
@@ -1302,7 +1261,7 @@ describe("AccountManager", () => {
       it("resets consecutive failure counter", () => {
         const stored: AccountStorageV4 = {
           version: 4,
-          accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+          accounts: [accountEntry()],
           activeIndex: 0,
         }
 
@@ -1367,7 +1326,7 @@ describe("AccountManager", () => {
       it("shouldTryOptimisticReset returns false when accounts are available", () => {
         const stored: AccountStorageV4 = {
           version: 4,
-          accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+          accounts: [accountEntry()],
           activeIndex: 0,
         }
 
@@ -1425,7 +1384,7 @@ describe("AccountManager", () => {
 
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1453,7 +1412,7 @@ describe("AccountManager", () => {
 
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1479,7 +1438,7 @@ describe("AccountManager", () => {
     it("regenerateAccountFingerprint saves old fingerprint to history", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1503,7 +1462,7 @@ describe("AccountManager", () => {
 
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1541,7 +1500,7 @@ describe("AccountManager", () => {
     it("getAccountFingerprintHistory returns empty array for new account", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1554,7 +1513,7 @@ describe("AccountManager", () => {
     it("limits fingerprint history to MAX_FINGERPRINT_HISTORY", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1574,10 +1533,7 @@ describe("AccountManager", () => {
     it("skips account over soft quota threshold in sticky mode", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-          { refreshToken: "r2", projectId: "p2", addedAt: 2, lastUsed: 0 },
-        ],
+        accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2", addedAt: 2 })],
         activeIndex: 0,
       }
 
@@ -1591,7 +1547,7 @@ describe("AccountManager", () => {
     it("allows account under soft quota threshold", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1605,7 +1561,7 @@ describe("AccountManager", () => {
     it("threshold of 100 disables soft quota protection", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1619,10 +1575,7 @@ describe("AccountManager", () => {
     it("returns null when all accounts over threshold", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-          { refreshToken: "r2", projectId: "p2", addedAt: 2, lastUsed: 0 },
-        ],
+        accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2", addedAt: 2 })],
         activeIndex: 0,
       }
 
@@ -1637,10 +1590,7 @@ describe("AccountManager", () => {
     it("skips account over threshold in round-robin mode", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-          { refreshToken: "r2", projectId: "p2", addedAt: 2, lastUsed: 0 },
-        ],
+        accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2", addedAt: 2 })],
         activeIndex: 0,
       }
 
@@ -1654,7 +1604,7 @@ describe("AccountManager", () => {
     it("account without cached quota is not skipped", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1667,10 +1617,7 @@ describe("AccountManager", () => {
     it("handles remainingFraction of 0 (fully exhausted)", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-          { refreshToken: "r2", projectId: "p2", addedAt: 2, lastUsed: 0 },
-        ],
+        accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2", addedAt: 2 })],
         activeIndex: 0,
       }
 
@@ -1687,7 +1634,7 @@ describe("AccountManager", () => {
 
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1705,7 +1652,7 @@ describe("AccountManager", () => {
     it("fails open when cachedQuotaUpdatedAt is missing", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1723,7 +1670,7 @@ describe("AccountManager", () => {
     it("returns 0 when accounts are available (under threshold)", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1737,7 +1684,7 @@ describe("AccountManager", () => {
     it("returns null when no resetTime available", () => {
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1754,7 +1701,7 @@ describe("AccountManager", () => {
 
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1779,7 +1726,7 @@ describe("AccountManager", () => {
 
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [{ refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 }],
+        accounts: [accountEntry()],
         activeIndex: 0,
       }
 
@@ -1804,10 +1751,7 @@ describe("AccountManager", () => {
 
       const stored: AccountStorageV4 = {
         version: 4,
-        accounts: [
-          { refreshToken: "r1", projectId: "p1", addedAt: 1, lastUsed: 0 },
-          { refreshToken: "r2", projectId: "p2", addedAt: 2, lastUsed: 0 },
-        ],
+        accounts: [accountEntry(), accountEntry({ refreshToken: "r2", projectId: "p2", addedAt: 2 })],
         activeIndex: 0,
       }
 

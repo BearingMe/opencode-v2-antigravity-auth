@@ -26,6 +26,38 @@ import {
 } from "./request-helpers"
 import { deduplicateThinkingText, createThoughtBuffer } from "./core/streaming/transformer"
 
+/**
+ * Builds a model content entry containing parts.
+ */
+function createModelTurn(parts: unknown[]) {
+  return { role: "model", parts }
+}
+
+/**
+ * Builds an assistant message entry containing content blocks.
+ */
+function createAssistantTurn(content: unknown[]) {
+  return { role: "assistant", content }
+}
+
+/**
+ * Builds a thinking block/part with optional signature.
+ */
+function createThinkingBlock(textOrThinking: unknown, signature?: string, format: "gemini" | "claude" = "claude") {
+  if (format === "gemini") {
+    return {
+      thought: true,
+      text: textOrThinking,
+      ...(signature ? { thoughtSignature: signature } : {}),
+    }
+  }
+  return {
+    type: "thinking",
+    thinking: textOrThinking,
+    ...(signature ? { signature } : {}),
+  }
+}
+
 describe("sanitizeThinkingPart (covered via filtering)", () => {
   it("extracts wrapped text and strips SDK fields for Gemini-style thought blocks", () => {
     const validSignature = "s".repeat(60)
@@ -524,14 +556,8 @@ describe("deepFilterThinkingBlocks", () => {
 describe("filterMessagesThinkingBlocks", () => {
   it("filters out unsigned thinking blocks in messages[].content", () => {
     const messages = [
-      {
-        role: "assistant",
-        content: [
-          { type: "thinking", thinking: "no signature" },
-          { type: "text", text: "visible" },
-        ],
-      },
-      { role: "assistant", content: [{ type: "text", text: "last" }] },
+      createAssistantTurn([createThinkingBlock("no signature"), { type: "text", text: "visible" }]),
+      createAssistantTurn([{ type: "text", text: "last" }]),
     ]
 
     const result = filterMessagesThinkingBlocks(messages) as any
@@ -546,20 +572,15 @@ describe("filterMessagesThinkingBlocks", () => {
       text === thinkingText ? validSignature : undefined
 
     const messages = [
-      {
-        role: "assistant",
-        content: [
-          {
-            type: "thinking",
-            thinking: { text: thinkingText, cache_control: { type: "ephemeral" } },
-            signature: validSignature,
-            cache_control: { type: "ephemeral" },
-            providerOptions: { injected: true },
-          },
-          { type: "text", text: "visible" },
-        ],
-      },
-      { role: "assistant", content: [{ type: "text", text: "last" }] },
+      createAssistantTurn([
+        {
+          ...createThinkingBlock({ text: thinkingText, cache_control: { type: "ephemeral" } }, validSignature),
+          cache_control: { type: "ephemeral" },
+          providerOptions: { injected: true },
+        },
+        { type: "text", text: "visible" },
+      ]),
+      createAssistantTurn([{ type: "text", text: "last" }]),
     ]
 
     const result = filterMessagesThinkingBlocks(messages, "session-1", getCachedSignatureFn) as any
@@ -573,18 +594,11 @@ describe("filterMessagesThinkingBlocks", () => {
   it("strips thinking blocks with foreign signatures not in our cache", () => {
     const foreignSignature = "f".repeat(60)
     const messages = [
-      {
-        role: "assistant",
-        content: [
-          {
-            type: "thinking",
-            thinking: "foreign thinking",
-            signature: foreignSignature,
-          },
-          { type: "text", text: "visible" },
-        ],
-      },
-      { role: "assistant", content: [{ type: "text", text: "last" }] },
+      createAssistantTurn([
+        createThinkingBlock("foreign thinking", foreignSignature),
+        { type: "text", text: "visible" },
+      ]),
+      createAssistantTurn([{ type: "text", text: "last" }]),
     ]
 
     const result = filterMessagesThinkingBlocks(messages) as any
@@ -594,14 +608,8 @@ describe("filterMessagesThinkingBlocks", () => {
 
   it("filters thinking blocks with short signatures", () => {
     const messages = [
-      {
-        role: "assistant",
-        content: [
-          { type: "thinking", thinking: "short sig", signature: "sig123" },
-          { type: "text", text: "visible" },
-        ],
-      },
-      { role: "assistant", content: [{ type: "text", text: "last" }] },
+      createAssistantTurn([createThinkingBlock("short sig", "sig123"), { type: "text", text: "visible" }]),
+      createAssistantTurn([{ type: "text", text: "last" }]),
     ]
 
     const result = filterMessagesThinkingBlocks(messages) as any

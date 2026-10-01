@@ -5,6 +5,13 @@ import { describe, test, expect, beforeEach, afterEach } from "vitest"
 import { updateOpencodeConfig } from "./updater"
 import { OPENCODE_MODEL_DEFINITIONS } from "./models"
 
+/**
+ * Creates a unique temporary directory with the given prefix.
+ */
+function createTempDir(prefix = "opencode-test-"): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), prefix))
+}
+
 describe("updateOpencodeConfig", () => {
   let tempDir: string
   let configPath: string
@@ -13,7 +20,7 @@ describe("updateOpencodeConfig", () => {
   beforeEach(() => {
     originalXdgConfigHome = process.env.XDG_CONFIG_HOME
     // Create a temporary directory for each test
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "opencode-test-"))
+    tempDir = createTempDir()
     configPath = path.join(tempDir, "opencode.json")
   })
 

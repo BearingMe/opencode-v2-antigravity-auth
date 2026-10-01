@@ -8,6 +8,53 @@ import {
   sanitizeCrossModelPayloadInPlace,
 } from "./cross-model-sanitizer"
 
+/**
+ * Builds a Gemini content part with optional thinking and metadata.
+ */
+function buildGeminiPart(options: {
+  text?: string
+  thought?: boolean
+  thoughtSignature?: string
+  thinkingMetadata?: Record<string, unknown>
+  functionCall?: { name: string; args?: Record<string, unknown> }
+  metadata?: Record<string, unknown>
+}) {
+  const part: Record<string, unknown> = {}
+  if (options.thought !== undefined) part.thought = options.thought
+  if (options.text !== undefined) part.text = options.text
+  if (options.thoughtSignature !== undefined) part.thoughtSignature = options.thoughtSignature
+  if (options.thinkingMetadata !== undefined) part.thinkingMetadata = options.thinkingMetadata
+  if (options.functionCall !== undefined) part.functionCall = options.functionCall
+  if (options.metadata !== undefined) part.metadata = options.metadata
+  return part
+}
+
+/**
+ * Builds a Claude content block with optional thinking or tool use.
+ */
+function buildClaudeBlock(options: {
+  type: string
+  text?: string
+  thinking?: string
+  signature?: string
+  data?: string
+  id?: string
+  name?: string
+  input?: Record<string, unknown>
+  metadata?: Record<string, unknown>
+}) {
+  const block: Record<string, unknown> = { type: options.type }
+  if (options.text !== undefined) block.text = options.text
+  if (options.thinking !== undefined) block.thinking = options.thinking
+  if (options.signature !== undefined) block.signature = options.signature
+  if (options.data !== undefined) block.data = options.data
+  if (options.id !== undefined) block.id = options.id
+  if (options.name !== undefined) block.name = options.name
+  if (options.input !== undefined) block.input = options.input
+  if (options.metadata !== undefined) block.metadata = options.metadata
+  return block
+}
+
 describe("cross-model-sanitizer", () => {
   describe("getModelFamily", () => {
     it("identifies Claude models", () => {
@@ -30,11 +77,11 @@ describe("cross-model-sanitizer", () => {
 
   describe("stripGeminiThinkingMetadata", () => {
     it("removes top-level thoughtSignature", () => {
-      const part = {
+      const part = buildGeminiPart({
         thought: true,
         text: "thinking...",
         thoughtSignature: "EsgQCsUQAXLI2ny...",
-      }
+      })
       const result = stripGeminiThinkingMetadata(part)
       expect(result.part.thoughtSignature).toBeUndefined()
       expect(result.stripped).toBe(1)
@@ -42,24 +89,24 @@ describe("cross-model-sanitizer", () => {
     })
 
     it("removes top-level thinkingMetadata", () => {
-      const part = {
+      const part = buildGeminiPart({
         text: "response",
         thinkingMetadata: { someData: true },
-      }
+      })
       const result = stripGeminiThinkingMetadata(part)
       expect(result.part.thinkingMetadata).toBeUndefined()
       expect(result.stripped).toBe(1)
     })
 
     it("removes nested metadata.google.thoughtSignature", () => {
-      const part = {
+      const part = buildGeminiPart({
         functionCall: { name: "bash", args: { command: "df -h" } },
         metadata: {
           google: {
             thoughtSignature: "EsgQCsUQAXLI2ny...",
           },
         },
-      }
+      })
       const result = stripGeminiThinkingMetadata(part)
       const metadata = result.part.metadata as Record<string, unknown> | undefined
       const google = metadata?.google as Record<string, unknown> | undefined
@@ -68,7 +115,7 @@ describe("cross-model-sanitizer", () => {
     })
 
     it("preserves non-signature metadata when preserveNonSignature is true", () => {
-      const part = {
+      const part = buildGeminiPart({
         functionCall: { name: "bash" },
         metadata: {
           google: {
@@ -77,7 +124,7 @@ describe("cross-model-sanitizer", () => {
           },
           cache_control: { type: "ephemeral" },
         },
-      }
+      })
       const result = stripGeminiThinkingMetadata(part, true)
       const metadata = result.part.metadata as Record<string, unknown> | undefined
       const google = metadata?.google as Record<string, unknown> | undefined
@@ -88,14 +135,14 @@ describe("cross-model-sanitizer", () => {
     })
 
     it("cleans up empty google object", () => {
-      const part = {
+      const part = buildGeminiPart({
         text: "hello",
         metadata: {
           google: {
             thoughtSignature: "sig123",
           },
         },
-      }
+      })
       const result = stripGeminiThinkingMetadata(part, true)
       const metadata = result.part.metadata as Record<string, unknown> | undefined
       const google = metadata?.google as Record<string, unknown> | undefined
@@ -103,14 +150,14 @@ describe("cross-model-sanitizer", () => {
     })
 
     it("cleans up empty metadata object", () => {
-      const part = {
+      const part = buildGeminiPart({
         text: "hello",
         metadata: {
           google: {
             thoughtSignature: "sig123",
           },
         },
-      }
+      })
       const result = stripGeminiThinkingMetadata(part, true)
       expect(result.part.metadata).toBeUndefined()
     })
@@ -125,11 +172,11 @@ describe("cross-model-sanitizer", () => {
 
   describe("stripClaudeThinkingFields", () => {
     it("removes signature from thinking blocks", () => {
-      const part = {
+      const part = buildClaudeBlock({
         type: "thinking",
         thinking: "Analyzing...",
         signature: "claude-sig-abc123def456...",
-      }
+      })
       const result = stripClaudeThinkingFields(part)
       expect(result.part.signature).toBeUndefined()
       expect(result.stripped).toBe(1)
@@ -137,33 +184,33 @@ describe("cross-model-sanitizer", () => {
     })
 
     it("removes signature from redacted_thinking blocks", () => {
-      const part = {
+      const part = buildClaudeBlock({
         type: "redacted_thinking",
         data: "encrypted",
         signature: "a]".repeat(30),
-      }
+      })
       const result = stripClaudeThinkingFields(part)
       expect(result.part.signature).toBeUndefined()
       expect(result.stripped).toBe(1)
     })
 
     it("removes long signature from non-thinking parts", () => {
-      const part = {
+      const part = buildClaudeBlock({
         type: "text",
         text: "hello",
         signature: "a".repeat(60),
-      }
+      })
       const result = stripClaudeThinkingFields(part)
       expect(result.part.signature).toBeUndefined()
       expect(result.stripped).toBe(1)
     })
 
     it("preserves short signature-like fields", () => {
-      const part = {
+      const part = buildClaudeBlock({
         type: "text",
         text: "hello",
         signature: "short",
-      }
+      })
       const result = stripClaudeThinkingFields(part)
       expect(result.part.signature).toBe("short")
       expect(result.stripped).toBe(0)

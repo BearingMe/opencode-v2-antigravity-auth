@@ -40,10 +40,6 @@ updateAccounts.mockImplementation(
   },
 )
 
-beforeEach(() => {
-  written.length = 0
-})
-
 describe("manageAccounts", () => {
   const accounts = [
     { email: "one@example.com", refreshToken: "one", addedAt: 1, lastUsed: 1, enabled: true },
@@ -54,6 +50,7 @@ describe("manageAccounts", () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    written.length = 0
     verifyAccountAccess.mockResolvedValue({
       status: "blocked",
       message: "verification required",

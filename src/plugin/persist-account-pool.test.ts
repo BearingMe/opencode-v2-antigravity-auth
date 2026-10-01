@@ -1,10 +1,8 @@
 /**
- * Tests for persistAccountPool function
+ * Storage and recovery tests for account persistence (loadAccounts / saveAccounts).
  *
- * Issue #89: Multi-account login overwrites existing accounts
- * Root cause: loadAccounts() returning null is treated as "no accounts"
- * even when the file exists but couldn't be read (permissions, corruption, etc.)
- *
+ * Covers Issue #89 failure modes (missing files, malformed JSON, schema migrations,
+ * and save error safety) against storage.ts.
  */
 
 import { promises as fs } from "node:fs"
@@ -33,6 +31,9 @@ vi.mock("node:fs", async () => {
   }
 })
 
+/**
+ * Creates a standard mock account for storage tests.
+ */
 function createMockAccount(overrides: Partial<AccountMetadataV3> = {}): AccountMetadataV3 {
   return {
     email: "test@example.com",
@@ -45,6 +46,9 @@ function createMockAccount(overrides: Partial<AccountMetadataV3> = {}): AccountM
   }
 }
 
+/**
+ * Creates a version 4 account storage object with the given accounts.
+ */
 function createMockStorage(accounts: AccountMetadataV3[], activeIndex = 0): AccountStorageV4 {
   return {
     version: 4,
@@ -203,64 +207,6 @@ describe("saveAccounts", () => {
   })
 })
 
-describe("persistAccountPool behavior (Issue #89)", () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date("2026-01-01T12:00:00Z"))
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  describe("merging behavior (replaceAll=false)", () => {
-    it.todo("merges new account with existing accounts")
-
-    it.todo("deduplicates by email, keeping the newest token")
-
-    it.todo("deduplicates by refresh token when email not available")
-
-    it.todo("preserves activeIndex when adding new accounts")
-
-    it.todo("updates lastUsed timestamp for existing accounts")
-  })
-
-  describe("fresh start behavior (replaceAll=true)", () => {
-    it.todo("replaces all existing accounts with new ones")
-
-    it.todo("resets activeIndex to 0")
-
-    it.todo("ignores existing accounts file")
-  })
-
-  describe("THE BUG: error handling when loadAccounts fails (Issue #89)", () => {
-    it.todo("should NOT overwrite accounts when loadAccounts returns null due to permission error")
-
-    it.todo("should throw error when file exists but cannot be read")
-
-    it.todo("should prompt user when existing accounts may be lost")
-
-    it.todo("should only treat ENOENT as 'safe to create new file'")
-  })
-})
-
-describe("TUI flow integration (Issue #89)", () => {
-  describe("account persistence after OAuth", () => {
-    it.todo("should merge new account with existing accounts in TUI flow")
-
-    it.todo("should show warning when existing accounts cannot be loaded")
-
-    it.todo("should ask user for confirmation before potentially overwriting accounts")
-  })
-
-  describe("authorize function behavior", () => {
-    it.todo("TUI flow (inputs falsy) should check for existing accounts")
-
-    it.todo("should handle loadAccounts returning null gracefully")
-  })
-})
-
 describe("regression tests", () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -322,24 +268,5 @@ describe("regression tests", () => {
         .mock.calls.find((call) => (call[0] as string).includes(".gitignore"))
       expect(gitignoreWriteCall).toBeDefined()
     })
-  })
-})
-
-describe("proposed fix validation", () => {
-  describe("loadAccounts should distinguish error types", () => {
-    it.todo("should return { error: 'ENOENT' } when file doesn't exist")
-    it.todo("should return { error: 'PERMISSION_DENIED' } on EACCES")
-    it.todo("should return { error: 'PARSE_ERROR' } on invalid JSON")
-    it.todo("should return { error: 'INVALID_FORMAT' } on schema mismatch")
-  })
-
-  describe("persistAccountPool should handle errors safely", () => {
-    it.todo("should throw AccountFileUnreadableError when file exists but can't be read")
-    it.todo("should include recovery instructions in error message")
-  })
-
-  describe("user prompts for data safety", () => {
-    it.todo("should prompt user when accounts file exists but is unreadable")
-    it.todo("should offer options: (r)etry, (b)ackup and continue, (a)bort")
   })
 })

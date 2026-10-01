@@ -23,6 +23,13 @@ function clearTestEnv(): void {
   }
 }
 
+/**
+ * Creates a unique temporary directory with the given prefix.
+ */
+function createTempDir(prefix: string): string {
+  return mkdtempSync(join(tmpdir(), prefix))
+}
+
 describe("loadConfig env overrides", () => {
   const previousConfigDir = process.env.OPENCODE_CONFIG_DIR
   let configDir = ""
@@ -30,8 +37,8 @@ describe("loadConfig env overrides", () => {
 
   beforeEach(() => {
     clearTestEnv()
-    configDir = mkdtempSync(join(tmpdir(), "antigravity-config-"))
-    projectDir = mkdtempSync(join(tmpdir(), "antigravity-project-"))
+    configDir = createTempDir("antigravity-config-")
+    projectDir = createTempDir("antigravity-project-")
     process.env.OPENCODE_CONFIG_DIR = configDir
   })
 

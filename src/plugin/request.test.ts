@@ -34,6 +34,9 @@ const {
   transformSseLine,
 } = __testExports
 
+/**
+ * Creates an in-memory mock signature store for testing.
+ */
 function createMockSignatureStore(): SignatureStore {
   const store = new Map<string, { text: string; signature: string }>()
   return {
@@ -44,6 +47,9 @@ function createMockSignatureStore(): SignatureStore {
   }
 }
 
+/**
+ * Creates an in-memory mock thought buffer for testing.
+ */
 function createMockThoughtBuffer(): ThoughtBuffer {
   const buffer = new Map<number, string>()
   return {
@@ -51,6 +57,36 @@ function createMockThoughtBuffer(): ThoughtBuffer {
     set: (idx: number, text: string) => buffer.set(idx, text),
     clear: () => buffer.clear(),
   }
+}
+
+/**
+ * Builds a message item fixture for contents or messages arrays.
+ */
+function createMessage(role: string, partsOrContent: unknown) {
+  if (
+    Array.isArray(partsOrContent) &&
+    partsOrContent.length > 0 &&
+    typeof partsOrContent[0] === "object" &&
+    partsOrContent[0] !== null &&
+    "type" in partsOrContent[0]
+  ) {
+    return { role, content: partsOrContent }
+  }
+  return { role, parts: partsOrContent }
+}
+
+/**
+ * Builds a thought part fixture with optional signature.
+ */
+function createThoughtPart(text: string, options: { signature?: string; thoughtSignature?: string } = {}) {
+  const part: Record<string, unknown> = { thought: true, text }
+  if (options.signature) {
+    part.signature = options.signature
+  }
+  if (options.thoughtSignature) {
+    part.thoughtSignature = options.thoughtSignature
+  }
+  return part
 }
 
 const defaultCallbacks: StreamingCallbacks = {}
@@ -174,7 +210,7 @@ describe("request.ts", () => {
     })
 
     it("returns empty string when no user messages", () => {
-      const messages = [{ role: "assistant", content: "response" }]
+      const messages = [createMessage("assistant", [{ type: "text", text: "response" }])]
       expect(extractConversationSeedFromMessages(messages)).toBe("")
     })
 
@@ -185,16 +221,13 @@ describe("request.ts", () => {
 
   describe("extractConversationSeedFromContents", () => {
     it("extracts seed from first user content", () => {
-      const contents = [
-        { role: "user", parts: [{ text: "hello" }] },
-        { role: "model", parts: [{ text: "hi" }] },
-      ]
+      const contents = [createMessage("user", [{ text: "hello" }]), createMessage("model", [{ text: "hi" }])]
       const seed = extractConversationSeedFromContents(contents)
       expect(seed).toContain("hello")
     })
 
     it("returns empty string when no user content", () => {
-      const contents = [{ role: "model", parts: [{ text: "hi" }] }]
+      const contents = [createMessage("model", [{ text: "hi" }])]
       expect(extractConversationSeedFromContents(contents)).toBe("")
     })
   })
@@ -324,16 +357,13 @@ describe("request.ts", () => {
   describe("hasSignedThinkingInContents", () => {
     it("returns true when contents have signed thinking", () => {
       const contents = [
-        {
-          role: "model",
-          parts: [{ thought: true, thoughtSignature: "a".repeat(MIN_SIGNATURE_LENGTH) }],
-        },
+        createMessage("model", [createThoughtPart("", { thoughtSignature: "a".repeat(MIN_SIGNATURE_LENGTH) })]),
       ]
       expect(hasSignedThinkingInContents(contents)).toBe(true)
     })
 
     it("returns false when no signed thinking present", () => {
-      const contents = [{ role: "model", parts: [{ thought: true, text: "unsigned" }] }]
+      const contents = [createMessage("model", [createThoughtPart("unsigned")])]
       expect(hasSignedThinkingInContents(contents)).toBe(false)
     })
   })
