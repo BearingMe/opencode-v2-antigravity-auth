@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { z } from "zod"
 import { ANTIGRAVITY_PROVIDER_ID } from "../constants.js"
-import { formatRefreshParts } from "./auth.js"
 import { checkAccountsQuota, type AccountQuotaResult } from "./quota.js"
 import {
   addTombstones,
@@ -856,8 +855,4 @@ export async function persistRefreshRotation(
     )
     return { storage: { ...current, accounts }, result: true }
   })
-}
-
-export function formatSelectedRefresh(parts: RefreshParts): string {
-  return formatRefreshParts(parts)
 }

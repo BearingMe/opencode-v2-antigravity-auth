@@ -291,16 +291,6 @@ export function getRecoverySuccessToast(): {
   }
 }
 
-export function getRecoveryFailureToast(): {
-  title: string
-  message: string
-} {
-  return {
-    title: "Recovery Failed",
-    message: "Please retry or start a new session.",
-  }
-}
-
 // =============================================================================
 // Session Recovery Hook
 // =============================================================================

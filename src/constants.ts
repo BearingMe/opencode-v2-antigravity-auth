@@ -79,6 +79,11 @@ export function setAntigravityVersion(version: string): void {
   versionLocked = true
 }
 
+/**
+ * Static fallback version string.
+ *
+ * @deprecated Use `getAntigravityVersion()` instead.
+ */
 export const ANTIGRAVITY_VERSION = ANTIGRAVITY_VERSION_FALLBACK
 
 export function getAntigravityHeaders(): HeaderSet & { "Client-Metadata": string } {
@@ -89,6 +94,11 @@ export function getAntigravityHeaders(): HeaderSet & { "Client-Metadata": string
   }
 }
 
+/**
+ * Static header set snapshot using fallback version.
+ *
+ * @deprecated Use `getAntigravityHeaders()` instead.
+ */
 export const ANTIGRAVITY_HEADERS = {
   "User-Agent": `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Antigravity/${ANTIGRAVITY_VERSION} Chrome/138.0.7204.235 Electron/37.3.1 Safari/537.36`,
   "X-Goog-Api-Client": "google-cloud-sdk vscode_cloudshelleditor/0.1",
@@ -200,46 +210,8 @@ export const SKIP_THOUGHT_SIGNATURE = "skip_thought_signature_validator"
  * The instruction provides identity and guidelines for the Antigravity agent.
  */
 // ============================================================================
-// GOOGLE SEARCH TOOL CONSTANTS
+// ANTIGRAVITY SYSTEM INSTRUCTION (Ported from CLIProxyAPI v6.6.89)
 // ============================================================================
-
-/**
- * Model used for Google Search grounding requests.
- * Uses gemini-2.5-flash for fast, cost-effective search operations. (3-flash is always at capacity and doesn't support souce citation).
- */
-export const SEARCH_MODEL = "gemini-2.5-flash"
-
-/**
- * Thinking budget for deep search (more thorough analysis).
- */
-export const SEARCH_THINKING_BUDGET_DEEP = 16384
-
-/**
- * Thinking budget for fast search (quick results).
- */
-export const SEARCH_THINKING_BUDGET_FAST = 4096
-
-/**
- * Timeout for search requests in milliseconds (60 seconds).
- */
-export const SEARCH_TIMEOUT_MS = 60000
-
-/**
- * System instruction for the Google Search tool.
- */
-export const SEARCH_SYSTEM_INSTRUCTION = `You are an expert web search assistant with access to Google Search and URL analysis tools.
-
-Your capabilities:
-- Use web search to find real-time information from the web
-- Fetch and analyze content from specific URLs when provided
-
-Guidelines:
-- Always provide accurate, well-sourced information
-- Cite your sources when presenting facts
-- If analyzing URLs, extract the most relevant information
-- Be concise but comprehensive in your responses
-- If information is uncertain or conflicting, acknowledge it
-- Focus on answering the user's question directly`
 
 export const ANTIGRAVITY_SYSTEM_INSTRUCTION = `You are Antigravity, a powerful agentic AI coding assistant designed by the Google DeepMind team working on Advanced Agentic Coding.
 You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.

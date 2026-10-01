@@ -1,5 +1,4 @@
 import * as crypto from "node:crypto"
-import * as os from "node:os"
 import { getAntigravityVersion } from "../constants"
 
 const OS_VERSIONS: Record<string, string[]> = {
@@ -97,28 +96,6 @@ export function generateFingerprint(): Fingerprint {
 }
 
 /**
- * Collect fingerprint based on actual current system.
- * Uses real OS info instead of randomized values.
- */
-export function collectCurrentFingerprint(): Fingerprint {
-  const platform = os.platform()
-  const arch = os.arch()
-
-  return {
-    deviceId: generateDeviceId(),
-    sessionToken: generateSessionToken(),
-    userAgent: `antigravity/${getAntigravityVersion()} ${platform}/${arch}`,
-    apiClient: "google-cloud-sdk vscode_cloudshelleditor/0.1",
-    clientMetadata: {
-      ideType: "ANTIGRAVITY",
-      platform: platformToDisplayName(platform),
-      pluginType: "GEMINI",
-    },
-    createdAt: Date.now(),
-  }
-}
-
-/**
  * Update the version in a fingerprint's userAgent to match the current runtime version.
  * Called after version fetcher resolves so saved fingerprints always carry the latest version.
  * Returns true if the userAgent was changed.
@@ -164,14 +141,5 @@ export function getSessionFingerprint(): Fingerprint {
   if (!sessionFingerprint) {
     sessionFingerprint = generateFingerprint()
   }
-  return sessionFingerprint
-}
-
-/**
- * Regenerate the session fingerprint.
- * Call this to get a fresh identity (e.g., after rate limiting).
- */
-export function regenerateSessionFingerprint(): Fingerprint {
-  sessionFingerprint = generateFingerprint()
   return sessionFingerprint
 }
