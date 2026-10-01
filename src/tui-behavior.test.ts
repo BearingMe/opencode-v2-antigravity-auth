@@ -82,15 +82,28 @@ function createHarness(options: {
   selectQueue: Array<unknown>
   deferListSelection?: boolean
   deferMissingAcknowledgement?: boolean
+  mutateImpl?: (input: { id: string; op: string }) => Promise<unknown>
 }) {
   type SetupContext = Parameters<typeof plugin.setup>[0]
   const listMock = vi.fn(async () => options.listResponses.shift() ?? { accounts: [] })
   const quotaMock = vi.fn(options.quotaImpl)
+  const mutateMock = vi.fn(
+    options.mutateImpl ??
+      (async (input: { id: string; op: string }) => ({
+        op: input.op,
+        index: 0,
+        nextActiveIndex: 0,
+        activeIndexByFamily: { claude: 0, gemini: 0 },
+        remaining: 1,
+        selected: null,
+      })),
+  )
   const toastMock = vi.fn()
   const alerts: Array<{ title: string; message: string }> = []
   const selectCalls: Array<{ title: string; placeholder?: string }> = []
   const selectQueue = [...options.selectQueue]
   const showCalls: Array<{ render: () => unknown; onClose?: () => void }> = []
+  const setCalls: Array<{ size?: string; centered?: boolean }> = []
   const listViews: Array<AccountListDialogProps> = []
   const missingViews: Array<MissingAccountDialogProps> = []
   let activeClose: (() => void) | undefined
@@ -100,13 +113,16 @@ function createHarness(options: {
     close?.()
   }
   const clearMock = vi.fn(dismiss)
+  const setMock = vi.fn((opts: { size?: string; centered?: boolean }) => {
+    setCalls.push(opts)
+  })
   let registeredRun: ((...args: Array<never>) => unknown) | undefined
 
   const context = {
     location: "test-location",
     data: { location: { default: () => "test-location" } },
     client: {
-      rpc: vi.fn(() => ({ list: listMock, quota: quotaMock })),
+      rpc: vi.fn(() => ({ list: listMock, quota: quotaMock, mutate: mutateMock })),
     },
     theme: {
       background: { raised: { high: "selected" }, formfield: { focused: "inputBackground" } },
@@ -134,7 +150,7 @@ function createHarness(options: {
         }),
         confirm: vi.fn(async () => false),
         clear: clearMock,
-        set: vi.fn(),
+        set: setMock,
         show: vi.fn((render: () => unknown, onClose?: () => void) => {
           dismiss()
           activeClose = onClose
@@ -176,11 +192,13 @@ function createHarness(options: {
   return {
     listMock,
     quotaMock,
+    mutateMock,
     toastMock,
     clearMock,
     alerts,
     selectCalls,
     showCalls,
+    setCalls,
     listViews,
     missingViews,
     runAccounts: registeredRun,
@@ -421,5 +439,102 @@ describe("show-quota on a deleted account", () => {
     expect(harness.showCalls).toHaveLength(0)
     const actionDialogs = harness.selectCalls.filter((call) => call.title === testAccount.email)
     expect(actionDialogs).toHaveLength(1)
+  })
+})
+
+describe("standardized dialog presentation size", () => {
+  it("sets large size for the account list, quota dialog, and missing account dialog", async () => {
+    const harness = createHarness({
+      listResponses: [{ accounts: [testAccount] }, { accounts: [] }],
+      quotaImpl: async (input) => ({ accounts: input.refresh ? [] : [quotaEntry()] }),
+      selectQueue: [testAccount.id, "show-quota"],
+      deferMissingAcknowledgement: true,
+    })
+
+    // 1. openList and openQuota set large
+    await harness.runAccounts()
+    expect(harness.setCalls).toContainEqual({ size: "large" })
+
+    // 2. Refresh detects missing account and triggers MissingAccountDialogView
+    const pendingRefresh = harness.view().controller.refresh()
+    await vi.waitFor(() => expect(harness.missingViews).toHaveLength(1))
+
+    // 3. Every dialog presented sets large
+    expect(harness.setCalls.every((call) => call.size === "large")).toBe(true)
+    expect(harness.setCalls.filter((call) => call.size === "large").length).toBeGreaterThanOrEqual(3)
+
+    harness.missingViews[0]!.acknowledge()
+    await pendingRefresh
+    harness.cleanup()
+  })
+})
+
+describe("toggle account enabled in list", () => {
+  it("invokes mutate on toggle and displays success toast", async () => {
+    const harness = createHarness({
+      listResponses: [{ accounts: [testAccount] }],
+      quotaImpl: async () => ({ accounts: [quotaEntry()] }),
+      selectQueue: [],
+      deferListSelection: true,
+    })
+    const pending = harness.runAccounts()
+    await vi.waitFor(() => expect(harness.listViews).toHaveLength(1))
+    const listView = harness.listViews[0]!
+    expect(typeof listView.toggle).toBe("function")
+
+    await listView.toggle!(testAccount.id)
+    expect(harness.mutateMock).toHaveBeenCalledWith(
+      { id: testAccount.id, op: "disable" },
+      { location: "test-location" },
+    )
+    expect(harness.toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Antigravity accounts",
+        message: `${testAccount.email} disabled.`,
+        variant: "success",
+      }),
+    )
+
+    // Second toggle toggles back to enable
+    await listView.toggle!(testAccount.id)
+    expect(harness.mutateMock).toHaveBeenCalledWith({ id: testAccount.id, op: "enable" }, { location: "test-location" })
+    expect(harness.toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Antigravity accounts",
+        message: `${testAccount.email} enabled.`,
+        variant: "success",
+      }),
+    )
+
+    harness.dismiss()
+    await pending
+    harness.cleanup()
+  })
+
+  it("handles stale mutate outcome by refreshing the account list", async () => {
+    const harness = createHarness({
+      listResponses: [{ accounts: [testAccount] }, { accounts: [] }],
+      quotaImpl: async () => ({ accounts: [] }),
+      selectQueue: [],
+      deferListSelection: true,
+      mutateImpl: async () => ({ ok: false, kind: "not-found", accountCount: 0 }),
+    })
+    const pending = harness.runAccounts()
+    await vi.waitFor(() => expect(harness.listViews).toHaveLength(1))
+    const listView = harness.listViews[0]!
+
+    await listView.toggle!(testAccount.id)
+    expect(harness.toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Antigravity accounts",
+        message: "That account is no longer saved. The list will refresh.",
+        variant: "warning",
+      }),
+    )
+    expect(harness.listMock).toHaveBeenCalledTimes(2)
+
+    harness.dismiss()
+    await pending
+    harness.cleanup()
   })
 })

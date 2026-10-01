@@ -1,14 +1,3 @@
-/**
- * Configuration loader for opencode-v2-antigravity-auth plugin.
- *
- * Loads config from files.
- * Priority (lowest to highest):
- * 1. Schema defaults
- * 2. User config file
- * 3. Project config file
- * 4. Environment variables (OPENCODE_ANTIGRAVITY_*)
- */
-
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { homedir } from "node:os"
@@ -205,9 +194,6 @@ function applyEnvOverrides(config: AntigravityConfig): AntigravityConfig {
 
 /**
  * Load the complete configuration.
- *
- * @param directory - The project directory (for project-level config)
- * @returns Fully resolved configuration
  */
 export function loadConfig(directory: string): AntigravityConfig {
   // Start with defaults

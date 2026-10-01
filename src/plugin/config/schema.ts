@@ -1,13 +1,3 @@
-/**
- * Configuration schema for opencode-v2-antigravity-auth plugin.
- *
- * Config file locations (in priority order, highest wins):
- * - Project: .opencode/antigravity.json
- * - User: ~/.config/opencode/antigravity.json (all platforms, including Windows)
- *
- * Environment variables always override config file values.
- */
-
 import { z } from "zod"
 
 /**
@@ -44,16 +34,12 @@ export type SchedulingMode = z.infer<typeof SchedulingModeSchema>
  * Signature cache configuration for persisting thinking block signatures to disk.
  */
 export const SignatureCacheConfigSchema = z.object({
-  /** Enable disk caching of signatures (default: true) */
   enabled: z.boolean().default(true),
 
-  /** In-memory TTL in seconds (default: 3600 = 1 hour) */
   memory_ttl_seconds: z.number().min(60).max(86400).default(3600),
 
-  /** Disk TTL in seconds (default: 172800 = 48 hours) */
   disk_ttl_seconds: z.number().min(3600).max(604800).default(172800),
 
-  /** Background write interval in seconds (default: 60) */
   write_interval_seconds: z.number().min(10).max(600).default(60),
 })
 
@@ -61,7 +47,6 @@ export const SignatureCacheConfigSchema = z.object({
  * Main configuration schema for the Antigravity OAuth plugin.
  */
 export const AntigravityConfigSchema = z.object({
-  /** JSON Schema reference for IDE support */
   $schema: z.string().optional(),
 
   // =========================================================================
@@ -72,7 +57,6 @@ export const AntigravityConfigSchema = z.object({
    * Suppress most toast notifications (rate limit, account switching, etc.)
    * Recovery toasts are always shown regardless of this setting.
    * Env override: OPENCODE_ANTIGRAVITY_QUIET=1
-   * @default false
    */
   quiet_mode: z.boolean().default(false),
 
@@ -85,14 +69,12 @@ export const AntigravityConfigSchema = z.object({
    *
    * Debug logging captures all toasts regardless of this setting.
    * Env override: OPENCODE_ANTIGRAVITY_TOAST_SCOPE=all
-   * @default "root_only"
    */
   toast_scope: ToastScopeSchema.default("root_only"),
 
   /**
    * Enable debug logging to file.
    * Env override: OPENCODE_ANTIGRAVITY_DEBUG=1
-   * @default false
    */
   debug: z.boolean().default(false),
 
@@ -100,14 +82,12 @@ export const AntigravityConfigSchema = z.object({
    * Show debug logs in the TUI log panel.
    * Works independently from `debug` file logging.
    * Env override: OPENCODE_ANTIGRAVITY_DEBUG_TUI=1
-   * @default false
    */
   debug_tui: z.boolean().default(false),
 
   /**
    * Custom directory for debug logs.
    * Env override: OPENCODE_ANTIGRAVITY_LOG_DIR=/path/to/logs
-   * @default OS-specific config dir + "/antigravity-logs"
    */
   log_dir: z.string().optional(),
 
@@ -122,7 +102,6 @@ export const AntigravityConfigSchema = z.object({
    * When true: Full context preserved, but may encounter signature errors.
    *
    * Env override: OPENCODE_ANTIGRAVITY_KEEP_THINKING=1
-   * @default false
    */
   keep_thinking: z.boolean().default(false),
 
@@ -134,7 +113,6 @@ export const AntigravityConfigSchema = z.object({
    * Enable automatic session recovery from tool_result_missing errors.
    * When enabled, shows a toast notification when recoverable errors occur.
    *
-   * @default true
    */
   session_recovery: z.boolean().default(true),
 
@@ -145,7 +123,6 @@ export const AntigravityConfigSchema = z.object({
    * When false: Only shows toast notification, user must manually continue.
    * When true: Automatically sends "continue" to resume the session.
    *
-   * @default false
    */
   auto_resume: z.boolean().default(false),
 
@@ -153,7 +130,6 @@ export const AntigravityConfigSchema = z.object({
    * Custom text to send when auto-resuming after recovery.
    * Only used when auto_resume is enabled.
    *
-   * @default "continue"
    */
   resume_text: z.string().default("continue"),
 
@@ -175,14 +151,12 @@ export const AntigravityConfigSchema = z.object({
    * Maximum retry attempts when Antigravity returns an empty response.
    * Empty responses occur when no candidates/choices are returned.
    *
-   * @default 4
    */
   empty_response_max_attempts: z.number().min(1).max(10).default(4),
 
   /**
    * Delay in milliseconds between empty response retries.
    *
-   * @default 2000
    */
   empty_response_retry_delay_ms: z.number().min(500).max(10000).default(2000),
 
@@ -195,7 +169,6 @@ export const AntigravityConfigSchema = z.object({
    * When tool responses have mismatched IDs (due to context compaction),
    * attempt to match them by function name or create placeholders.
    *
-   * @default true
    */
   tool_id_recovery: z.boolean().default(true),
 
@@ -212,14 +185,12 @@ export const AntigravityConfigSchema = z.object({
    * This helps prevent Claude from using parameter names from its training
    * data instead of the actual schema.
    *
-   * @default true
    */
   claude_tool_hardening: z.boolean().default(true),
 
   /**
    * Enable Claude prompt auto-caching by adding top-level cache_control when absent.
    *
-   * @default false
    */
   claude_prompt_auto_caching: z.boolean().default(false),
 
@@ -232,7 +203,6 @@ export const AntigravityConfigSchema = z.object({
    * When enabled, tokens are refreshed in the background before they expire,
    * ensuring requests never block on token refresh.
    *
-   * @default true
    */
   proactive_token_refresh: z.boolean().default(true),
 
@@ -240,7 +210,6 @@ export const AntigravityConfigSchema = z.object({
    * Seconds before token expiry to trigger proactive refresh.
    * Default is 30 minutes (1800 seconds).
    *
-   * @default 1800
    */
   proactive_refresh_buffer_seconds: z.number().min(60).max(7200).default(1800),
 
@@ -248,7 +217,6 @@ export const AntigravityConfigSchema = z.object({
    * Interval between proactive refresh checks in seconds.
    * Default is 5 minutes (300 seconds).
    *
-   * @default 300
    */
   proactive_refresh_check_interval_seconds: z.number().min(30).max(1800).default(300),
 
@@ -263,7 +231,6 @@ export const AntigravityConfigSchema = z.object({
    *
    * Set to 0 to disable (wait indefinitely).
    *
-   * @default 300 (5 minutes)
    */
   max_rate_limit_wait_seconds: z.number().min(0).max(3600).default(300),
 
@@ -272,7 +239,6 @@ export const AntigravityConfigSchema = z.object({
    * This flag is ignored at runtime.
    * Gemini requests always fall back between Antigravity and Gemini CLI quotas.
    *
-   * @default false
    */
   quota_fallback: z.boolean().default(false),
 
@@ -282,14 +248,12 @@ export const AntigravityConfigSchema = z.object({
    * When false (default): Antigravity is tried first, then gemini-cli.
    * When true: gemini-cli is tried first, then Antigravity.
    *
-   * @default false
    */
   cli_first: z.boolean().default(false),
 
   /**
    * Strategy for selecting accounts when making requests.
    * Env override: OPENCODE_ANTIGRAVITY_ACCOUNT_SELECTION_STRATEGY
-   * @default "hybrid"
    */
   account_selection_strategy: AccountSelectionStrategySchema.default("hybrid"),
 
@@ -303,7 +267,6 @@ export const AntigravityConfigSchema = z.object({
    * Anthropic's prompt cache across restarts (recommended for single-session use).
    *
    * Env override: OPENCODE_ANTIGRAVITY_PID_OFFSET_ENABLED=1
-   * @default false
    */
   pid_offset_enabled: z.boolean().default(false),
 
@@ -311,7 +274,6 @@ export const AntigravityConfigSchema = z.object({
    * Switch to another account immediately on first rate limit (after 1s delay).
    * When disabled, retries same account first, then switches on second rate limit.
    *
-   * @default true
    */
   switch_on_first_rate_limit: z.boolean().default(true),
 
@@ -323,7 +285,6 @@ export const AntigravityConfigSchema = z.object({
    * - `performance_first`: Round-robin distribution for maximum throughput.
    *
    * Env override: OPENCODE_ANTIGRAVITY_SCHEDULING_MODE
-   * @default "cache_first"
    */
   scheduling_mode: SchedulingModeSchema.default("cache_first"),
 
@@ -331,7 +292,6 @@ export const AntigravityConfigSchema = z.object({
    * Maximum seconds to wait for same account in cache_first mode.
    * If the account's rate limit reset time exceeds this, switch accounts.
    *
-   * @default 60
    */
   max_cache_first_wait_seconds: z.number().min(5).max(300).default(60),
 
@@ -340,7 +300,6 @@ export const AntigravityConfigSchema = z.object({
    * After this period of no failures, consecutiveFailures resets to 0.
    * This prevents old failures from permanently penalizing an account.
    *
-   * @default 3600 (1 hour)
    */
   failure_ttl_seconds: z.number().min(60).max(7200).default(3600),
 
@@ -348,7 +307,6 @@ export const AntigravityConfigSchema = z.object({
    * Default retry delay in seconds when API doesn't return a retry-after header.
    * Lower values allow faster retries but may trigger more 429 errors.
    *
-   * @default 60
    */
   default_retry_after_seconds: z.number().min(1).max(300).default(60),
 
@@ -356,7 +314,6 @@ export const AntigravityConfigSchema = z.object({
    * Maximum backoff delay in seconds for exponential retry.
    * This caps how long the exponential backoff can grow.
    *
-   * @default 60
    */
   max_backoff_seconds: z.number().min(5).max(300).default(60),
 
@@ -365,7 +322,6 @@ export const AntigravityConfigSchema = z.object({
    * Adds timing jitter to break predictable request cadence patterns.
    * Set to 0 to disable request jitter.
    *
-   * @default 0
    */
   request_jitter_max_ms: z.number().min(0).max(5000).default(0),
 
@@ -377,7 +333,6 @@ export const AntigravityConfigSchema = z.object({
    * Example: 90 means skip account when 90% of quota is used (10% remaining).
    * Set to 100 to disable soft quota protection.
    *
-   * @default 90
    */
   soft_quota_threshold_percent: z.number().min(1).max(100).default(90),
 
@@ -386,7 +341,6 @@ export const AntigravityConfigSchema = z.object({
    * Quota is refreshed opportunistically after successful API requests.
    * Set to 0 to disable automatic refresh (manual only via Check quotas).
    *
-   * @default 15
    */
   quota_refresh_interval_minutes: z.number().min(0).max(60).default(15),
 
@@ -396,7 +350,6 @@ export const AntigravityConfigSchema = z.object({
    *
    * "auto" = derive from refresh interval: max(2 * refresh_interval, 10)
    *
-   * @default "auto"
    */
   soft_quota_cache_ttl_minutes: z.union([z.literal("auto"), z.number().min(1).max(120)]).default("auto"),
 
@@ -434,7 +387,6 @@ export const AntigravityConfigSchema = z.object({
 
   /**
    * Enable automatic plugin updates.
-   * @default true
    */
   auto_update: z.boolean().default(true),
 })

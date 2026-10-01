@@ -1,9 +1,3 @@
-/**
- * Types for session recovery.
- *
- * Based on oh-my-opencode/src/hooks/session-recovery/types.ts
- */
-
 // =============================================================================
 // Storage Types (for reading from OpenCode's filesystem)
 // =============================================================================

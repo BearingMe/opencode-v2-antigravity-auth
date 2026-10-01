@@ -1,10 +1,3 @@
-/**
- * Model Resolution with Thinking Tier Support
- *
- * Resolves model names with tier suffixes (e.g., gemini-3-pro-high, claude-opus-4-6-thinking-low)
- * to their actual API model names and corresponding thinking configurations.
- */
-
 import type { ResolvedModel, ThinkingTier, GoogleSearchConfig } from "./types"
 
 export interface ModelResolverOptions {
@@ -148,10 +141,6 @@ function isGemini3FlashModel(model: string): boolean {
  * - "gemini-3-pro-preview" → { quotaPreference: "antigravity" }
  * - "antigravity-gemini-3-pro-high" → { quotaPreference: "antigravity", explicitQuota: true }
  * - "claude-opus-4-6-thinking-medium" → { quotaPreference: "antigravity" }
- *
- * @param requestedModel - The model name from the request
- * @param options - Optional configuration including cli_first preference
- * @returns Resolved model with thinking configuration
  */
 export function resolveModelWithTier(requestedModel: string, options: ModelResolverOptions = {}): ResolvedModel {
   const isAntigravity = QUOTA_PREFIX_REGEX.test(requestedModel)

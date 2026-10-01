@@ -553,7 +553,6 @@ function flattenTypeArrays(schema: any, nullableFields?: Map<string, string[]>, 
 
 /**
  * Phase 3: Removes unsupported keywords after hints have been extracted.
- * @param insideProperties - When true, keys are property NAMES (preserve); when false, keys are JSON Schema keywords (filter).
  */
 function removeUnsupportedKeywords(schema: any, insideProperties: boolean = false): any {
   if (!schema || typeof schema !== "object") {
@@ -794,13 +793,12 @@ export function extractThinkingConfig(
  * Variant thinking config extracted from OpenCode's providerOptions.
  */
 export interface VariantThinkingConfig {
-  /** Gemini 3 native thinking level (low/medium/high) */
   thinkingLevel?: string
-  /** Numeric thinking budget for Claude and Gemini 2.5 */
+
   thinkingBudget?: number
-  /** Whether to include thoughts in output */
+
   includeThoughts?: boolean
-  /** Google Search configuration */
+
   googleSearch?: GoogleSearchConfig
 }
 
@@ -1249,10 +1247,6 @@ function filterContentArray(
 /**
  * Filters thinking blocks from contents unless the signature matches our cache.
  * Attempts to restore signatures from cache for thinking blocks that lack signatures.
- *
- * @param contents - The contents array from the request
- * @param sessionId - Optional session ID for signature cache lookup
- * @param getCachedSignatureFn - Optional function to retrieve cached signatures
  */
 export function filterUnsignedThinkingBlocks(
   contents: any[],
@@ -1724,9 +1718,6 @@ function isAntigravityModel(target?: string): boolean {
  * - No candidates in Gemini format
  * - No choices in OpenAI format
  * - Candidates/choices exist but have no content
- *
- * @param text - The response body text (should be valid JSON)
- * @returns true if the response is empty
  */
 export function isEmptyResponseBody(text: string): boolean {
   if (!text || !text.trim()) {
@@ -1838,9 +1829,6 @@ export function createStreamingChunkCounter(): StreamingChunkCounter {
 
 /**
  * Checks if an SSE line contains meaningful content.
- *
- * @param line - A single SSE line (e.g., "data: {...}")
- * @returns true if the line contains content worth counting
  */
 export function isMeaningfulSseLine(line: string): boolean {
   if (!line.startsWith("data: ")) {
@@ -1900,11 +1888,6 @@ export function isMeaningfulSseLine(line: string): boolean {
  *
  * This is useful because Antigravity sometimes returns JSON-stringified values
  * in tool arguments, which can cause downstream parsing issues.
- *
- * @param obj - The object to recursively parse
- * @param skipParseKeys - Set of keys whose values should NOT be parsed as JSON (preserved as strings)
- * @param currentKey - The current key being processed (internal use)
- * @returns The parsed object with JSON strings expanded
  */
 // Keys whose string values should NOT be parsed as JSON - they contain literal text content
 const SKIP_PARSE_KEYS = new Set([
@@ -2044,9 +2027,6 @@ export function recursivelyParseJsonStrings(
  * 2. Pass 2: Match by function name (for ID mismatches)
  * 3. Pass 3: Match "unknown_function" orphans or take first available
  * 4. Fallback: Create placeholder responses for missing tool results
- *
- * @param contents - Array of Gemini-style content messages
- * @returns Fixed contents array with matched tool responses
  */
 export function fixToolResponseGrouping(contents: any[]): any[] {
   if (!Array.isArray(contents) || contents.length === 0) {
@@ -2220,9 +2200,6 @@ export function fixToolResponseGrouping(contents: any[]): any[] {
 
 /**
  * Checks if contents have any tool call/response ID mismatches.
- *
- * @param contents - Array of Gemini-style content messages
- * @returns Object with mismatch details
  */
 export function detectToolIdMismatches(contents: any[]): {
   hasMismatches: boolean
@@ -2297,9 +2274,6 @@ export function findOrphanedToolUseIds(messages: any[]): Set<string> {
  * Claude format:
  * - assistant message with content[]: { type: 'tool_use', id, name, input }
  * - user message with content[]: { type: 'tool_result', tool_use_id, content }
- *
- * @param messages - Claude format messages array
- * @returns Fixed messages with placeholder tool_results for orphans
  */
 export function fixClaudeToolPairing(messages: any[]): any[] {
   if (!Array.isArray(messages) || messages.length === 0) {
@@ -2512,10 +2486,6 @@ function formatTypeHint(propData: Record<string, unknown>, depth = 0): string {
  * This helps prevent tool hallucination by explicitly listing parameters
  * in the description, making it harder for the model to hallucinate
  * parameters from its training data.
- *
- * @param tools - Array of tool definitions (Gemini format)
- * @param promptTemplate - Template for the signature (default: "\\n\\nSTRICT PARAMETERS: {params}.")
- * @returns Modified tools array with signatures injected
  */
 export function injectParameterSignatures(tools: any[], promptTemplate = "\n\n⚠️ STRICT PARAMETERS: {params}."): any[] {
   if (!tools || !Array.isArray(tools)) return tools
@@ -2559,9 +2529,6 @@ export function injectParameterSignatures(tools: any[], promptTemplate = "\n\n�
 /**
  * Injects a tool hardening system instruction into the request payload.
  * Port of LLM-API-Key-Proxy's _inject_tool_hardening_instruction()
- *
- * @param payload - The Gemini request payload
- * @param instructionText - The instruction text to inject
  */
 export function injectToolHardeningInstruction(payload: Record<string, unknown>, instructionText: string): void {
   if (!instructionText) return
@@ -2610,9 +2577,6 @@ export function injectToolHardeningInstruction(payload: Record<string, unknown>,
 /**
  * Assigns IDs to functionCall parts and returns the pending call IDs by name.
  * This is the first pass of tool ID assignment.
- *
- * @param contents - Gemini-style contents array
- * @returns Object with modified contents and pending call IDs map
  */
 export function assignToolIdsToContents(contents: any[]): {
   contents: any[]
@@ -2655,10 +2619,6 @@ export function assignToolIdsToContents(contents: any[]): {
 /**
  * Matches functionResponse IDs to their corresponding functionCall IDs.
  * This is the second pass of tool ID assignment.
- *
- * @param contents - Gemini-style contents array
- * @param pendingCallIdsByName - Map of function names to pending call IDs
- * @returns Modified contents with matched response IDs
  */
 export function matchResponseIdsToContents(contents: any[], pendingCallIdsByName: Map<string, string[]>): any[] {
   if (!Array.isArray(contents)) {
@@ -2696,10 +2656,6 @@ export function matchResponseIdsToContents(contents: any[], pendingCallIdsByName
  * 2. Response ID matching for functionResponses
  * 3. Orphan recovery via fixToolResponseGrouping
  * 4. Claude format pairing fix via validateAndFixClaudeToolPairing
- *
- * @param payload - Request payload object
- * @param isClaude - Whether this is a Claude model request
- * @returns Object with fix applied status
  */
 export function applyToolPairingFixes(
   payload: Record<string, unknown>,
@@ -2755,10 +2711,6 @@ export function applyToolPairingFixes(
  * and the user cannot use /compact or other commands. This function creates
  * a fake "successful" SSE response (200 OK) with the error message as text content,
  * allowing the user to continue using the session.
- *
- * @param errorMessage - The error message to include in the response
- * @param requestedModel - The model that was requested
- * @returns A Response object with synthetic SSE stream
  */
 export function createSyntheticErrorResponse(errorMessage: string, requestedModel: string = "unknown"): Response {
   // Generate a unique message ID

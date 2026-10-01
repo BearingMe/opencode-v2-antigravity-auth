@@ -1,9 +1,3 @@
-/**
- * Storage utilities for reading OpenCode's session data.
- *
- * Based on oh-my-opencode/src/hooks/session-recovery/storage.ts
- */
-
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { MESSAGE_STORAGE, PART_STORAGE, THINKING_TYPES, META_TYPES } from "./constants"

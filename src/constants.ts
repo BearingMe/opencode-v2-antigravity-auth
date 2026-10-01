@@ -79,7 +79,6 @@ export function setAntigravityVersion(version: string): void {
   versionLocked = true
 }
 
-/** @deprecated Use getAntigravityVersion() for runtime access. */
 export const ANTIGRAVITY_VERSION = ANTIGRAVITY_VERSION_FALLBACK
 
 export function getAntigravityHeaders(): HeaderSet & { "Client-Metadata": string } {
@@ -90,7 +89,6 @@ export function getAntigravityHeaders(): HeaderSet & { "Client-Metadata": string
   }
 }
 
-/** @deprecated Use getAntigravityHeaders() for runtime access. */
 export const ANTIGRAVITY_HEADERS = {
   "User-Agent": `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Antigravity/${ANTIGRAVITY_VERSION} Chrome/138.0.7204.235 Electron/37.3.1 Safari/537.36`,
   "X-Goog-Api-Client": "google-cloud-sdk vscode_cloudshelleditor/0.1",
@@ -189,7 +187,6 @@ export const EMPTY_SCHEMA_PLACEHOLDER_DESCRIPTION = "Placeholder. Always pass tr
  * - gemini-cli: https://github.com/google-gemini/gemini-cli
  * - Google .NET SDK: PredictionServiceChatClient.cs
  *
- * @see https://ai.google.dev/gemini-api/docs/thought-signatures
  */
 export const SKIP_THOUGHT_SIGNATURE = "skip_thought_signature_validator"
 

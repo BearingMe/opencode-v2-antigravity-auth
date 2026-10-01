@@ -716,13 +716,12 @@ export function isGenerativeLanguageRequest(input: RequestInfo): boolean {
  * Options for request preparation.
  */
 export interface PrepareRequestOptions {
-  /** Enable Claude tool hardening (parameter signatures + system instruction). Default: true */
   claudeToolHardening?: boolean
-  /** Enable top-level Claude prompt auto-caching (`cache_control`). Default: false */
+
   claudePromptAutoCaching?: boolean
-  /** Google Search configuration (global default) */
+
   googleSearch?: GoogleSearchConfig
-  /** Per-account fingerprint for rate limit mitigation. Falls back to session fingerprint if not provided. */
+
   fingerprint?: Fingerprint
 }
 

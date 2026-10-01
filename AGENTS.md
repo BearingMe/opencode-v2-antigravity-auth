@@ -101,6 +101,25 @@ Git hooks managed via Husky + lint-staged (pre-commit: eslint --fix + prettier) 
 - `createLogger("module-name")` for structured logging
 - `console.log` only for CLI/user-facing output
 
+### Documentation
+
+- No file headers in `src/` modules
+- Every exported symbol and private helper uses JSDoc (`/** ... */`)
+- For `*.test.ts`, document helper functions only (not `describe` or `it` blocks)
+- Format:
+  ```ts
+  /**
+   * <one to three lines description>
+   *
+   * @example <example>
+   * @throws <throw when applied>
+   * @deprecated <keep existing only>
+   */
+  ```
+- Omit `@param`, `@returns`, and trailing double-space line breaks
+- Use blank lines between sections, never trailing spaces
+- Include `@example`, `@throws`, and `@deprecated` only when applicable
+
 ## Module Structure
 
 ```
@@ -174,6 +193,13 @@ Login (`opencode auth login`, one account per run) only adds/reconnects;
 `/antigravity` manages via the credential-free `AntigravityAccounts` RPC
 (`list`, `quota`, `verify`, `mutate`, `deleteAll`, `ping`). Mutations use
 durable ids, omit `undefined` optionals, and fail closed on stale targets.
+
+### 7. Host Boundary Rule
+
+Never modify or couple to the OpenCode host application itself. OpenCode is an
+external runtime host; this repository is strictly an out-of-tree plugin that
+integrates solely through public `@opencode/plugin` APIs, typed RPC, and TUI
+surfaces. Do not attempt to patch or touch OpenCode core codebase.
 
 ## Dependencies
 

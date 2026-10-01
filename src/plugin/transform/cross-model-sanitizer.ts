@@ -1,12 +1,3 @@
-/**
- * Cross-Model Metadata Sanitization
- *
- * Fixes: "Invalid `signature` in `thinking` block" error when switching models mid-session.
- *
- * Root cause: Gemini stores thoughtSignature in metadata.google, Claude stores signature
- * in top-level thinking blocks. Foreign signatures fail validation on the target model.
- */
-
 import { isClaudeModel } from "./claude"
 import { isGeminiModel } from "./gemini"
 

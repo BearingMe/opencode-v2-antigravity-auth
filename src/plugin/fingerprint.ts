@@ -1,13 +1,3 @@
-/**
- * Device Fingerprint Generator for Rate Limit Mitigation
- *
- * Ported from antigravity-claude-proxy PR #170
- * https://github.com/badrisnarayanan/antigravity-claude-proxy/pull/170
- *
- * Generates randomized device fingerprints to help distribute API usage
- * across different apparent device identities.
- */
-
 import * as crypto from "node:crypto"
 import * as os from "node:os"
 import { getAntigravityVersion } from "../constants"
@@ -44,7 +34,7 @@ export interface Fingerprint {
   apiClient: string
   clientMetadata: ClientMetadata
   createdAt: number
-  /** @deprecated Kept for backward compat with stored fingerprints */
+
   quotaUser?: string
 }
 
@@ -58,7 +48,6 @@ export interface FingerprintVersion {
   reason: "initial" | "regenerated" | "restored"
 }
 
-/** Maximum number of fingerprint versions to keep per account */
 export const MAX_FINGERPRINT_HISTORY = 5
 
 export interface FingerprintHeaders {

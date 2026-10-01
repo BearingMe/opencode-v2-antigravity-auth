@@ -20,33 +20,6 @@ import type { PluginClient, RefreshParts } from "./types.js"
 
 const log = createLogger("account-service")
 
-/**
- * Shared account-management service.
- *
- * Owns every read/write of the plugin account store (`antigravity-accounts.json`)
- * plus the redacted, credential-free view models consumed by the
- * `antigravity_accounts` tool and (later) the `/antigravity` TUI RPC.
- *
- * Deletions tombstone the removed identity (durable id plus a token
- * fingerprint and normalized email for pre-id accounts) in the same
- * `updateAccounts` transaction, and every load/persist path filters
- * tombstoned entries — so a stale in-memory manager or a background save
- * can never resurrect a removed account. Re-adding the same account via
- * fresh OAuth clears its tombstone through the dedupe-by-email/token path.
- * No host credential-store changes: the host connection remains
- * authoritative for request routing while it resolves (Task 1 gate).
- * `src/v2-plugin.ts` applies in-memory effects (currentAuth, manager
- * invalidation) from service outcomes.
- *
- * Known limitation (pre-existing, unchanged): `getAuth()` in
- * `src/v2-plugin.ts` resolves the active host connection first, so while a
- * host connection is active the saved selection (and `currentAuth`) is
- * bypassed for request routing. Selection mutations still persist to the
- * plugin store and take effect once the host connection no longer resolves.
- * Do not "fix" precedence here and do not touch host credentials: host
- * credential handling is gated by Task 1.
- */
-
 export const MAX_SAVED_ACCOUNTS = 10
 
 export type VerificationStatus = "verification_required" | "ok" | "blocked" | "error" | "not_checked"
@@ -76,12 +49,11 @@ export interface AccountList {
   accounts: AccountSummary[]
 }
 
-/** Quota result with credential material removed. Never carries updatedAccount. */
 export type RedactedQuotaResult = Omit<AccountQuotaResult, "updatedAccount">
 
 export interface QuotaCheckOutcome {
   results: RedactedQuotaResult[]
-  /** Number of accounts whose rotated token/project metadata was persisted. */
+
   persistedUpdates: number
 }
 
@@ -122,11 +94,10 @@ export const quotaPresentationSchema = z
 export type QuotaPresentation = z.infer<typeof quotaPresentationSchema>
 
 export interface QuotaPresentationOptions {
-  /** Refresh quota before returning; defaults to true. */
   refresh?: boolean
-  /** Maximum wait for each account check, clamped to 1–30 seconds. */
+
   timeoutMs?: number
-  /** Cached values older than this are marked stale. Defaults to 15 minutes. */
+
   staleAfterMs?: number
 }
 
@@ -135,7 +106,6 @@ export type AccountTarget = { id: string } | { index: number }
 export type TargetResolution =
   { ok: true; index: number } | { ok: false; kind: "invalid-index" | "not-found" | "ambiguous"; accountCount: number }
 
-/** Failure half of a resolution. Service entry points never return ok:true. */
 export type ResolutionFailure = Exclude<TargetResolution, { ok: true }>
 
 export interface VerifyOutcome {
@@ -159,7 +129,6 @@ export interface MutateOptions {
 }
 
 export interface SelectedAccount {
-  /** Durable account id of the selected account. */
   id: string
   index: number
   email?: string
@@ -172,7 +141,7 @@ export interface MutationOutcome {
   nextActiveIndex: number
   activeIndexByFamily: { claude: number; gemini: number }
   remaining: number
-  /** Account the caller should point auth at; null when none remain. */
+
   selected: SelectedAccount | null
 }
 
@@ -186,7 +155,7 @@ export interface OAuthPersistInput {
 
 export interface OAuthPersistOutcome {
   selectedIndex: number
-  /** Durable id of the selected account. */
+
   selectedId: string
   selectedRefreshParts: RefreshParts
   accountCount: number
@@ -212,7 +181,6 @@ function clampCursor(value: number | undefined, fallback: number, length: number
   return Math.min(Math.max(Math.trunc(value), 0), length - 1)
 }
 
-/** Deterministic fallback identity for accounts predating durable ids. */
 export { fingerprintRefreshToken } from "./storage.js"
 
 /**

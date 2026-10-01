@@ -1,11 +1,3 @@
-/**
- * Shared Google account-verification response helpers.
- *
- * Single home for the verification parsing used by both the account
- * verification probe (verify.ts) and the request engine's 403 handling
- * (engine.ts), so the two paths cannot drift apart.
- */
-
 export function decodeEscapedText(input: string): string {
   return input
     .replace(/&amp;/g, "&")

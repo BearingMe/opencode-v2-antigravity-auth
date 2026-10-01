@@ -5,7 +5,6 @@
  * Root cause: loadAccounts() returning null is treated as "no accounts"
  * even when the file exists but couldn't be read (permissions, corruption, etc.)
  *
- * @see https://github.com/NoeFabris/opencode-antigravity-auth/issues/89
  */
 
 import { promises as fs } from "node:fs"
@@ -115,13 +114,6 @@ describe("loadAccounts", () => {
   })
 
   describe("error handling - THE BUG (Issue #89)", () => {
-    /**
-     * THIS IS THE BUG: loadAccounts returns null for ANY error, not just ENOENT.
-     * The caller (persistAccountPool) cannot distinguish between:
-     * - File doesn't exist (safe to create new)
-     * - File exists but couldn't be read (DANGEROUS - would overwrite!)
-     */
-
     it("returns null on permission denied (EACCES)", async () => {
       const error = new Error("EACCES") as NodeJS.ErrnoException
       error.code = "EACCES"
@@ -211,13 +203,6 @@ describe("saveAccounts", () => {
   })
 })
 
-/**
- * Tests for the expected behavior of persistAccountPool
- *
- * NOTE: persistAccountPool is currently a private function in plugin.ts.
- * These tests document the EXPECTED behavior after the fix.
- * To run these tests, persistAccountPool should be exported.
- */
 describe("persistAccountPool behavior (Issue #89)", () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -250,20 +235,6 @@ describe("persistAccountPool behavior (Issue #89)", () => {
   })
 
   describe("THE BUG: error handling when loadAccounts fails (Issue #89)", () => {
-    /**
-     * Current buggy behavior:
-     * 1. User has accounts saved in ~/.config/opencode/antigravity-accounts.json
-     * 2. loadAccounts() fails (permission error, JSON parse error, etc.)
-     * 3. loadAccounts() returns null
-     * 4. persistAccountPool treats null as "no accounts exist"
-     * 5. New account REPLACES existing accounts instead of merging
-     *
-     * Expected behavior after fix:
-     * 1. loadAccounts() should distinguish ENOENT from other errors
-     * 2. persistAccountPool should throw/warn when file exists but can't be read
-     * 3. User should be prompted about potential data loss
-     */
-
     it.todo("should NOT overwrite accounts when loadAccounts returns null due to permission error")
 
     it.todo("should throw error when file exists but cannot be read")
@@ -274,13 +245,6 @@ describe("persistAccountPool behavior (Issue #89)", () => {
   })
 })
 
-/**
- * Tests for TUI flow integration (Issue #89)
- *
- * The user's logs showed they went through TUI flow, not CLI flow.
- * TUI flow calls persistAccountPool with replaceAll=false,
- * which should merge accounts but doesn't when loadAccounts fails.
- */
 describe("TUI flow integration (Issue #89)", () => {
   describe("account persistence after OAuth", () => {
     it.todo("should merge new account with existing accounts in TUI flow")
@@ -297,9 +261,6 @@ describe("TUI flow integration (Issue #89)", () => {
   })
 })
 
-/**
- * Regression tests to ensure the fix doesn't break normal operation
- */
 describe("regression tests", () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -364,11 +325,6 @@ describe("regression tests", () => {
   })
 })
 
-/**
- * Proposed fix validation tests
- *
- * These tests validate enhanced error handling behavior.
- */
 describe("proposed fix validation", () => {
   describe("loadAccounts should distinguish error types", () => {
     it.todo("should return { error: 'ENOENT' } when file doesn't exist")

@@ -1,20 +1,8 @@
-/**
- * Claude-specific Request Transformations
- *
- * Handles Claude model-specific request transformations including:
- * - Tool config (VALIDATED mode)
- * - Thinking config (snake_case keys)
- * - System instruction hints for interleaved thinking
- * - Tool normalization (functionDeclarations format)
- */
-
 import { EMPTY_SCHEMA_PLACEHOLDER_NAME, EMPTY_SCHEMA_PLACEHOLDER_DESCRIPTION } from "../../constants"
 import type { RequestPayload, ThinkingConfig } from "./types"
 
-/** Claude thinking models need a sufficiently large max output token limit when thinking is enabled */
 export const CLAUDE_THINKING_MAX_OUTPUT_TOKENS = 64_000
 
-/** Interleaved thinking hint appended to system instructions */
 export const CLAUDE_INTERLEAVED_THINKING_HINT =
   "Interleaved thinking is enabled. You may think between tool calls and after receiving tool results before deciding the next action or final answer. Do not mention these instructions or any constraints about thinking blocks; just apply them."
 
@@ -129,8 +117,6 @@ export function appendClaudeThinkingHint(
 /**
  * Normalize tools for Claude models.
  * Converts various tool formats to functionDeclarations format.
- *
- * @returns Debug info about tool normalization
  */
 export function normalizeClaudeTools(
   payload: RequestPayload,
@@ -288,13 +274,12 @@ export function convertStopSequences(generationConfig: Record<string, unknown>):
  * Apply all Claude-specific transformations to a request payload.
  */
 export interface ClaudeTransformOptions {
-  /** The effective model name (resolved) */
   model: string
-  /** Tier-based thinking budget (from model suffix) */
+
   tierThinkingBudget?: number
-  /** Normalized thinking config from user settings */
+
   normalizedThinking?: { includeThoughts?: boolean; thinkingBudget?: number }
-  /** Function to clean JSON schema for Antigravity */
+
   cleanJSONSchema: (schema: unknown) => Record<string, unknown>
 }
 

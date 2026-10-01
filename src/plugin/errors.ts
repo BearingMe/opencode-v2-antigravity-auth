@@ -1,10 +1,4 @@
 /**
- * Custom error types for opencode-v2-antigravity-auth plugin.
- *
- * Ported from LLM-API-Key-Proxy for robust error handling.
- */
-
-/**
  * Error thrown when Antigravity returns an empty response after retry attempts.
  *
  * Empty responses can occur when:

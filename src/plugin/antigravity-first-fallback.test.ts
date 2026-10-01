@@ -3,17 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AccountManager, type ModelFamily, type HeaderStyle } from "./accounts"
 import type { AccountStorageV4 } from "./storage"
 
-/**
- * Test: Antigravity-first fallback logic
- *
- * Requirement: Exhaust Antigravity across ALL accounts before falling back to Gemini CLI
- *
- * Scenario:
- * - Account 0: antigravity rate-limited, gemini-cli available
- * - Account 1: antigravity available
- *
- * Expected: Switch to Account 1 (use antigravity), NOT fall back to gemini-cli on Account 0
- */
 describe("Antigravity-first fallback", () => {
   beforeEach(() => {
     vi.useRealTimers()

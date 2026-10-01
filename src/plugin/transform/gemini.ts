@@ -1,12 +1,3 @@
-/**
- * Gemini-specific Request Transformations
- *
- * Handles Gemini model-specific request transformations including:
- * - Thinking config (camelCase keys, thinkingLevel for Gemini 3)
- * - Tool normalization (function/custom format)
- * - Schema transformation (JSON Schema -> Gemini Schema format)
- */
-
 import type { RequestPayload, ThinkingConfig, ThinkingTier, GoogleSearchConfig } from "./types"
 
 /**
@@ -17,12 +8,6 @@ import type { RequestPayload, ThinkingConfig, ThinkingTier, GoogleSearchConfig }
  * - Converts type values to uppercase (object -> OBJECT)
  * - Removes unsupported fields like additionalProperties, $schema
  * - Recursively processes nested schemas (properties, items, anyOf, etc.)
- *
- * @param schema - A JSON Schema object or primitive value
- * @returns Gemini-compatible schema
- *
- * Fields that Gemini API rejects and must be removed from schemas.
- * Antigravity uses strict protobuf-backed JSON validation.
  */
 const UNSUPPORTED_SCHEMA_FIELDS = new Set([
   "additionalProperties",
@@ -215,8 +200,6 @@ export function buildImageGenerationConfig(): ImageConfig {
 /**
  * Normalize tools for Gemini models.
  * Ensures tools have proper function-style format.
- *
- * @returns Debug info about tool normalization
  */
 export function normalizeGeminiTools(payload: RequestPayload): {
   toolDebugMissing: number
@@ -337,24 +320,23 @@ export function normalizeGeminiTools(payload: RequestPayload): {
  * Apply all Gemini-specific transformations to a request payload.
  */
 export interface GeminiTransformOptions {
-  /** The effective model name (resolved) */
   model: string
-  /** Tier-based thinking budget (from model suffix, for Gemini 2.5) */
+
   tierThinkingBudget?: number
-  /** Tier-based thinking level (from model suffix, for Gemini 3) */
+
   tierThinkingLevel?: ThinkingTier
-  /** Normalized thinking config from user settings */
+
   normalizedThinking?: { includeThoughts?: boolean; thinkingBudget?: number }
-  /** Google Search configuration */
+
   googleSearch?: GoogleSearchConfig
 }
 
 export interface GeminiTransformResult {
   toolDebugMissing: number
   toolDebugSummaries: string[]
-  /** Number of function declarations after wrapping */
+
   wrappedFunctionCount: number
-  /** Number of passthrough tools (googleSearch, googleSearchRetrieval, codeExecution) */
+
   passthroughToolCount: number
 }
 

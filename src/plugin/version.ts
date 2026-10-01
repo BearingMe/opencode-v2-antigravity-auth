@@ -1,17 +1,3 @@
-/**
- * Remote Antigravity version fetcher.
- *
- * Mirrors the Antigravity-Manager's version resolution strategy:
- *   1. Auto-updater API (plain text with semver)
- *   2. Changelog page scrape (first 5000 chars)
- *   3. Hardcoded fallback in constants.ts
- *
- * Called once at plugin startup to ensure headers use the latest
- * supported version, avoiding "version no longer supported" errors.
- *
- * @see https://github.com/lbjlaq/Antigravity-Manager (src-tauri/src/constants.rs)
- */
-
 import { getAntigravityVersion, setAntigravityVersion } from "../constants"
 import { createLogger } from "./logger"
 

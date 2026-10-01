@@ -1,14 +1,3 @@
-/**
- * Session recovery hook for handling recoverable errors.
- *
- * Supports:
- * - tool_result_missing: When ESC is pressed during tool execution
- * - thinking_block_order: When thinking blocks are corrupted/stripped
- * - thinking_disabled_violation: Thinking in non-thinking model
- *
- * Based on oh-my-opencode/src/hooks/session-recovery/index.ts
- */
-
 import type { AntigravityConfig } from "./config"
 import { createLogger } from "./logger"
 import { logToast } from "./debug"
