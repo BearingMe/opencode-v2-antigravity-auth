@@ -48,7 +48,7 @@ config (`~/.config/opencode/opencode.json` or `opencode.jsonc`):
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["/absolute/path/to/opencode-v2-antigravity-auth"]
+  "plugins": ["/absolute/path/to/opencode-v2-antigravity-auth"],
 }
 ```
 
@@ -69,10 +69,11 @@ opencode run "Hello" --model=google/antigravity-gemini-3-flash
 
 ## Multi-account in 30 seconds
 
-- Add: `opencode auth login` (re-signing refreshes the same entry in place).
-- Manage: `/antigravity` — quota bars, refresh, rotation hint (`Use next`,
-  never pinning), enable/disable, verify with reconnect guidance,
-  confirm-guarded removal.
+- Add: `opencode auth login` — choose Add/reconnect before the browser opens
+  (re-signing refreshes the same entry in place). Adds one account per command;
+  rerun to add another (max 10), or press Ctrl+C to cancel. No custom host needed.
+- Manage: `/antigravity` — saved quota bars, refresh-on-open and manual refresh (`ctrl+r`),
+  enable/disable, verify with reconnect guidance, confirm-guarded removal.
 - Details: [docs/user/accounts-and-quota.md](docs/user/accounts-and-quota.md).
 
 ## Configuration (optional)
@@ -80,12 +81,12 @@ opencode run "Hello" --model=google/antigravity-gemini-3-flash
 Create `~/.config/opencode/antigravity.json` (project override:
 `.opencode/antigravity.json`). Defaults work for most users.
 
-| Area | Key options |
-|---|---|
+| Area              | Key options                                                                                                    |
+| ----------------- | -------------------------------------------------------------------------------------------------------------- |
 | Thinking/recovery | `keep_thinking` (default `false`), `session_recovery` (`true`), `auto_resume` (`false`), `cli_first` (`false`) |
-| Rotation | `account_selection_strategy` (`hybrid`), `scheduling_mode` (`cache_first`), `pid_offset_enabled` (`false`) |
-| Quota protection | `soft_quota_threshold_percent` (`90`), `quota_refresh_interval_minutes` (`15`) |
-| Behavior | `quiet_mode` (`false`), `toast_scope` (`root_only`), `debug` / `debug_tui` (`false`), `auto_update` (`true`) |
+| Rotation          | `account_selection_strategy` (`hybrid`), `scheduling_mode` (`cache_first`), `pid_offset_enabled` (`false`)     |
+| Quota protection  | `soft_quota_threshold_percent` (`90`), `quota_refresh_interval_minutes` (`15`)                                 |
+| Behavior          | `quiet_mode` (`false`), `toast_scope` (`root_only`), `debug` / `debug_tui` (`false`), `auto_update` (`true`)   |
 
 Full reference: [docs/user/configuration.md](docs/user/configuration.md).
 Schema: `assets/antigravity.schema.json`.
@@ -100,7 +101,7 @@ Schema: `assets/antigravity.schema.json`.
 - Developer: [docs/dev/README.md](docs/dev/README.md) (architecture,
   storage, RPC/TUI, quota contract, API, testing, manual checklist,
   maintainer ops)
-- Normative specs: `specs/00-07` (agent/reviewer source of truth)
+- Normative specs: `docs/specs/00-07` (agent/reviewer source of truth)
 - [Changelog](CHANGELOG.md)
 
 ## Compatibility

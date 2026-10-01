@@ -8,13 +8,10 @@
   `manageAccounts` (`src/v2-plugin.ts`); `executeAntigravityRequest`,
   `refreshOAuthCredentialUnified`, `disposeAntigravityRuntimeResources`
   (`src/plugin/engine.ts`); `verifyAccountAccess` (`src/plugin/verify.ts`).
-  (Historical V1, deleted Task 2: `createAntigravityPlugin`,
-  `AntigravityCLIOAuthPlugin`, `GoogleOAuthPlugin`, and the
-  `__testExports` in `src/plugin.ts`.)
 - Fetch scope rule (R-FETCH-SCOPE): the interceptor MUST only route
   absolute http(s) URLs on `generativelanguage.googleapis.com` matching
   `^/v1(beta)?/models/[^/]+:(generateContent|streamGenerateContent|
-  countTokens)$`. Non-model GL paths throw
+countTokens)$`. Non-model GL paths throw
   `Unsupported Google Generative Language endpoint`; external origins are
   direct-fetched with `x-goog-api-key` and `authorization` removed.
   Evidence: `v2-plugin.ts :: antigravityFetch`; `v2-plugin.test.ts` ::
@@ -24,7 +21,7 @@
   (code+state extracted, state equality enforced against the authorize URL)
   or a raw code (requires non-empty expected state). Empty code, missing
   code/state in URL, or mismatch throws. Evidence: `parseOAuthCallbackInput`
-  + tests (redirect extract, raw-code accept, mismatch reject, trim).
+  - tests (redirect extract, raw-code accept, mismatch reject, trim).
 - `normalizeFetchBody` MUST NOT consume the original `Request`
   (clone-then-read), MUST preserve method/headers/signal/cache/credentials/
   integrity/keepalive/mode/redirect/referrer/policy, MUST decode JSON bytes
@@ -32,16 +29,14 @@
   JSON, and MUST pass binary/empty bodies through. Evidence:
   `v2-plugin.test.ts` (4 normalize cases incl. abort-signal liveness).
 - Tools: `antigravity_accounts{action, index?}` with `list|check_quota|verify|
-  enable|disable|select|delete|delete_all` (see F3; out-of-range index is a
+enable|disable|select|delete|delete_all` (see F3; out-of-range index is a
   message, not a write — `v2-plugin.accounts.test.ts`).
-  (Historical, REMOVED 2026-09-28 Task 3: `google_search{query, urls?,
-  thinking?}` tool + `src/plugin/search.ts`. Model-declared `web_search` /
+  No search tool is registered. Model-declared `web_search` /
   `google_search` names are still recognized and sanitized by the
-  D-SEARCH-MUTEX guard in `transform/gemini.ts`, but no search tool is
-  registered.)
+  D-SEARCH-MUTEX guard in `transform/gemini.ts`.
 - Events consumed: `session.created` (child tracking + update check),
   `session.error` (recovery), V2 `session.retry` (forward). V2 `aisdk.hook
-  ("sdk")` is beta and MAY change upstream (see §06).
+("sdk")` is beta and MAY change upstream (see §06).
 
 ## Error handling
 
@@ -50,11 +45,9 @@
   the single implementation, reached via
   `src/plugin/engine.ts :: refreshOAuthCredentialUnified` and via
   `src/v2-plugin.ts :: refreshOAuthCredential` (thin wrapper preserving the
-  credential shape; see `engine.test.ts :: refreshOAuthCredentialUnified
-  (D-REFRESH-DUAL)`). `invalid_grant` → evict account + clear project/auth
-  caches + rotate; all-invalid → login error. (Prior spec text describing a
-  V2 generic-error divergence is retired; do not reintroduce a parallel
-  refresh path — see D-REFRESH-DUAL.)
+  credential shape). `invalid_grant` → evict account + clear project/auth
+  caches + rotate; all-invalid → login error. Do not reintroduce a parallel
+  refresh path (see D-REFRESH-DUAL).
 - Rate-limit handling: classify → backoff (`Retry-After` ≥ 2 s respected)
   → `markRateLimitedWithReason` → rotate; all-blocked → wait (capped) or
   quota-protection throw; capacity uses tiered `[5..60 s]` delays.

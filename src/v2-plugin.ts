@@ -52,9 +52,12 @@ type OAuthValue = {
 }
 
 function isOAuthValue(value: unknown): value is OAuthValue {
-  return !!value && typeof value === "object" &&
+  return (
+    !!value &&
+    typeof value === "object" &&
     (value as Record<string, unknown>).type === "oauth" &&
     typeof (value as Record<string, unknown>).access === "string"
+  )
 }
 
 /**
@@ -100,6 +103,17 @@ export default Plugin.define({
   id: PLUGIN_ID,
   async setup(ctx) {
     let currentAuth: OAuthAuthDetails | null = null
+    let accountSummary = (await loadAccounts())?.accounts ?? []
+    const refreshAccountSummary = async (): Promise<void> => {
+      try {
+        accountSummary = (await loadAccounts())?.accounts ?? []
+        await ctx.integration.reload()
+      } catch (error: unknown) {
+        // Presentation failure must not turn an already-persisted mutation
+        // or login into a failed operation.
+        bridgeLog.warn("Unable to reload the login account summary", { error: String(error) })
+      }
+    }
     const bridgeClient = makeBridgeClient(ctx, (next) => {
       currentAuth = next
     })
@@ -116,13 +130,19 @@ export default Plugin.define({
     try {
       accountsRegistration = await ctx.rpc.register(AntigravityAccounts, {
         list: async () => listAccounts(),
-        quota: async (input) => getQuotaPresentation(bridgeClient, {
-          refresh: input.refresh ?? true,
-        }, ANTIGRAVITY_PROVIDER_ID),
+        quota: async (input) =>
+          getQuotaPresentation(
+            bridgeClient,
+            {
+              refresh: input.refresh ?? true,
+            },
+            ANTIGRAVITY_PROVIDER_ID,
+          ),
         verify: async (input) => {
           const outcome = await verifyAccount({ id: input.id }, bridgeClient, ANTIGRAVITY_PROVIDER_ID)
           if ("ok" in outcome) return outcome
           resetNativeManager()
+          await refreshAccountSummary()
           const projected: {
             index: number
             email?: string
@@ -155,23 +175,27 @@ export default Plugin.define({
             currentAuth = { type: "oauth", refresh: "", access: "", expires: 0 }
           }
           resetNativeManager()
+          await refreshAccountSummary()
           return {
             op: outcome.op,
             index: outcome.index,
             nextActiveIndex: outcome.nextActiveIndex,
             activeIndexByFamily: outcome.activeIndexByFamily,
             remaining: outcome.remaining,
-            selected: selected ? {
-              id: selected.id,
-              index: selected.index,
-              ...(selected.email !== undefined ? { email: selected.email } : {}),
-            } : null,
+            selected: selected
+              ? {
+                  id: selected.id,
+                  index: selected.index,
+                  ...(selected.email !== undefined ? { email: selected.email } : {}),
+                }
+              : null,
           }
         },
         deleteAll: async () => {
           await deleteAllAccounts()
           currentAuth = { type: "oauth", refresh: "", access: "", expires: 0 }
           resetNativeManager()
+          await refreshAccountSummary()
           return { remaining: 0 as const }
         },
         ping: async () => "ANTIGRAVITY_RPC_ACCOUNTS_OK",
@@ -205,7 +229,10 @@ export default Plugin.define({
       initDiskSignatureCache(nativeConfig.signature_cache)
     }
 
-    const sessionRecovery = createSessionRecoveryHook({ client: bridgeClient, directory: ctx.location.directory }, nativeConfig)
+    const sessionRecovery = createSessionRecoveryHook(
+      { client: bridgeClient, directory: ctx.location.directory },
+      nativeConfig,
+    )
 
     const updateChecker = createAutoUpdateCheckerHook(bridgeClient, ctx.location.directory, {
       showStartupToast: true,
@@ -217,7 +244,8 @@ export default Plugin.define({
       await updateChecker.event(input)
 
       if (input.event.type === "session.created") {
-        const props = input.event.properties as { info?: { parentID?: string }; sessionID?: string; id?: string } | undefined
+        const props = input.event.properties as
+          { info?: { parentID?: string }; sessionID?: string; id?: string } | undefined
         const createdId = props?.sessionID ?? props?.id
         const createdIsChild = !!props?.info?.parentID
         childSessions.remember(createdId, createdIsChild)
@@ -243,14 +271,19 @@ export default Plugin.define({
 
             const successToast = getRecoverySuccessToast()
             bridgeLog.debug("recovery-toast", { ...successToast })
-            if (!nativeConfig.quiet_mode && !(nativeConfig.toast_scope === "root_only" && childSessions.isChildSession(sessionID))) {
-              await bridgeClient.tui.showToast({
-                body: {
-                  title: successToast.title,
-                  message: successToast.message,
-                  variant: "success",
-                },
-              }).catch(() => {})
+            if (
+              !nativeConfig.quiet_mode &&
+              !(nativeConfig.toast_scope === "root_only" && childSessions.isChildSession(sessionID))
+            ) {
+              await bridgeClient.tui
+                .showToast({
+                  body: {
+                    title: successToast.title,
+                    message: successToast.message,
+                    variant: "success",
+                  },
+                })
+                .catch(() => {})
             }
           }
         }
@@ -324,8 +357,13 @@ export default Plugin.define({
     const antigravityFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       await requireOAuthAuth()
       const destination = getFetchDestination(input)
-      if (destination.hostname === "generativelanguage.googleapis.com" && !isGenerativeLanguageModelPath(destination.pathname)) {
-        throw new Error(`Unsupported Google Generative Language endpoint for Antigravity OAuth: ${destination.pathname}`)
+      if (
+        destination.hostname === "generativelanguage.googleapis.com" &&
+        !isGenerativeLanguageModelPath(destination.pathname)
+      ) {
+        throw new Error(
+          `Unsupported Google Generative Language endpoint for Antigravity OAuth: ${destination.pathname}`,
+        )
       }
       // Gemini may fetch externally hosted attachments. Never forward the SDK's
       // placeholder key or OAuth credentials to a different origin.
@@ -355,7 +393,6 @@ export default Plugin.define({
       })
     }
 
-    let accountSummary = (await loadAccounts())?.accounts ?? []
     await ctx.integration.transform((editor) => {
       editor.update(INTEGRATION_ID, (integration) => {
         integration.name = "Google Antigravity"
@@ -368,32 +405,42 @@ export default Plugin.define({
           id: "google-oauth",
           type: "oauth",
           label: "OAuth with Google (Antigravity)",
+          form: [
+            {
+              key: "accountAction",
+              type: "string",
+              title: "Google Antigravity",
+              description: formatAuthSummary(accountSummary, MAX_SAVED_ACCOUNTS),
+              required: true,
+              options: [
+                {
+                  value: "add",
+                  label:
+                    accountSummary.length >= MAX_SAVED_ACCOUNTS
+                      ? "Reconnect a saved account"
+                      : "Add or reconnect an account",
+                },
+              ],
+            },
+          ],
         },
-        authorize: async () => {
+        authorize: async (answer) => {
+          // The host answers method.form BEFORE starting OAuth/opening a URL.
+          // Refuse missing/legacy answers rather than bypassing consent.
+          if (answer.accountAction !== "add")
+            throw new Error("Choose Add or reconnect an account before starting Google sign-in.")
           accountSummary = (await loadAccounts())?.accounts ?? []
-          const saved = accountSummary.map((account) => `${account.email ?? "Unnamed account"}${account.enabled === false ? " (disabled)" : ""}`).join(", ")
           const authorization = await authorizeAntigravity("")
           return {
             mode: "code" as const,
             url: authorization.url,
-            instructions: [
-              `Saved accounts: ${accountSummary.length}/${MAX_SAVED_ACCOUNTS}${saved ? ` — ${saved}` : ""}.`,
-              "One account per login. Run login again to add another account; signing in again refreshes an existing account.",
-              ...(accountSummary.length >= MAX_SAVED_ACCOUNTS
-                ? [`Maximum of ${MAX_SAVED_ACCOUNTS} Antigravity accounts reached. Sign in to an existing account or delete a saved account before adding another.`]
-                : []),
-              "Manage saved accounts: /antigravity.",
-              "Complete Google sign-in, then paste either the authorization code or the full localhost redirect URL.",
-            ].join("\n"),
+            instructions: formatAuthInstructions(accountSummary, MAX_SAVED_ACCOUNTS),
             callback: async (code: string) => {
-              const params = parseOAuthCallbackInput(
-                code,
-                new URL(authorization.url).searchParams.get("state") ?? "",
-              )
+              const params = parseOAuthCallbackInput(code, new URL(authorization.url).searchParams.get("state") ?? "")
               const result = await exchangeAntigravity(params.code, params.state)
               if (result.type !== "success") throw new Error(result.error)
               await persistOAuthAccount(result, "add")
-              accountSummary = (await loadAccounts())?.accounts ?? []
+              await refreshAccountSummary()
               currentAuth = {
                 type: "oauth",
                 refresh: formatRefreshParts({ refreshToken: result.refresh, projectId: result.projectId }),
@@ -415,9 +462,11 @@ export default Plugin.define({
         refresh: async (credential) => refreshOAuthCredential(credential, bridgeClient),
         label: (credential) => {
           const email = credential.metadata?.email
-          return typeof email === "string" ? email : accountSummary.find(
-            (account) => account.refreshToken === parseRefreshParts(credential.refresh).refreshToken,
-          )?.email
+          return typeof email === "string"
+            ? email
+            : accountSummary.find(
+                (account) => account.refreshToken === parseRefreshParts(credential.refresh).refreshToken,
+              )?.email
         },
       })
     })
@@ -470,30 +519,34 @@ export default Plugin.define({
       }
     })
 
-    await ctx.aisdk.hook("sdk", async (event) => {
-      if (event.package !== ANTIGRAVITY_SDK && event.package !== "@ai-sdk/google") return
-      const antigravityModel = event.model.id.startsWith("antigravity-")
-      const geminiModel = event.model.id.startsWith("gemini-")
-      if (!antigravityModel && !geminiModel) return
-      const auth = await getAuth()
-      if (!isOAuthAuth(auth)) {
-        if (antigravityModel) {
-          throw new Error("Antigravity OAuth is not connected. Connect Google Antigravity before using this model.")
+    await ctx.aisdk.hook(
+      "sdk",
+      async (event) => {
+        if (event.package !== ANTIGRAVITY_SDK && event.package !== "@ai-sdk/google") return
+        const antigravityModel = event.model.id.startsWith("antigravity-")
+        const geminiModel = event.model.id.startsWith("gemini-")
+        if (!antigravityModel && !geminiModel) return
+        const auth = await getAuth()
+        if (!isOAuthAuth(auth)) {
+          if (antigravityModel) {
+            throw new Error("Antigravity OAuth is not connected. Connect Google Antigravity before using this model.")
+          }
+          bridgeLog.debug("Keeping Google SDK model on its configured API-key route", { model: event.model.id })
+          if (event.package === ANTIGRAVITY_SDK) event.sdk = createGoogle(event.options)
+          return
         }
-        bridgeLog.debug("Keeping Google SDK model on its configured API-key route", { model: event.model.id })
-        if (event.package === ANTIGRAVITY_SDK) event.sdk = createGoogle(event.options)
-        return
-      }
-      event.options.fetch = antigravityFetch
-      // The Google SDK requires an API key even though this fetch bridge uses OAuth.
-      // Its generated x-goog-api-key header is removed by the request adapter.
-      event.options.apiKey = "antigravity-oauth"
-      bridgeLog.info("Routed Google SDK model through OAuth bridge", {
-        model: event.model.id,
-        package: event.package,
-      })
-      event.sdk = createGoogle(event.options)
-    }, { providerID: GOOGLE_PROVIDER_ID })
+        event.options.fetch = antigravityFetch
+        // The Google SDK requires an API key even though this fetch bridge uses OAuth.
+        // Its generated x-goog-api-key header is removed by the request adapter.
+        event.options.apiKey = "antigravity-oauth"
+        bridgeLog.info("Routed Google SDK model through OAuth bridge", {
+          model: event.model.id,
+          package: event.package,
+        })
+        event.sdk = createGoogle(event.options)
+      },
+      { providerID: GOOGLE_PROVIDER_ID },
+    )
 
     await ctx.tool.transform((editor) => {
       editor.add({
@@ -507,17 +560,33 @@ export default Plugin.define({
               enum: ["list", "check_quota", "verify", "enable", "disable", "select", "delete", "delete_all"],
               description: "Account management operation",
             },
-            index: { type: "integer", minimum: 0, description: "Zero-based account index for account-specific operations" },
+            index: {
+              type: "integer",
+              minimum: 0,
+              description: "Zero-based account index for account-specific operations",
+            },
           },
           required: ["action"],
           additionalProperties: false,
         },
-        execute: async (input) => manageAccounts(input as { action: string; index?: number }, bridgeClient, () => {
-          resetNativeManager()
-        }, (auth) => {
-          currentAuth = auth
-          resetNativeManager()
-        }),
+        execute: async (input) => {
+          const action = input as { action: string; index?: number }
+          const result = await manageAccounts(
+            action,
+            bridgeClient,
+            () => {
+              resetNativeManager()
+            },
+            (auth) => {
+              currentAuth = auth
+              resetNativeManager()
+            },
+          )
+          if (["verify", "enable", "disable", "select", "delete", "delete_all"].includes(action.action)) {
+            await refreshAccountSummary()
+          }
+          return result
+        },
       })
     })
 
@@ -536,9 +605,10 @@ export default Plugin.define({
     void (async () => {
       for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
         const data = event.data as { parentID?: string; sessionID?: string; id?: string }
-        const properties = event.type === "session.created"
-          ? { info: { parentID: data.parentID }, sessionID: data.sessionID ?? data.id }
-          : event.data
+        const properties =
+          event.type === "session.created"
+            ? { info: { parentID: data.parentID }, sessionID: data.sessionID ?? data.id }
+            : event.data
         await handlePluginEvent({
           event: {
             type: event.type,
@@ -557,11 +627,13 @@ export default Plugin.define({
       await accountsRegistration?.dispose()
       await disposeAntigravityRuntimeResources()
     }
-
   },
 })
 
-function makeBridgeClient(ctx: Parameters<Parameters<typeof Plugin.define>[0]["setup"]>[0], setAuth: (auth: OAuthAuthDetails) => void): PluginClient {
+function makeBridgeClient(
+  ctx: Parameters<Parameters<typeof Plugin.define>[0]["setup"]>[0],
+  setAuth: (auth: OAuthAuthDetails) => void,
+): PluginClient {
   const client = {
     app: {
       log: async (input: unknown) => {
@@ -636,9 +708,7 @@ export async function normalizeFetchBody(
     output.referrerPolicy = request.referrerPolicy
   }
 
-  const body = request
-    ? request.body ? await request.clone().arrayBuffer() : undefined
-    : init?.body
+  const body = request ? (request.body ? await request.clone().arrayBuffer() : undefined) : init?.body
   if (body === undefined || body === null) {
     delete output.body
     return { input: url, init: output }
@@ -662,11 +732,7 @@ export async function normalizeFetchBody(
 }
 
 export function getFetchDestination(input: RequestInfo | URL): URL {
-  const value = input instanceof Request
-    ? input.url
-    : input instanceof URL
-      ? input.toString()
-      : input
+  const value = input instanceof Request ? input.url : input instanceof URL ? input.toString() : input
   try {
     const destination = new URL(value)
     if (destination.protocol !== "https:" && destination.protocol !== "http:") {
@@ -680,6 +746,41 @@ export function getFetchDestination(input: RequestInfo | URL): URL {
 
 export function isGenerativeLanguageModelPath(pathname: string): boolean {
   return /^\/v1(?:beta)?\/models\/[^/]+:(?:generateContent|streamGenerateContent|countTokens)$/.test(pathname)
+}
+
+export function formatAuthInstructions(
+  accounts: Array<{ email?: string | null; enabled?: boolean }>,
+  maxAccounts: number,
+): string {
+  return [
+    "Complete Google sign-in, then paste the authorization code or full localhost redirect URL.",
+    ...(accounts.length >= maxAccounts
+      ? [`Maximum of ${maxAccounts} Antigravity accounts reached; reconnect a saved account.`]
+      : []),
+  ].join("\n")
+}
+
+export function formatAuthSummary(
+  accounts: Array<{ email?: string | null; enabled?: boolean }>,
+  maxAccounts: number,
+): string {
+  const lines = accounts.map((account) => {
+    const email = account.email?.trim() ? account.email : "Unnamed account"
+    return `- ${email}${account.enabled === false ? " (disabled)" : ""}`
+  })
+  return [
+    `Google Antigravity — saved accounts (${accounts.length}/${maxAccounts})`,
+    "",
+    ...(lines.length > 0 ? lines : ["- (none yet)"]),
+    "",
+    "Signing in again reconnects a saved account. Manage accounts with /antigravity.",
+    "One account per command. Run opencode auth login again to add another. Ctrl+C cancels.",
+    ...(accounts.length >= maxAccounts
+      ? [
+          `Maximum of ${maxAccounts} Antigravity accounts reached. Sign in to an existing account or delete a saved account before adding another.`,
+        ]
+      : []),
+  ].join("\n")
 }
 
 export function parseOAuthCallbackInput(value: string, expectedState: string): { code: string; state: string } {
@@ -726,20 +827,24 @@ export async function manageAccounts(
   if (input.action === "list") {
     const dto = await listAccounts()
     return {
-      content: JSON.stringify({
-        activeIndex: dto.activeIndex,
-        accounts: dto.accounts.map((account) => ({
-          index: account.index,
-          email: account.email,
-          enabled: account.enabled,
-          active: account.active,
-          verificationRequired: account.verificationRequired,
-          verificationStatus: account.verificationStatus,
-          lastVerificationAt: account.lastVerificationAt,
-          cooldownUntil: account.cooldownUntil,
-          quotaResetTimes: account.quotaResetTimes,
-        })),
-      }, null, 2),
+      content: JSON.stringify(
+        {
+          activeIndex: dto.activeIndex,
+          accounts: dto.accounts.map((account) => ({
+            index: account.index,
+            email: account.email,
+            enabled: account.enabled,
+            active: account.active,
+            verificationRequired: account.verificationRequired,
+            verificationStatus: account.verificationStatus,
+            lastVerificationAt: account.lastVerificationAt,
+            cooldownUntil: account.cooldownUntil,
+            quotaResetTimes: account.quotaResetTimes,
+          })),
+        },
+        null,
+        2,
+      ),
     }
   }
 
@@ -778,7 +883,12 @@ export async function manageAccounts(
     return { content: "All Antigravity accounts deleted." }
   }
 
-  if (input.action === "delete" || input.action === "enable" || input.action === "disable" || input.action === "select") {
+  if (
+    input.action === "delete" ||
+    input.action === "enable" ||
+    input.action === "disable" ||
+    input.action === "select"
+  ) {
     const op = input.action as MutationOp
     const outcome = await mutateAccount({ index: input.index ?? NaN }, op)
     if ("ok" in outcome) {
@@ -791,16 +901,22 @@ export async function manageAccounts(
       return { content: `Unknown account action: ${input.action}` }
     }
     const selected = outcome.selected
-    setAuth(selected
-      ? {
-          type: "oauth",
-          refresh: formatRefreshParts(selected.refreshParts),
-          access: "",
-          expires: 0,
-        }
-      : { type: "oauth", refresh: "", access: "", expires: 0 })
+    setAuth(
+      selected
+        ? {
+            type: "oauth",
+            refresh: formatRefreshParts(selected.refreshParts),
+            access: "",
+            expires: 0,
+          }
+        : { type: "oauth", refresh: "", access: "", expires: 0 },
+    )
     invalidateFetch()
-    return { content: selected ? `Selected ${selected.email ?? `account ${outcome.nextActiveIndex + 1}`}.` : "No Antigravity accounts remain." }
+    return {
+      content: selected
+        ? `Selected ${selected.email ?? `account ${outcome.nextActiveIndex + 1}`}.`
+        : "No Antigravity accounts remain.",
+    }
   }
 
   // Unknown actions never reach the service, so they cannot write. The legacy

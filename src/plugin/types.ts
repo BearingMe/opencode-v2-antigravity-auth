@@ -1,32 +1,32 @@
 export interface OAuthAuthDetails {
-  type: "oauth";
-  refresh: string;
-  access?: string;
-  expires?: number;
+  type: "oauth"
+  refresh: string
+  access?: string
+  expires?: number
 }
 
 export interface ApiKeyAuthDetails {
-  type: "api_key";
-  key: string;
+  type: "api_key"
+  key: string
 }
 
 export interface NonOAuthAuthDetails {
-  type: string;
-  [key: string]: unknown;
+  type: string
+  [key: string]: unknown
 }
 
-export type AuthDetails = OAuthAuthDetails | ApiKeyAuthDetails | NonOAuthAuthDetails;
+export type AuthDetails = OAuthAuthDetails | ApiKeyAuthDetails | NonOAuthAuthDetails
 
 export interface ProviderModel {
   cost?: {
-    input: number;
-    output: number;
-  };
-  [key: string]: unknown;
+    input: number
+    output: number
+  }
+  [key: string]: unknown
 }
 
 export interface Provider {
-  models?: Record<string, ProviderModel>;
+  models?: Record<string, ProviderModel>
 }
 
 /**
@@ -37,28 +37,28 @@ export interface Provider {
  */
 export interface PluginClient {
   app: {
-    log: (input: unknown) => Promise<unknown>;
-  };
+    log: (input: unknown) => Promise<unknown>
+  }
   auth: {
-    set: (input: unknown) => Promise<unknown>;
-  };
+    set: (input: unknown) => Promise<unknown>
+  }
   session: {
-    prompt: (input: unknown) => Promise<unknown>;
-    abort: (input: unknown) => Promise<unknown>;
-    messages: (input: unknown) => Promise<unknown>;
-  };
+    prompt: (input: unknown) => Promise<unknown>
+    abort: (input: unknown) => Promise<unknown>
+    messages: (input: unknown) => Promise<unknown>
+  }
   tui: {
-    showToast: (input: unknown) => Promise<unknown>;
-  };
+    showToast: (input: unknown) => Promise<unknown>
+  }
 }
 
 export interface RefreshParts {
-  refreshToken: string;
-  projectId?: string;
-  managedProjectId?: string;
+  refreshToken: string
+  projectId?: string
+  managedProjectId?: string
 }
 
 export interface ProjectContextResult {
-  auth: OAuthAuthDetails;
-  effectiveProjectId: string;
+  auth: OAuthAuthDetails
+  effectiveProjectId: string
 }

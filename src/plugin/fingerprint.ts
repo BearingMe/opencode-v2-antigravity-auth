@@ -8,49 +8,44 @@
  * across different apparent device identities.
  */
 
-import * as crypto from "node:crypto";
-import * as os from "node:os";
-import { getAntigravityVersion } from "../constants";
+import * as crypto from "node:crypto"
+import * as os from "node:os"
+import { getAntigravityVersion } from "../constants"
 
 const OS_VERSIONS: Record<string, string[]> = {
   darwin: ["10.15.7", "11.6.8", "12.6.3", "13.5.2", "14.2.1", "14.5"],
   win32: ["10.0.19041", "10.0.19042", "10.0.19043", "10.0.22000", "10.0.22621", "10.0.22631"],
   linux: ["5.15.0", "5.19.0", "6.1.0", "6.2.0", "6.5.0", "6.6.0"],
-};
+}
 
-const ARCHITECTURES = ["x64", "arm64"];
+const ARCHITECTURES = ["x64", "arm64"]
 
-const IDE_TYPES = [
-  "ANTIGRAVITY",
-] as const;
+const IDE_TYPES = ["ANTIGRAVITY"] as const
 
-const PLATFORMS = [
-  "WINDOWS",
-  "MACOS",
-] as const;
+const PLATFORMS = ["WINDOWS", "MACOS"] as const
 
 const SDK_CLIENTS = [
   "google-cloud-sdk vscode_cloudshelleditor/0.1",
   "google-cloud-sdk vscode/1.86.0",
   "google-cloud-sdk vscode/1.87.0",
   "google-cloud-sdk vscode/1.96.0",
-];
+]
 
 export interface ClientMetadata {
-  ideType: string;
-  platform: string;
-  pluginType: string;
+  ideType: string
+  platform: string
+  pluginType: string
 }
 
 export interface Fingerprint {
-  deviceId: string;
-  sessionToken: string;
-  userAgent: string;
-  apiClient: string;
-  clientMetadata: ClientMetadata;
-  createdAt: number;
+  deviceId: string
+  sessionToken: string
+  userAgent: string
+  apiClient: string
+  clientMetadata: ClientMetadata
+  createdAt: number
   /** @deprecated Kept for backward compat with stored fingerprints */
-  quotaUser?: string;
+  quotaUser?: string
 }
 
 /**
@@ -58,35 +53,35 @@ export interface Fingerprint {
  * Stores a snapshot of a fingerprint with metadata about when/why it was saved.
  */
 export interface FingerprintVersion {
-  fingerprint: Fingerprint;
-  timestamp: number;
-  reason: 'initial' | 'regenerated' | 'restored';
+  fingerprint: Fingerprint
+  timestamp: number
+  reason: "initial" | "regenerated" | "restored"
 }
 
 /** Maximum number of fingerprint versions to keep per account */
-export const MAX_FINGERPRINT_HISTORY = 5;
+export const MAX_FINGERPRINT_HISTORY = 5
 
 export interface FingerprintHeaders {
-  "User-Agent": string;
+  "User-Agent": string
 }
 
-const PLATFORM_CHOICES = ["darwin", "win32"] as const;
-type PlatformChoice = typeof PLATFORM_CHOICES[number];
+const PLATFORM_CHOICES = ["darwin", "win32"] as const
+type PlatformChoice = (typeof PLATFORM_CHOICES)[number]
 
 function randomFrom<T>(arr: readonly T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]!;
+  return arr[Math.floor(Math.random() * arr.length)]!
 }
 
 function platformToDisplayName(platform: string): "WINDOWS" | "MACOS" {
-  return platform === "win32" ? "WINDOWS" : "MACOS";
+  return platform === "win32" ? "WINDOWS" : "MACOS"
 }
 
 function generateDeviceId(): string {
-  return crypto.randomUUID();
+  return crypto.randomUUID()
 }
 
 function generateSessionToken(): string {
-  return crypto.randomBytes(16).toString("hex");
+  return crypto.randomBytes(16).toString("hex")
 }
 
 /**
@@ -94,9 +89,9 @@ function generateSessionToken(): string {
  * Each fingerprint represents a unique "device" identity.
  */
 export function generateFingerprint(): Fingerprint {
-  const platform = randomFrom(PLATFORM_CHOICES);
-  const arch = randomFrom(ARCHITECTURES);
-  const osVersion = randomFrom(OS_VERSIONS[platform] ?? OS_VERSIONS.darwin!);
+  const platform = randomFrom(PLATFORM_CHOICES)
+  const arch = randomFrom(ARCHITECTURES)
+  const osVersion = randomFrom(OS_VERSIONS[platform] ?? OS_VERSIONS.darwin!)
 
   return {
     deviceId: generateDeviceId(),
@@ -109,7 +104,7 @@ export function generateFingerprint(): Fingerprint {
       pluginType: "GEMINI",
     },
     createdAt: Date.now(),
-  };
+  }
 }
 
 /**
@@ -117,8 +112,8 @@ export function generateFingerprint(): Fingerprint {
  * Uses real OS info instead of randomized values.
  */
 export function collectCurrentFingerprint(): Fingerprint {
-  const platform = os.platform();
-  const arch = os.arch();
+  const platform = os.platform()
+  const arch = os.arch()
 
   return {
     deviceId: generateDeviceId(),
@@ -131,7 +126,7 @@ export function collectCurrentFingerprint(): Fingerprint {
       pluginType: "GEMINI",
     },
     createdAt: Date.now(),
-  };
+  }
 }
 
 /**
@@ -140,16 +135,16 @@ export function collectCurrentFingerprint(): Fingerprint {
  * Returns true if the userAgent was changed.
  */
 export function updateFingerprintVersion(fingerprint: Fingerprint): boolean {
-  const currentVersion = getAntigravityVersion();
-  const versionPattern = /^(antigravity\/)([\d.]+)/;
-  const match = fingerprint.userAgent.match(versionPattern);
+  const currentVersion = getAntigravityVersion()
+  const versionPattern = /^(antigravity\/)([\d.]+)/
+  const match = fingerprint.userAgent.match(versionPattern)
 
   if (!match || match[2] === currentVersion) {
-    return false;
+    return false
   }
 
-  fingerprint.userAgent = fingerprint.userAgent.replace(versionPattern, `$1${currentVersion}`);
-  return true;
+  fingerprint.userAgent = fingerprint.userAgent.replace(versionPattern, `$1${currentVersion}`)
+  return true
 }
 
 /**
@@ -158,19 +153,19 @@ export function updateFingerprintVersion(fingerprint: Fingerprint): boolean {
  */
 export function buildFingerprintHeaders(fingerprint: Fingerprint | null): Partial<FingerprintHeaders> {
   if (!fingerprint) {
-    return {};
+    return {}
   }
 
   return {
     "User-Agent": fingerprint.userAgent,
-  };
+  }
 }
 
 /**
  * Session-level fingerprint instance.
  * Generated once at module load, persists for the lifetime of the process.
  */
-let sessionFingerprint: Fingerprint | null = null;
+let sessionFingerprint: Fingerprint | null = null
 
 /**
  * Get or create the session fingerprint.
@@ -178,9 +173,9 @@ let sessionFingerprint: Fingerprint | null = null;
  */
 export function getSessionFingerprint(): Fingerprint {
   if (!sessionFingerprint) {
-    sessionFingerprint = generateFingerprint();
+    sessionFingerprint = generateFingerprint()
   }
-  return sessionFingerprint;
+  return sessionFingerprint
 }
 
 /**
@@ -188,6 +183,6 @@ export function getSessionFingerprint(): Fingerprint {
  * Call this to get a fresh identity (e.g., after rate limiting).
  */
 export function regenerateSessionFingerprint(): Fingerprint {
-  sessionFingerprint = generateFingerprint();
-  return sessionFingerprint;
+  sessionFingerprint = generateFingerprint()
+  return sessionFingerprint
 }

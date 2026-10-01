@@ -26,7 +26,13 @@ vi.mock("./plugin/version.js", () => ({
 
 vi.mock("./antigravity/oauth.js", () => ({
   authorizeAntigravity: vi.fn(async () => ({ url: "https://accounts.google.com/auth", verifier: "v", projectId: "" })),
-  exchangeAntigravity: vi.fn(async () => ({ type: "success" as const, refresh: "r", access: "a", expires: 1, projectId: "p" })),
+  exchangeAntigravity: vi.fn(async () => ({
+    type: "success" as const,
+    refresh: "r",
+    access: "a",
+    expires: 1,
+    projectId: "p",
+  })),
 }))
 
 vi.mock("./plugin/storage.js", async (importOriginal) => {
@@ -128,23 +134,25 @@ describe("Antigravity RPC transport", () => {
     const ctx = {
       location: { directory: "C:/rpc-transport-test" },
       integration: {
-        transform: async (callback: (editor: unknown) => void) => callback({
-          update: (id: string, update: (integration: { name: string }) => void) => update({ name: "" }),
-          method: {
-            list: () => [],
-            remove: vi.fn(),
-            update: vi.fn(),
-          },
-        }),
+        transform: async (callback: (editor: unknown) => void) =>
+          callback({
+            update: (id: string, update: (integration: { name: string }) => void) => update({ name: "" }),
+            method: {
+              list: () => [],
+              remove: vi.fn(),
+              update: vi.fn(),
+            },
+          }),
         connection: { active: vi.fn(async () => undefined), resolve: vi.fn() },
       },
       provider: {
-        transform: async (callback: (editor: unknown) => void) => callback({
-          get: () => undefined,
-          update: vi.fn(),
-          models: { set: vi.fn() },
-          add: vi.fn(),
-        }),
+        transform: async (callback: (editor: unknown) => void) =>
+          callback({
+            get: () => undefined,
+            update: vi.fn(),
+            models: { set: vi.fn() },
+            add: vi.fn(),
+          }),
       },
       model: {
         transform: async (callback: (editor: unknown) => void) => callback({ list: () => [] }),
@@ -171,23 +179,25 @@ describe("Antigravity RPC transport", () => {
     const legacy = {
       activeIndex: 0,
       activeIndexByFamily: { claude: 0, gemini: 0 },
-      accounts: [{
-        id: "acc-one",
-        index: 0,
-        email: "Account 1",
-        enabled: true,
-        active: true,
-        verificationRequired: false,
-        verificationStatus: "not_checked",
-        lastVerificationAt: undefined,
-        cooldownUntil: undefined,
-      }],
+      accounts: [
+        {
+          id: "acc-one",
+          index: 0,
+          email: "Account 1",
+          enabled: true,
+          active: true,
+          verificationRequired: false,
+          verificationStatus: "not_checked",
+          lastVerificationAt: undefined,
+          cooldownUntil: undefined,
+        },
+      ],
     }
     expect(() => encodeTransport(legacy)).toThrow(/Expected JSON value/)
   })
 
   it("transports sparse list output with hostile reset times dropped", async () => {
-    const output = await call("list", {}) as {
+    const output = (await call("list", {})) as {
       activeIndex: number
       accounts: Array<Record<string, unknown>>
     }
@@ -212,8 +222,11 @@ describe("Antigravity RPC transport", () => {
   })
 
   it("transports cached quota output with null-not-zero semantics", async () => {
-    const output = await call("quota", { refresh: false }) as {
-      accounts: Array<{ id: string; groups: Record<string, { remainingFraction: number | null; resetTime: number | null }> }>
+    const output = (await call("quota", { refresh: false })) as {
+      accounts: Array<{
+        id: string
+        groups: Record<string, { remainingFraction: number | null; resetTime: number | null }>
+      }>
     }
     const cached = output.accounts.find((entry) => entry.id === "acc-three")
     expect(cached?.groups.claude?.remainingFraction).toBe(0)
@@ -225,7 +238,7 @@ describe("Antigravity RPC transport", () => {
   })
 
   it("transports verify success without email or verifyUrl", async () => {
-    const output = await call("verify", { id: "acc-one" }) as Record<string, unknown>
+    const output = (await call("verify", { id: "acc-one" })) as Record<string, unknown>
     expect(output).not.toHaveProperty("email")
     expect(output).not.toHaveProperty("verifyUrl")
     expect(output).toMatchObject({ status: "ok" })
@@ -242,7 +255,7 @@ describe("Antigravity RPC transport", () => {
   })
 
   it("transports mutate select without email", async () => {
-    const output = await call("mutate", { id: "acc-one", op: "select" }) as {
+    const output = (await call("mutate", { id: "acc-one", op: "select" })) as {
       selected: Record<string, unknown> | null
     }
     expect(output.selected).not.toBeNull()

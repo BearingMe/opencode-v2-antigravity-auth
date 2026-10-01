@@ -16,12 +16,17 @@ function isUsableFraction(value: unknown): value is number {
 }
 
 export function renderQuotaBar(fraction: number | null | undefined, width = 12): string {
-  const safeWidth = Number.isInteger(width) && width > 0 ? Math.min(width, 40) : 12
-  if (!isUsableFraction(fraction)) return `${EMPTY_BLOCK.repeat(safeWidth)} unknown`
+  const { bar, percentage } = quotaBarParts(fraction, width)
+  return `${bar} ${percentage}`
+}
+
+export function quotaBarParts(fraction: number | null | undefined, width = 12): { bar: string; percentage: string } {
+  const safeWidth = Number.isInteger(width) && width > 0 ? width : 12
+  if (!isUsableFraction(fraction)) return { bar: EMPTY_BLOCK.repeat(safeWidth), percentage: "unknown" }
   const filled = Math.round(fraction * safeWidth)
   const empty = safeWidth - filled
   const pct = Math.round(fraction * 100)
-  return `${FULL_BLOCK.repeat(filled)}${EMPTY_BLOCK.repeat(empty)} ${pct}%`
+  return { bar: `${FULL_BLOCK.repeat(filled)}${EMPTY_BLOCK.repeat(empty)}`, percentage: `${pct}%` }
 }
 
 export function formatResetCountdown(resetTime: number | null | undefined, now: number = Date.now()): string {
@@ -48,4 +53,57 @@ export function formatAccountOneLiner(account: AccountOneLinerInput): string {
   if (account.status === "unknown") tags.push("quota unknown")
   if (tags.length === 0) return email
   return `${email} [${tags.join("] [")}]`
+}
+
+export interface QuotaRowGroup {
+  remainingFraction: number | null
+  resetTime: number | null
+}
+
+export interface QuotaInfoRow {
+  title: string
+  value: string
+  description: string
+}
+
+const QUOTA_GROUP_KEYS = ["claude", "gemini-pro", "gemini-flash"] as const
+
+const QUOTA_GROUP_LABELS: Record<string, string> = {
+  claude: "Claude",
+  "gemini-pro": "Gemini Pro",
+  "gemini-flash": "Gemini Flash",
+}
+
+export function quotaInfoRows(groups: Record<string, QuotaRowGroup>): Array<QuotaInfoRow> {
+  return QUOTA_GROUP_KEYS.map((key) => {
+    const entry = groups[key] ?? { remainingFraction: null, resetTime: null }
+    return {
+      title: QUOTA_GROUP_LABELS[key] ?? key,
+      value: `quota-row-${key}`,
+      description: `${renderQuotaBar(entry.remainingFraction)} (${formatResetCountdown(entry.resetTime)})`,
+    }
+  })
+}
+
+export function quotaViewPlaceholder(): string {
+  return "Updates when opened. Not live-updated; ctrl+r to refresh."
+}
+
+export interface QuotaDetailSnapshot {
+  enabled?: boolean
+  groups: Record<string, QuotaRowGroup>
+  checkedAt: number | null
+  freshness: string
+  status: string
+}
+
+export type QuotaRefreshOutcome =
+  { ok: true; entry: QuotaDetailSnapshot } | { ok: false; reason: "missing" | "failed"; invalidResponse: boolean }
+
+export function quotaDetailLines(snapshot: QuotaDetailSnapshot): Array<string> {
+  const checked = snapshot.checkedAt === null ? "never checked" : new Date(snapshot.checkedAt).toLocaleString()
+  return [
+    ...quotaInfoRows(snapshot.groups).map((row) => `${row.title}: ${row.description}`),
+    `status: ${snapshot.status} (${snapshot.freshness}, checked: ${checked})`,
+  ]
 }

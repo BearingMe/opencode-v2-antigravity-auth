@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest"
-import plugin, { getFetchDestination, isGenerativeLanguageModelPath, normalizeFetchBody, parseOAuthCallbackInput } from "./v2-plugin.js"
+import plugin, {
+  formatAuthInstructions,
+  formatAuthSummary,
+  getFetchDestination,
+  isGenerativeLanguageModelPath,
+  normalizeFetchBody,
+  parseOAuthCallbackInput,
+} from "./v2-plugin.js"
 
 describe("OpenCode V2 plugin entrypoint", () => {
   it("exports a stable V2 plugin definition", () => {
@@ -41,12 +48,15 @@ describe("normalizeFetchBody", () => {
   it("normalizes Request URL, method, headers, body, and signal without consuming the original", async () => {
     const json = JSON.stringify({ contents: [{ role: "user", parts: [{ text: "hello" }] }] })
     const controller = new AbortController()
-    const original = new Request("https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro:generateContent", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-test": "request" },
-      body: json,
-      signal: controller.signal,
-    })
+    const original = new Request(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro:generateContent",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-test": "request" },
+        body: json,
+        signal: controller.signal,
+      },
+    )
 
     const normalized = await normalizeFetchBody(original, {
       headers: { "content-type": "application/json", "x-test-override": "init" },
@@ -64,13 +74,16 @@ describe("normalizeFetchBody", () => {
   })
 
   it("decodes only the selected byte range of a typed-array view", async () => {
-    const json = "{\"ok\":true}"
+    const json = '{"ok":true}'
     const bytes = new TextEncoder().encode(`discard${json}tail`)
     const view = new Uint8Array(bytes.buffer, 7, json.length)
-    const normalized = await normalizeFetchBody("https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro:generateContent", {
-      headers: { "content-type": "application/json" },
-      body: view,
-    })
+    const normalized = await normalizeFetchBody(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro:generateContent",
+      {
+        headers: { "content-type": "application/json" },
+        body: view,
+      },
+    )
     expect(normalized.init.body).toBe(json)
   })
 
@@ -79,6 +92,51 @@ describe("normalizeFetchBody", () => {
     expect(isGenerativeLanguageModelPath("/v1/models/gemini-3-pro:streamGenerateContent")).toBe(true)
     expect(isGenerativeLanguageModelPath("/upload/v1beta/files")).toBe(false)
     expect(() => getFetchDestination("not a URL")).toThrow("absolute HTTP(S) URL")
+  })
+})
+
+describe("formatAuthSummary", () => {
+  it("lists saved accounts before authorization without a printed fake menu", () => {
+    const instructions = formatAuthSummary(
+      [{ email: "one@example.com" }, { email: "two@example.com", enabled: false }],
+      10,
+    )
+    expect(instructions).toContain("2/10")
+    expect(instructions).toContain("- one@example.com")
+    expect(instructions).toContain("- two@example.com (disabled)")
+    expect(instructions).toContain("/antigravity")
+    expect(instructions).toContain("One account per command")
+    expect(instructions).toContain("Run opencode auth login again")
+    expect(instructions).toContain("Ctrl+C cancels")
+    expect(instructions).not.toContain("Menu:")
+    expect(instructions).not.toContain("Maximum of 10")
+  })
+
+  it("marks an empty pool", () => {
+    const instructions = formatAuthSummary([], 10)
+    expect(instructions).toContain("0/10")
+    expect(instructions).toContain("(none yet)")
+  })
+
+  it("adds the capacity message at the account limit", () => {
+    const accounts = Array.from({ length: 10 }, (_, index) => ({ email: `saved-${index}@example.com` }))
+    const instructions = formatAuthSummary(accounts, 10)
+    expect(instructions).toContain("10/10")
+    expect(instructions).toContain("Maximum of 10 Antigravity accounts reached")
+  })
+
+  it("falls back to an unnamed label for blank emails", () => {
+    const instructions = formatAuthSummary([{ email: "   " }], 10)
+    expect(instructions).toContain("- Unnamed account")
+  })
+})
+
+describe("formatAuthInstructions", () => {
+  it("only describes completing the authorization already selected", () => {
+    const instructions = formatAuthInstructions([{ email: "one@example.com" }], 10)
+    expect(instructions).toContain("authorization code")
+    expect(instructions).not.toContain("Menu:")
+    expect(instructions).not.toContain("one@example.com")
   })
 })
 
@@ -101,9 +159,8 @@ describe("parseOAuthCallbackInput", () => {
   })
 
   it("rejects redirect URLs with a mismatched state", () => {
-    expect(() => parseOAuthCallbackInput(
-      "http://localhost:51121/oauth-callback?state=other&code=4%2Fauth-code",
-      "expected-state",
-    )).toThrow("OAuth state mismatch")
+    expect(() =>
+      parseOAuthCallbackInput("http://localhost:51121/oauth-callback?state=other&code=4%2Fauth-code", "expected-state"),
+    ).toThrow("OAuth state mismatch")
   })
 })

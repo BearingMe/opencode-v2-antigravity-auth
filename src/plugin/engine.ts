@@ -1,11 +1,7 @@
-import {
-  ANTIGRAVITY_ENDPOINT_FALLBACKS,
-  ANTIGRAVITY_ENDPOINT_PROD,
-  type HeaderStyle,
-} from "../constants.js"
+import { ANTIGRAVITY_ENDPOINT_FALLBACKS, ANTIGRAVITY_ENDPOINT_PROD, type HeaderStyle } from "../constants.js"
 import { accessTokenExpired } from "./auth.js"
+import type { AccountManager } from "./accounts.js"
 import {
-  AccountManager,
   calculateBackoffMs,
   computeSoftQuotaCacheTtlMs,
   parseRateLimitReason,
@@ -14,11 +10,7 @@ import {
 } from "./accounts.js"
 import { createSyntheticErrorResponse, isEmptyResponseBody } from "./request-helpers.js"
 import { EmptyResponseError } from "./errors.js"
-import {
-  buildThinkingWarmupBody,
-  prepareAntigravityRequest,
-  transformAntigravityResponse,
-} from "./request.js"
+import { buildThinkingWarmupBody, prepareAntigravityRequest, transformAntigravityResponse } from "./request.js"
 import { AntigravityTokenRefreshError, refreshAccessToken } from "./token.js"
 import { ensureProjectContext } from "./project.js"
 import { resolveModelWithTier } from "./transform/model-resolver.js"
@@ -309,11 +301,7 @@ function getCliFirst(config: AntigravityConfig): boolean {
   return (config as AntigravityConfig & { cli_first?: boolean }).cli_first ?? false
 }
 
-export function getHeaderStyleFromUrl(
-  urlString: string,
-  family: ModelFamily,
-  cliFirst: boolean = false,
-): HeaderStyle {
+export function getHeaderStyleFromUrl(urlString: string, family: ModelFamily, cliFirst: boolean = false): HeaderStyle {
   if (family === "claude") {
     return "antigravity"
   }
@@ -504,7 +492,6 @@ export function formatWaitTime(ms: number): string {
   return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`
 }
 
-
 export type EngineToastVariant = "info" | "warning" | "success" | "error"
 
 export interface EngineRequestOptions {
@@ -636,8 +623,7 @@ export async function executeAntigravityRequest(
     )
 
     if (!account && allowQuotaFallback) {
-      const alternateHeaderStyle: HeaderStyle =
-        preferredHeaderStyle === "antigravity" ? "gemini-cli" : "antigravity"
+      const alternateHeaderStyle: HeaderStyle = preferredHeaderStyle === "antigravity" ? "gemini-cli" : "antigravity"
       account = accountManager.getCurrentOrNextForFamily(
         family,
         model,
@@ -664,20 +650,12 @@ export async function executeAntigravityRequest(
         )
       ) {
         const threshold = config.soft_quota_threshold_percent
-        const softQuotaWaitMs = accountManager.getMinWaitTimeForSoftQuota(
-          family,
-          threshold,
-          softQuotaCacheTtlMs,
-          model,
-        )
+        const softQuotaWaitMs = accountManager.getMinWaitTimeForSoftQuota(family, threshold, softQuotaCacheTtlMs, model)
         const maxWaitMs = (config.max_rate_limit_wait_seconds ?? 300) * 1000
 
         if (softQuotaWaitMs === null || (maxWaitMs > 0 && softQuotaWaitMs > maxWaitMs)) {
           const waitTimeFormatted = softQuotaWaitMs ? formatWaitTime(softQuotaWaitMs) : "unknown"
-          await showToast(
-            `All accounts over ${threshold}% quota threshold. Resets in ${waitTimeFormatted}.`,
-            "error",
-          )
+          await showToast(`All accounts over ${threshold}% quota threshold. Resets in ${waitTimeFormatted}.`, "error")
           throw new Error(
             `Quota protection: All ${accountCount} account(s) are over ${threshold}% usage for ${family}. ` +
               `Quota resets in ${waitTimeFormatted}. ` +
@@ -700,8 +678,7 @@ export async function executeAntigravityRequest(
       }
 
       const strictWait = !allowQuotaFallback
-      const waitMs =
-        accountManager.getMinWaitTimeForFamily(family, model, preferredHeaderStyle, strictWait) || 60_000
+      const waitMs = accountManager.getMinWaitTimeForFamily(family, model, preferredHeaderStyle, strictWait) || 60_000
       const waitSecValue = Math.max(1, Math.ceil(waitMs / 1000))
 
       pushDebug(`all-rate-limited family=${family} accounts=${accountCount} waitMs=${waitMs}`)
@@ -881,7 +858,7 @@ export async function executeAntigravityRequest(
         typeof prepared.init.body === "string" ? prepared.init.body : undefined,
         Boolean(
           prepared.effectiveModel?.toLowerCase().includes("claude") &&
-            prepared.effectiveModel?.toLowerCase().includes("thinking"),
+          prepared.effectiveModel?.toLowerCase().includes("thinking"),
         ),
       )
       if (!warmupBody) {
@@ -944,9 +921,7 @@ export async function executeAntigravityRequest(
     if (accountManager.isRateLimitedForHeaderStyle(account, family, headerStyle, model)) {
       if (allowQuotaFallback && family === "gemini" && headerStyle === "antigravity") {
         if (accountManager.hasOtherAccountWithAntigravityAvailable(account.index, family, model)) {
-          pushDebug(
-            `antigravity rate-limited on account ${account.index}, but available on other accounts. Switching.`,
-          )
+          pushDebug(`antigravity rate-limited on account ${account.index}, but available on other accounts. Switching.`)
           shouldSwitchAccount = true
         } else {
           const alternateStyle = accountManager.getAvailableHeaderStyle(account, family, model)
@@ -1118,11 +1093,7 @@ export async function executeAntigravityRequest(
             const quotaKey = headerStyleToQuotaKey(headerStyle, family)
             const { attempt, delayMs } = getRateLimitBackoff(account.index, quotaKey, serverRetryMs)
 
-            const smartBackoffMs = calculateBackoffMs(
-              rateLimitReason,
-              account.consecutiveFailures ?? 0,
-              serverRetryMs,
-            )
+            const smartBackoffMs = calculateBackoffMs(rateLimitReason, account.consecutiveFailures ?? 0, serverRetryMs)
             const effectiveDelayMs = Math.max(delayMs, smartBackoffMs)
 
             pushDebug(
@@ -1277,7 +1248,10 @@ export async function executeAntigravityRequest(
           resetAccountFailureState(account.index)
 
           if (response.status === 403) {
-            const errorBodyText = await response.clone().text().catch(() => "")
+            const errorBodyText = await response
+              .clone()
+              .text()
+              .catch(() => "")
             const extracted = extractVerificationErrorDetails(errorBodyText)
 
             if (extracted.validationRequired) {
@@ -1306,8 +1280,7 @@ export async function executeAntigravityRequest(
             }
           }
 
-          const shouldRetryEndpoint =
-            response.status === 403 || response.status === 404 || response.status >= 500
+          const shouldRetryEndpoint = response.status === 403 || response.status === 404 || response.status >= 500
 
           if (shouldRetryEndpoint && i < ANTIGRAVITY_ENDPOINT_FALLBACKS.length - 1) {
             await logResponseBody(debugContext, response, response.status)
@@ -1334,8 +1307,7 @@ export async function executeAntigravityRequest(
               const bodyText = await cloned.text()
               if (bodyText.includes("Prompt is too long") || bodyText.includes("prompt_too_long")) {
                 await showToast("Context too long - use /compact to reduce size", "warning")
-                const errorMessage =
-                  `[Antigravity Error] Context is too long for this model.\n\nPlease use /compact to reduce context size, then retry your request.\n\nAlternatively, you can:\n- Use /clear to start fresh\n- Use /undo to remove recent messages\n- Switch to a model with larger context window`
+                const errorMessage = `[Antigravity Error] Context is too long for this model.\n\nPlease use /compact to reduce context size, then retry your request.\n\nAlternatively, you can:\n- Use /clear to start fresh\n- Use /undo to remove recent messages\n- Switch to a model with larger context window`
                 return createSyntheticErrorResponse(errorMessage, prepared.requestedModel)
               }
             }
@@ -1356,20 +1328,13 @@ export async function executeAntigravityRequest(
               pushDebug(`empty-response: attempt ${currentAttempts}/${maxAttempts}`)
 
               if (currentAttempts < maxAttempts) {
-                await showToast(
-                  `Empty response received. Retrying (${currentAttempts}/${maxAttempts})...`,
-                  "warning",
-                )
+                await showToast(`Empty response received. Retrying (${currentAttempts}/${maxAttempts})...`, "warning")
                 await sleep(retryDelayMs, abortSignal)
                 continue
               }
 
               emptyResponseAttempts.delete(emptyAttemptKey)
-              throw new EmptyResponseError(
-                "antigravity",
-                prepared.effectiveModel ?? "unknown",
-                currentAttempts,
-              )
+              throw new EmptyResponseError("antigravity", prepared.effectiveModel ?? "unknown", currentAttempts)
             }
 
             const emptyAttemptKeyClean = `${prepared.sessionId ?? "none"}:${prepared.effectiveModel ?? "unknown"}`

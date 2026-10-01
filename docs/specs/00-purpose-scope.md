@@ -2,7 +2,8 @@
 
 ## What the project is
 
-`opencode-antigravity-auth` is an OpenCode plugin that provides Google
+`opencode-v2-antigravity-auth` (`src/v2-plugin.ts :: PLUGIN_ID`,
+package `opencode-v2-antigravity-auth`) is an OpenCode V2 plugin that provides Google
 Antigravity (Cloud Code Assist) OAuth authentication and request routing for
 Gemini and Claude models. It intercepts `fetch()` calls aimed at
 `generativelanguage.googleapis.com`, rewrites them into Antigravity
@@ -41,13 +42,12 @@ In scope:
   (`src/plugin/accounts.ts`, `rotation.ts`, `quota.ts`, `fingerprint.ts`,
   `project.ts`, `storage.ts`, `refresh-queue.ts`).
 - Recovery (in-flight turn repair + session-error hook), debug file/TUI
-  logging split (`debug` vs `debug_tui`, 1.6.0), version pinning,
+  logging split (`debug` vs `debug_tui`), version pinning,
   auto-update checker, `antigravity_accounts` tool, `/antigravity` dialog
   over the `AntigravityAccounts` RPC (`src/tui.ts`, `src/rpc.ts`).
-  (Historical, REMOVED: OAuth localhost server `server.ts`, CLI prompts
-  `cli.ts`, terminal UI `ui/`, dedicated `google_search` tool
-  `plugin/search.ts` — model-declared web search is still sanitized via
-  the D-SEARCH-MUTEX guard.)
+  Removed surfaces stay removed: OAuth localhost server, CLI prompts,
+  terminal UI, dedicated `google_search` tool — model-declared web search
+  is still sanitized via the D-SEARCH-MUTEX guard.
 
 Non-goals:
 
@@ -63,15 +63,11 @@ Non-goals:
 
 ## Entry points (normative)
 
-- V1 legacy engine (REMOVED 2026-09-28, Task 2): `src/plugin.ts`
-  (`createAntigravityPlugin`, `AntigravityCLIOAuthPlugin`,
-  `GoogleOAuthPlugin`), `cli.ts`, `server.ts`, `ui/`, and the
-  `@opencode-ai/plugin` V1 dependency were deleted. `verifyAccountAccess`
-  lives in `src/plugin/verify.ts`; routing lives in
-  `src/plugin/engine.ts :: executeAntigravityRequest`.
-- V2 bridge (current OpenCode V2 product path):
+- V2 bridge (current product path):
   `src/v2-plugin.ts` default export `Plugin.define({id:
-  "opencode-antigravity-auth"})`.
+"opencode-v2-antigravity-auth"})`. Routing lives in
+  `src/plugin/engine.ts :: executeAntigravityRequest`;
+  `verifyAccountAccess` lives in `src/plugin/verify.ts`.
 - AI-SDK shim: `src/google-sdk.ts :: createGoogle` re-export. Models MUST
   point at `aisdk:<ANTIGRAVITY_SDK>` (the `./google-sdk.js` URL), never
   directly at `@ai-sdk/google`, so the `aisdk.hook("sdk")` bridge cannot be

@@ -4,14 +4,14 @@
 
 `AntigravityAccounts` (`src/rpc.ts`, handlers in `src/v2-plugin.ts`):
 
-| Method | Input | Output |
-|---|---|---|
-| `list` | `{}` | Accounts (redacted) + `activeIndex` / `activeIndexByFamily` |
-| `quota` | `{ refresh? }` | `QuotaPresentation` (see [quota-contract.md](quota-contract.md)) |
-| `verify` | `{ id }` | Success `{ index, email?, checkedAt, status: ok\|blocked\|error, message, verifyUrl? }` or `{ ok: false, kind: invalid-index\|not-found\|ambiguous, accountCount }` |
-| `mutate` | `{ id, op: select\|enable\|disable\|delete, family? }` | Success (selection/cursors/remaining/selected) or `{ ok: false, kind, accountCount }` |
-| `deleteAll` | `{}` | `{ remaining: 0 }` |
-| `ping` | `{}` | `"ANTIGRAVITY_RPC_ACCOUNTS_OK"` |
+| Method      | Input                                                  | Output                                                                                                                                                              |
+| ----------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list`      | `{}`                                                   | Accounts (redacted) + `activeIndex` / `activeIndexByFamily`                                                                                                         |
+| `quota`     | `{ refresh? }`                                         | `QuotaPresentation` (see [quota-contract.md](quota-contract.md))                                                                                                    |
+| `verify`    | `{ id }`                                               | Success `{ index, email?, checkedAt, status: ok\|blocked\|error, message, verifyUrl? }` or `{ ok: false, kind: invalid-index\|not-found\|ambiguous, accountCount }` |
+| `mutate`    | `{ id, op: select\|enable\|disable\|delete, family? }` | Success (selection/cursors/remaining/selected) or `{ ok: false, kind, accountCount }`                                                                               |
+| `deleteAll` | `{}`                                                   | `{ remaining: 0 }`                                                                                                                                                  |
+| `ping`      | `{}`                                                   | `"ANTIGRAVITY_RPC_ACCOUNTS_OK"`                                                                                                                                     |
 
 Rules:
 
@@ -31,14 +31,47 @@ Rules:
 - Entry: `/antigravity` slash command and `Antigravity accounts` palette
   entry (`antigravity.accounts`, registered from an app-slot render —
   `keymap.layer` must run inside a component, never at setup top level).
-- Dialog-only by necessity: custom JSX route pages crash against the host
-  renderer (`No renderer found` outside `RendererContext`), and the TUI
-  imports no Solid runtime. Every screen is a host-rendered dialog, select,
-  confirm, alert, or toast.
-- List shows each account email with disabled/selection/quota state in the
-  description plus the `Add accounts: opencode auth login` footer. Empty
+- Account management uses the host's dialog stack. The quota view is custom
+  Solid/OpenTUI content mounted with `dialog.show`, not a second renderer.
+- The host-mounted account-list view uses small colored `●` glyphs beside
+  emails (enabled/disabled only), `[disabled]` text fallback, and a shared
+  legend/login footer. Search, arrow selection, Enter, Esc, and mouse selection
+  are component-owned; long lists scroll. Search uses the host's focused
+  formfield text/background tokens, including on light themes. Muted selection/quota metadata for
+  the highlighted account appears below the rows. Empty
   state alerts point to `opencode auth login`. Verify-blocked alerts show
   the `verifyUrl` plus reconnect guidance.
+- Account actions are `Show quota`, `Enable`/`Disable`, `Verify`, `Remove`,
+  `Back` — there is no standalone `Refresh quota` and no `Use next`
+  (rotation hints remain available via the `antigravity_accounts` agent
+  tool's `select` op; rotation itself is unchanged).
+- The quota view (`Antigravity quota`) is one custom dialog with padded
+  sections, theme-colored aligned rows, update time, and a `refresh ctrl+r`
+  footer. The quota-group box's `onSizeChange` measures actual content width
+  after host sizing and padding. Bars reserve label, percentage, and longest
+  reset columns; narrow layouts stack the label/reset around the bar. Resizing
+  changes layout only. Saved readings render first; `onMount` refreshes enabled
+  accounts. `ctrl+r` or clicking refresh uses the same controller operation.
+  Loading and failures render inline; there is no polling or submenu.
+  The component-owned modal keymap has priority 10. Explicit Back/Esc returns
+  to the list once. Native dismissal/replacement only disposes: `onClose`
+  cannot distinguish them, so it must never reopen menus or clear a replacement.
+  Missing-account notices use host-mounted content with explicit Enter/Esc
+  or mouse acknowledgement before list navigation. Replacing the notice
+  cancels navigation; native alert promise resolution is not acknowledgement.
+  Teardown disposes without
+  reopening menus; late results cannot update a closed view. Enabled state
+  comes from the quota response and is retained across refreshes.
+- `script/build-tui.mjs` compiles JSX through the OpenTUI Solid transform
+  and externalizes all imports. tsc's automatic JSX emit alone evaluates
+  dynamic props eagerly. `test/tui-quota-render.test.ts` uses Bun's native
+  renderer to verify the built artifact's loading, bar updates, failure
+  retention, full-width/aligned rows, host-constrained sizing, resizing,
+  narrow layout, and disposal. It does not replace an installed
+  host input/auth check. The separate test checkout's optional
+  `antigravity-package.test.tsx` loads a packed plugin through its runtime
+  singleton bridge and real keymap/dialog stack; it exercises Enter, ctrl+r,
+  Esc, replacement, and cleanup with fixture RPC data.
 - TUI→server calls go through `context.client.rpc(AntigravityAccounts)`
   with the current location. Quota text renders via the pure helpers in
   `src/plugin/account-ui-format.ts` (`renderQuotaBar`, `formatResetCountdown`,
@@ -71,14 +104,18 @@ smoke remnants, and they are gone from the current contract (`ping` returns
   domain facades — so generated `credential.*` endpoints are not reachable
   from the server plugin. Host credential removal/deactivation needs host
   work, not a plugin-only change.
-- The only SDK-supported OAuth path is the host login flow
-  (`authorize`/`callback`); driving OAuth from a TUI page has no SDK
-  contract and stays out of `/antigravity`. Additions belong to
-  `opencode auth login`.
-- OAuth completion inside the login flow is prompt-free and Skip-free for
-  the form-less `google-oauth` method (no method picker, no declared fields).
-  One CLI run performs one `authorize` round-trip (one account per run);
-  repeated invocations build the pool. Live successful-OAuth completion and
-  post-success rendering still need user-participated verification; the
-  at-cap branch and host credential-store state after login are likewise
-  covered by unit tests only, not live runs.
+- Login declares a required `method.form` string selection with options.
+  The host's `auth/login.ts` calls `answerForm` before `oauth.connect`, so
+  saved-account information and Add/reconnect appear before any URL is
+  generated. `authorize` validates the answer; no Exit option is exposed.
+  Ctrl+C while answering uses the host's native prompt cancellation.
+- The form summary is captured by the integration transform and refreshed
+  after successful OAuth, RPC mutations/verification/deletion, and tool
+  management actions via `integration.reload`. External store changes
+  may require plugin reload to refresh this pre-auth summary; authorization
+  and the capacity transaction always reread the live store.
+- The stock v2.0.18 CLI performs one authentication and exits with Done.
+  Rerun the command to add another account. No host-specific login metadata
+  or repeated-login loop is used. Login
+  additions remain on `opencode auth login`, not silently moved to a TUI flow.
+  Live OAuth completion still requires user-participated verification.

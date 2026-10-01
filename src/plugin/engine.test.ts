@@ -75,7 +75,13 @@ const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemi
 
 describe("engine routing helpers (V1 parity)", () => {
   it("forces antigravity headers for claude and honors cli_first for gemini", () => {
-    expect(getHeaderStyleFromUrl("https://generativelanguage.googleapis.com/v1beta/models/antigravity-claude-opus-4-6:generateContent", "claude", true)).toBe("antigravity")
+    expect(
+      getHeaderStyleFromUrl(
+        "https://generativelanguage.googleapis.com/v1beta/models/antigravity-claude-opus-4-6:generateContent",
+        "claude",
+        true,
+      ),
+    ).toBe("antigravity")
     expect(getHeaderStyleFromUrl(GEMINI_URL, "gemini", false)).toBe("antigravity")
     expect(getHeaderStyleFromUrl(GEMINI_URL, "gemini", true)).toBe("gemini-cli")
   })
@@ -84,14 +90,24 @@ describe("engine routing helpers (V1 parity)", () => {
     const config = { ...DEFAULT_CONFIG, cli_first: false }
     expect(resolveHeaderRoutingDecision(GEMINI_URL, "gemini", config).allowQuotaFallback).toBe(true)
     expect(resolveHeaderRoutingDecision(GEMINI_URL, "claude", config).allowQuotaFallback).toBe(false)
-    expect(resolveQuotaFallbackHeaderStyle({ family: "claude", headerStyle: "antigravity", alternateStyle: "gemini-cli" })).toBeNull()
-    expect(resolveQuotaFallbackHeaderStyle({ family: "gemini", headerStyle: "antigravity", alternateStyle: "antigravity" })).toBeNull()
-    expect(resolveQuotaFallbackHeaderStyle({ family: "gemini", headerStyle: "antigravity", alternateStyle: "gemini-cli" })).toBe("gemini-cli")
+    expect(
+      resolveQuotaFallbackHeaderStyle({ family: "claude", headerStyle: "antigravity", alternateStyle: "gemini-cli" }),
+    ).toBeNull()
+    expect(
+      resolveQuotaFallbackHeaderStyle({ family: "gemini", headerStyle: "antigravity", alternateStyle: "antigravity" }),
+    ).toBeNull()
+    expect(
+      resolveQuotaFallbackHeaderStyle({ family: "gemini", headerStyle: "antigravity", alternateStyle: "gemini-cli" }),
+    ).toBe("gemini-cli")
   })
 
   it("extracts model family from URL", () => {
     expect(getModelFamilyFromUrl(GEMINI_URL)).toBe("gemini")
-    expect(getModelFamilyFromUrl("https://generativelanguage.googleapis.com/v1beta/models/antigravity-claude-opus:generateContent")).toBe("claude")
+    expect(
+      getModelFamilyFromUrl(
+        "https://generativelanguage.googleapis.com/v1beta/models/antigravity-claude-opus:generateContent",
+      ),
+    ).toBe("claude")
     expect(extractModelFromUrl(GEMINI_URL)).toBe("gemini-3-pro")
   })
 
@@ -160,7 +176,12 @@ describe("refreshOAuthCredentialUnified (D-REFRESH-DUAL)", () => {
     }
     const refreshed = await refreshOAuthCredentialUnified(credential, client, "google")
     expect(mockRefreshAccessToken).toHaveBeenCalledOnce()
-    expect(refreshed).toMatchObject({ access: "new-access", refresh: "rotated|proj", expires: 4242, methodID: "google-oauth" })
+    expect(refreshed).toMatchObject({
+      access: "new-access",
+      refresh: "rotated|proj",
+      expires: 4242,
+      methodID: "google-oauth",
+    })
   })
 })
 
@@ -199,28 +220,39 @@ describe("executeAntigravityRequest", () => {
   it("throws when no accounts are available", async () => {
     const manager = makeManager([])
     await expect(
-      executeAntigravityRequest(GEMINI_URL, { method: "POST" }, {
-        client: makeClient(),
-        providerId: "google",
-        config: { ...DEFAULT_CONFIG },
-        accountManager: manager,
-      }),
+      executeAntigravityRequest(
+        GEMINI_URL,
+        { method: "POST" },
+        {
+          client: makeClient(),
+          providerId: "google",
+          config: { ...DEFAULT_CONFIG },
+          accountManager: manager,
+        },
+      ),
     ).rejects.toThrow("No Antigravity accounts available")
   })
 
   it("routes SDK JSON through the engine and marks the account used", async () => {
     const manager = makeManager([{ refreshToken: "rt-1", access: "at-1", expires: Date.now() + 3600_000 }])
-    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    }))
-    const response = await executeAntigravityRequest(GEMINI_URL, { method: "POST", body: "{}" }, {
-      client: makeClient(),
-      providerId: "google",
-      config: { ...DEFAULT_CONFIG },
-      accountManager: manager,
-      fetchImpl: fetchImpl as unknown as typeof fetch,
-    })
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    )
+    const response = await executeAntigravityRequest(
+      GEMINI_URL,
+      { method: "POST", body: "{}" },
+      {
+        client: makeClient(),
+        providerId: "google",
+        config: { ...DEFAULT_CONFIG },
+        accountManager: manager,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      },
+    )
     expect(response.status).toBe(200)
     expect(fetchImpl).toHaveBeenCalledOnce()
     expect(mockPrepare).toHaveBeenCalledOnce()
@@ -244,17 +276,24 @@ describe("executeAntigravityRequest", () => {
       }
       return { ...auth, access: "at-fresh", expires: Date.now() + 3600_000 }
     })
-    const fetchImpl = vi.fn(async () => new Response("{}", {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    }))
-    const response = await executeAntigravityRequest(GEMINI_URL, { method: "POST" }, {
-      client: makeClient(),
-      providerId: "google",
-      config: { ...DEFAULT_CONFIG },
-      accountManager: manager,
-      fetchImpl: fetchImpl as unknown as typeof fetch,
-    })
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response("{}", {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    )
+    const response = await executeAntigravityRequest(
+      GEMINI_URL,
+      { method: "POST" },
+      {
+        client: makeClient(),
+        providerId: "google",
+        config: { ...DEFAULT_CONFIG },
+        accountManager: manager,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      },
+    )
     expect(response.status).toBe(200)
     expect(fetchImpl).toHaveBeenCalledOnce()
     expect(manager.getTotalAccountCount()).toBe(1)
@@ -275,13 +314,17 @@ describe("executeAntigravityRequest", () => {
       }
       return new Response("{}", { status: 200, headers: { "content-type": "application/json" } })
     })
-    const response = await executeAntigravityRequest(GEMINI_URL, { method: "POST" }, {
-      client: makeClient(),
-      providerId: "google",
-      config: { ...DEFAULT_CONFIG },
-      accountManager: manager,
-      fetchImpl: fetchImpl as unknown as typeof fetch,
-    })
+    const response = await executeAntigravityRequest(
+      GEMINI_URL,
+      { method: "POST" },
+      {
+        client: makeClient(),
+        providerId: "google",
+        config: { ...DEFAULT_CONFIG },
+        accountManager: manager,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      },
+    )
     expect(response.status).toBe(200)
     expect(fetchImpl).toHaveBeenCalledTimes(2)
     expect(mockPrepare.mock.calls[0]?.[5]).toBe("antigravity")
@@ -290,21 +333,28 @@ describe("executeAntigravityRequest", () => {
 
   it("returns a synthetic prompt-too-long response on 400 instead of locking the session", async () => {
     const manager = makeManager([{ refreshToken: "rt-1", access: "at-1", expires: Date.now() + 3600_000 }])
-    const fetchImpl = vi.fn(async () => new Response("Prompt is too long", {
-      status: 400,
-      headers: { "content-type": "application/json" },
-    }))
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response("Prompt is too long", {
+          status: 400,
+          headers: { "content-type": "application/json" },
+        }),
+    )
     const toasts: Array<{ message: string; variant: string }> = []
-    const response = await executeAntigravityRequest(GEMINI_URL, { method: "POST" }, {
-      client: makeClient(),
-      providerId: "google",
-      config: { ...DEFAULT_CONFIG },
-      accountManager: manager,
-      fetchImpl: fetchImpl as unknown as typeof fetch,
-      onToast: (message, variant) => {
-        toasts.push({ message, variant })
+    const response = await executeAntigravityRequest(
+      GEMINI_URL,
+      { method: "POST" },
+      {
+        client: makeClient(),
+        providerId: "google",
+        config: { ...DEFAULT_CONFIG },
+        accountManager: manager,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        onToast: (message, variant) => {
+          toasts.push({ message, variant })
+        },
       },
-    })
+    )
     expect(response.status).toBe(200)
     expect(await response.text()).toContain("compact")
     expect(toasts.some((toast) => toast.message.includes("compact"))).toBe(true)
@@ -312,10 +362,13 @@ describe("executeAntigravityRequest", () => {
 
   it("shows toasts through the client when quiet_mode is off", async () => {
     const manager = makeManager([{ refreshToken: "rt-1", access: "at-1", expires: Date.now() + 3600_000 }])
-    const fetchImpl = vi.fn(async () => new Response("Prompt is too long", {
-      status: 400,
-      headers: { "content-type": "application/json" },
-    }))
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response("Prompt is too long", {
+          status: 400,
+          headers: { "content-type": "application/json" },
+        }),
+    )
     const showToast = vi.fn(async (_input: unknown) => ({ data: undefined }))
     const client = {
       app: { log: vi.fn(async () => undefined) },
@@ -327,22 +380,29 @@ describe("executeAntigravityRequest", () => {
       },
       tui: { showToast },
     } as unknown as PluginClient
-    await executeAntigravityRequest(GEMINI_URL, { method: "POST" }, {
-      client,
-      providerId: "google",
-      config: { ...DEFAULT_CONFIG, quiet_mode: false },
-      accountManager: manager,
-      fetchImpl: fetchImpl as unknown as typeof fetch,
-    })
+    await executeAntigravityRequest(
+      GEMINI_URL,
+      { method: "POST" },
+      {
+        client,
+        providerId: "google",
+        config: { ...DEFAULT_CONFIG, quiet_mode: false },
+        accountManager: manager,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      },
+    )
     expect(showToast).toHaveBeenCalledOnce()
   })
 
   it("suppresses toasts through the client when quiet_mode is on", async () => {
     const manager = makeManager([{ refreshToken: "rt-1", access: "at-1", expires: Date.now() + 3600_000 }])
-    const fetchImpl = vi.fn(async () => new Response("Prompt is too long", {
-      status: 400,
-      headers: { "content-type": "application/json" },
-    }))
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response("Prompt is too long", {
+          status: 400,
+          headers: { "content-type": "application/json" },
+        }),
+    )
     const showToast = vi.fn(async (_input: unknown) => ({ data: undefined }))
     const client = {
       app: { log: vi.fn(async () => undefined) },
@@ -354,13 +414,17 @@ describe("executeAntigravityRequest", () => {
       },
       tui: { showToast },
     } as unknown as PluginClient
-    await executeAntigravityRequest(GEMINI_URL, { method: "POST" }, {
-      client,
-      providerId: "google",
-      config: { ...DEFAULT_CONFIG, quiet_mode: true },
-      accountManager: manager,
-      fetchImpl: fetchImpl as unknown as typeof fetch,
-    })
+    await executeAntigravityRequest(
+      GEMINI_URL,
+      { method: "POST" },
+      {
+        client,
+        providerId: "google",
+        config: { ...DEFAULT_CONFIG, quiet_mode: true },
+        accountManager: manager,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      },
+    )
     expect(showToast).not.toHaveBeenCalled()
   })
 })

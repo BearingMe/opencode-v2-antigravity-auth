@@ -76,10 +76,7 @@ export function truncateTextForLog(text: string, maxChars: number): string {
   return `${text.slice(0, maxChars)}... (truncated ${text.length - maxChars} chars)`
 }
 
-export function formatBodyPreviewForLog(
-  body: BodyInit | null | undefined,
-  maxChars: number,
-): string | undefined {
+export function formatBodyPreviewForLog(body: BodyInit | null | undefined, maxChars: number): string | undefined {
   if (body == null) {
     return undefined
   }

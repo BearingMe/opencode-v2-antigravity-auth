@@ -1,41 +1,41 @@
-import type { ProviderModel } from "../types";
+import type { ProviderModel } from "../types"
 
-export type ModelThinkingLevel = "minimal" | "low" | "medium" | "high";
+export type ModelThinkingLevel = "minimal" | "low" | "medium" | "high"
 
 export interface ModelThinkingConfig {
-  thinkingBudget: number;
+  thinkingBudget: number
 }
 
 export interface ModelVariant {
-  thinkingLevel?: ModelThinkingLevel;
-  thinkingConfig?: ModelThinkingConfig;
+  thinkingLevel?: ModelThinkingLevel
+  thinkingConfig?: ModelThinkingConfig
 }
 
 export interface ModelLimit {
-  context: number;
-  output: number;
+  context: number
+  output: number
 }
 
-export type ModelModality = "text" | "image" | "pdf";
+export type ModelModality = "text" | "image" | "pdf"
 
 export interface ModelModalities {
-  input: ModelModality[];
-  output: ModelModality[];
+  input: ModelModality[]
+  output: ModelModality[]
 }
 
 export interface OpencodeModelDefinition extends ProviderModel {
-  name: string;
-  limit: ModelLimit;
-  modalities: ModelModalities;
-  variants?: Record<string, ModelVariant>;
+  name: string
+  limit: ModelLimit
+  modalities: ModelModalities
+  variants?: Record<string, ModelVariant>
 }
 
-export type OpencodeModelDefinitions = Record<string, OpencodeModelDefinition>;
+export type OpencodeModelDefinitions = Record<string, OpencodeModelDefinition>
 
 const DEFAULT_MODALITIES: ModelModalities = {
   input: ["text", "image", "pdf"],
   output: ["text"],
-};
+}
 
 export const OPENCODE_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
   "antigravity-gemini-3-pro": {
@@ -111,4 +111,4 @@ export const OPENCODE_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
     limit: { context: 1048576, output: 65535 },
     modalities: DEFAULT_MODALITIES,
   },
-};
+}
