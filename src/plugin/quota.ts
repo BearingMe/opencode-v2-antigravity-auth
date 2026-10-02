@@ -5,9 +5,10 @@ import { ensureProjectContext } from "./project"
 import { refreshAccessToken } from "./token"
 import { getModelFamily } from "./transform/model-resolver"
 import type { PluginClient, OAuthAuthDetails } from "./types"
-import type { AccountMetadataV3 } from "./storage"
+import type { AccountMetadataV3, QuotaSummaryBucket, QuotaSummaryGroup, QuotaSummaryWindow } from "./storage"
 
 const FETCH_TIMEOUT_MS = 10000
+const SUMMARY_FETCH_TIMEOUT_MS = 5_000
 
 export type QuotaGroup = "claude" | "gemini-pro" | "gemini-flash"
 
@@ -21,6 +22,8 @@ export interface QuotaSummary {
   groups: Partial<Record<QuotaGroup, QuotaGroupSummary>>
   modelCount: number
   error?: string
+  quotaSummaryGroups?: QuotaSummaryGroup[]
+  quotaSummaryStatus?: "ok" | "error" | "unknown"
 }
 
 export type AccountQuotaStatus = "ok" | "disabled" | "error"
@@ -46,6 +49,21 @@ interface FetchAvailableModelEntry {
   }
   displayName?: string
   modelName?: string
+}
+
+/** Untrusted bucket fields returned by retrieveUserQuotaSummary. */
+interface FetchQuotaSummaryBucket {
+  window?: unknown
+  remainingFraction?: unknown
+  resetTime?: unknown
+  disabled?: unknown
+}
+
+/** Untrusted group fields returned by retrieveUserQuotaSummary. */
+interface FetchQuotaSummaryGroup {
+  displayName?: unknown
+  description?: unknown
+  buckets?: unknown
 }
 
 function buildAuthFromAccount(account: AccountMetadataV3): OAuthAuthDetails {
@@ -80,6 +98,72 @@ function parseResetTime(resetTime?: string): number | null {
     return null
   }
   return timestamp
+}
+
+/** Keeps text copied from upstream quota metadata bounded and terminal-safe. */
+function safeSummaryText(value: unknown, maxLength: number): string | undefined {
+  if (typeof value !== "string") return undefined
+  const text = Array.from(value)
+    .filter((character) => {
+      const codePoint = character.codePointAt(0) ?? 0
+      return codePoint >= 0x20 && (codePoint < 0x7f || codePoint > 0x9f)
+    })
+    .join("")
+    .trim()
+    .slice(0, maxLength)
+  return text || undefined
+}
+
+/** Accept only the two quota windows returned by the summary endpoint. */
+function parseSummaryWindow(value: unknown): QuotaSummaryWindow | undefined {
+  return value === "weekly" || value === "5h" ? value : undefined
+}
+
+/**
+ * Parses Antigravity's grouped weekly and five-hour quota response.
+ * Invalid windows and unusable bucket values stay absent instead of implying a full quota.
+ */
+export function parseQuotaSummaryResponse(response: unknown): QuotaSummaryGroup[] | undefined {
+  if (typeof response !== "object" || response === null || Array.isArray(response)) return undefined
+  const root = response as Record<string, unknown>
+  const summary = typeof root.quotaSummary === "object" && root.quotaSummary !== null ? root.quotaSummary : undefined
+  const rawGroups = Array.isArray(root.groups)
+    ? root.groups
+    : summary && typeof summary === "object" && Array.isArray((summary as Record<string, unknown>).groups)
+      ? ((summary as Record<string, unknown>).groups as unknown[])
+      : undefined
+  if (!rawGroups) return undefined
+
+  const groups: QuotaSummaryGroup[] = []
+  for (const rawGroup of rawGroups.slice(0, 10)) {
+    if (typeof rawGroup !== "object" || rawGroup === null || Array.isArray(rawGroup)) continue
+    const group = rawGroup as FetchQuotaSummaryGroup
+    const displayName = safeSummaryText(group.displayName, 120)
+    if (!displayName || !Array.isArray(group.buckets)) continue
+
+    const buckets: Partial<Record<QuotaSummaryWindow, QuotaSummaryBucket>> = {}
+    for (const rawBucket of group.buckets) {
+      if (typeof rawBucket !== "object" || rawBucket === null || Array.isArray(rawBucket)) continue
+      const bucket = rawBucket as FetchQuotaSummaryBucket
+      const window = parseSummaryWindow(bucket.window)
+      if (!window || bucket.disabled === true || buckets[window]) continue
+
+      const remainingFraction = normalizeRemainingFraction(bucket.remainingFraction)
+      const rawResetTime = safeSummaryText(bucket.resetTime, 80)
+      const resetTime = rawResetTime && parseResetTime(rawResetTime) !== null ? rawResetTime : undefined
+      if (remainingFraction === undefined && resetTime === undefined) continue
+
+      buckets[window] = {
+        ...(remainingFraction === undefined ? {} : { remainingFraction }),
+        ...(resetTime === undefined ? {} : { resetTime }),
+      }
+    }
+
+    if (Object.keys(buckets).length === 0) continue
+    const description = safeSummaryText(group.description, 300)
+    groups.push({ displayName, ...(description ? { description } : {}), buckets })
+  }
+  return groups
 }
 
 function classifyQuotaGroup(modelName: string, displayName?: string): QuotaGroup | null {
@@ -145,22 +229,25 @@ function aggregateQuota(models?: Record<string, FetchAvailableModelEntry>): Quot
   return { groups, modelCount: totalCount }
 }
 
-async function fetchWithTimeout(
+/** Fetches and consumes an Antigravity response within one timeout/cancellation scope. */
+async function fetchWithTimeout<T>(
   url: string,
   options: RequestInit,
+  readResponse: (response: Response) => Promise<T>,
   timeoutMs = FETCH_TIMEOUT_MS,
   signal?: AbortSignal,
-): Promise<Response> {
+): Promise<T> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
-  // AbortSignal.any needs Node >= 20.3 while engines allow >= 20.0: without
-  // it the external signal is ignored and only the timeout applies.
-  const combinedSignal =
-    signal && typeof AbortSignal.any === "function" ? AbortSignal.any([controller.signal, signal]) : controller.signal
+  const abort = () => controller.abort(signal?.reason)
+  signal?.addEventListener("abort", abort, { once: true })
+  if (signal?.aborted) abort()
   try {
-    return await fetch(url, { ...options, signal: combinedSignal })
+    const response = await fetch(url, { ...options, signal: controller.signal })
+    return await readResponse(response)
   } finally {
     clearTimeout(timeout)
+    signal?.removeEventListener("abort", abort)
   }
 }
 
@@ -171,10 +258,9 @@ async function fetchAvailableModels(
 ): Promise<FetchAvailableModelsResponse> {
   const endpoint = ANTIGRAVITY_ENDPOINT_PROD
   const quotaUserAgent = getAntigravityHeaders()["User-Agent"] || "antigravity/windows/amd64"
-  const errors: string[] = []
 
   const body = projectId ? { project: projectId } : {}
-  const response = await fetchWithTimeout(
+  return fetchWithTimeout(
     `${endpoint}/v1internal:fetchAvailableModels`,
     {
       method: "POST",
@@ -185,19 +271,46 @@ async function fetchAvailableModels(
       },
       body: JSON.stringify(body),
     },
+    async (response) => {
+      if (response.ok) return (await response.json()) as FetchAvailableModelsResponse
+
+      const message = await response.text().catch(() => "")
+      const snippet = message.trim().slice(0, 200)
+      throw new Error(`fetchAvailableModels ${response.status} at ${endpoint}${snippet ? `: ${snippet}` : ""}`)
+    },
     FETCH_TIMEOUT_MS,
     quotaSignal,
   )
+}
 
-  if (response.ok) {
-    return (await response.json()) as FetchAvailableModelsResponse
-  }
+/** Retrieves the supplementary grouped quota; callers may degrade if it is unavailable. */
+async function fetchQuotaSummary(
+  accessToken: string,
+  projectId: string,
+  quotaSignal?: AbortSignal,
+): Promise<QuotaSummaryGroup[]> {
+  const quotaUserAgent = getAntigravityHeaders()["User-Agent"] || "antigravity/windows/amd64"
+  return fetchWithTimeout(
+    `${ANTIGRAVITY_ENDPOINT_PROD}/v1internal:retrieveUserQuotaSummary`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "User-Agent": quotaUserAgent,
+      },
+      body: JSON.stringify(projectId ? { project: projectId } : {}),
+    },
+    async (response) => {
+      if (!response.ok) throw new Error(`retrieveUserQuotaSummary returned ${response.status}`)
 
-  const message = await response.text().catch(() => "")
-  const snippet = message.trim().slice(0, 200)
-  errors.push(`fetchAvailableModels ${response.status} at ${endpoint}${snippet ? `: ${snippet}` : ""}`)
-
-  throw new Error(errors.join("; ") || "fetchAvailableModels failed")
+      const groups = parseQuotaSummaryResponse(await response.json())
+      if (!groups) throw new Error("Invalid retrieveUserQuotaSummary response")
+      return groups
+    },
+    SUMMARY_FETCH_TIMEOUT_MS,
+    quotaSignal,
+  )
 }
 
 function applyAccountUpdates(account: AccountMetadataV3, auth: OAuthAuthDetails): AccountMetadataV3 | undefined {
@@ -251,20 +364,22 @@ export async function checkAccountsQuota(
 
       // Quota cancellation covers the Antigravity probe only; token refresh
       // and project-context resolution above are left untouched.
-      const antigravityResponse = await fetchAvailableModels(
-        auth.access ?? "",
-        projectContext.effectiveProjectId,
-        quotaSignal,
-      ).catch((): FetchAvailableModelsResponse => ({ models: undefined }))
+      const [modelsResult, summaryResult] = await Promise.allSettled([
+        fetchAvailableModels(auth.access ?? "", projectContext.effectiveProjectId, quotaSignal),
+        fetchQuotaSummary(auth.access ?? "", projectContext.effectiveProjectId, quotaSignal),
+      ])
 
-      const quotaResult =
-        antigravityResponse.models === undefined
-          ? {
-              groups: {},
-              modelCount: 0,
-              error: "Failed to fetch Antigravity quota",
-            }
-          : aggregateQuota(antigravityResponse.models)
+      const quotaResult: QuotaSummary =
+        modelsResult.status === "rejected"
+          ? { groups: {}, modelCount: 0, error: "Failed to fetch Antigravity quota" }
+          : aggregateQuota(modelsResult.value.models)
+
+      if (summaryResult.status === "fulfilled") {
+        quotaResult.quotaSummaryGroups = summaryResult.value
+        quotaResult.quotaSummaryStatus = summaryResult.value.length > 0 ? "ok" : "unknown"
+      } else {
+        quotaResult.quotaSummaryStatus = "error"
+      }
 
       results.push({
         index,

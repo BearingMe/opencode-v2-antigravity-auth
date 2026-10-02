@@ -49,6 +49,65 @@ describe("AntigravityAccounts contract", () => {
     expect(() => AntigravityAccounts.methods.list.output.parse(polluted)).toThrow()
   })
 
+  it("accepts grouped quota windows while remaining compatible with older servers", () => {
+    const account = {
+      id: "acc-one",
+      email: "one@example.com",
+      enabled: true,
+      status: "ok",
+      groups: {
+        claude: { remainingFraction: null, consumedPercent: null, resetTime: null },
+        "gemini-pro": { remainingFraction: null, consumedPercent: null, resetTime: null },
+        "gemini-flash": { remainingFraction: null, consumedPercent: null, resetTime: null },
+      },
+      checkedAt: null,
+      freshness: "unchecked",
+      verificationRequired: false,
+      cooldownUntil: null,
+      coolingDown: false,
+      selectedByFamily: { claude: false, gemini: false },
+    }
+    const output = {
+      activeIndexByFamily: { claude: 0, gemini: 0 },
+      accounts: [
+        {
+          ...account,
+          quotaSummary: {
+            groups: [
+              {
+                displayName: "Gemini Models",
+                description: "Models within this group: Gemini Flash, Gemini Pro",
+                buckets: {
+                  weekly: { remainingFraction: 0.6558833, resetTime: 1_800_000_000_000 },
+                  "5h": { remainingFraction: 1, resetTime: 1_800_000_000_000 },
+                },
+              },
+            ],
+            checkedAt: 1_800_000_000_000,
+            freshness: "fresh",
+            status: "ok",
+          },
+        },
+      ],
+    }
+
+    expect(AntigravityAccounts.methods.quota.output.parse(output)).toEqual(output)
+    const quotaAccount = output.accounts[0]
+    if (!quotaAccount) throw new Error("test fixture missing quota account")
+    expect(
+      AntigravityAccounts.methods.quota.output.parse({
+        activeIndexByFamily: output.activeIndexByFamily,
+        accounts: [account],
+      }),
+    ).toMatchObject({ accounts: [{ id: "acc-one" }] })
+    expect(() =>
+      AntigravityAccounts.methods.quota.output.parse({
+        ...output,
+        accounts: [{ ...quotaAccount, quotaSummary: { ...quotaAccount.quotaSummary, accessToken: "secret" } }],
+      }),
+    ).toThrow()
+  })
+
   it("rejects mutate output carrying refreshParts", () => {
     const polluted = {
       op: "select",

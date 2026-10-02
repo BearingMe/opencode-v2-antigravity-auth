@@ -59,28 +59,29 @@ generic server-unavailable toast; diagnostics stay in the host log.
 
 ## Quota bars
 
-Each account shows three groups — `claude`, `gemini-pro`, `gemini-flash` —
-plus a last-successful-update timestamp. Bars use theme colors
-(`████░░ 60%`); unknown renders as `unknown`, never `0%` (`0%` means
-genuinely exhausted). Reset lines read `resets in Xh Ym`, `resets in Xm`,
-`resets in <1m`, or `reset unknown`.
+The quota dialog shows Antigravity's grouped **Gemini Models** and
+**Claude and GPT models** pools, each with separate weekly and five-hour
+bars. Percentages use two decimal places; full buckets say `Quota available`,
+and other known buckets show when they refresh (including multi-day weekly
+countdowns). Unknown values remain unknown, never `0%` (`0%` means genuinely
+exhausted).
 
-Bars fill the available dialog width, with aligned percentage and reset columns.
-Narrow terminals stack the label and reset text around the bar. Resizing updates
-the layout without fetching quota. The footer shows only **refresh ctrl+r**;
-the header's **esc** control and keyboard Esc return to the account list.
+The weekly/grouped reading comes from Antigravity's `retrieveUserQuotaSummary`
+endpoint; its explicit window labels are used rather than inferred. If that
+summary is unavailable, the dialog labels and displays the older per-model
+`claude` / `gemini-pro` / `gemini-flash` rows as a fallback. See the
+[quota contract](../dev/quota-contract.md) for sources and unknown semantics.
 
-Only Antigravity `fetchAvailableModels` groups are shown. There are no
-weekly/five-hour pool sections: no consumed API field backs such a split (see
-[dev/quota-contract.md](../dev/quota-contract.md)).
+Bars fill the available dialog width. Narrow terminals may wrap descriptions
+and status lines; resizing updates the layout without fetching quota. The footer
+shows only **refresh ctrl+r**; the header's **esc** control and keyboard Esc
+return to the account list.
 
-Quota caching: the presentation prefers a usable fresh check, otherwise the
-last good cached reading (timestamped as such). Failed refreshes surface as
-`error` without discarding cached values; the quota screen additionally
-shows `Refresh failed — showing last saved values.` inline. Successful
-readings are saved for subsequent visits and restarts. A refresh in
-progress ignores repeat requests. Per-account presentation timeout
-defaults to 12 s (clamped 1–30 s); staleness threshold defaults to 15 min.
+Grouped and per-model readings have independent caches and timestamps. Failed
+refreshes keep the last good reading and mark grouped values as saved/stale
+when applicable. Successful readings survive visits and restarts. A refresh in
+progress ignores repeat requests. Per-account presentation timeout defaults to
+12 s (clamped 1–30 s); staleness threshold defaults to 15 min.
 
 Updates when opened. Not live-updated; press `ctrl+r` to refresh. There is
 no polling while the screen remains open. Disabled accounts retain saved

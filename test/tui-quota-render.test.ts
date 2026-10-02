@@ -367,6 +367,84 @@ describe("published quota view", () => {
     }
   })
 
+  test("renders grouped weekly and five-hour windows instead of per-model rows", async () => {
+    let commands: Array<QuotaDialogKeymapCommand> = []
+    const controller = createQuotaDialogController({
+      initial: {
+        ...snapshot(0.7),
+        quotaSummary: {
+          groups: [
+            {
+              displayName: "Gemini Models",
+              description: "Models within this group: Gemini Flash, Gemini Pro",
+              buckets: {
+                weekly: { remainingFraction: 0.6558833, resetTime: Date.now() + 20 * 60 * 60 * 1000 },
+                "5h": { remainingFraction: 1, resetTime: Date.now() + 5 * 60 * 60 * 1000 },
+              },
+            },
+            {
+              displayName: "Claude and GPT models",
+              description: "Models within this group: Claude Opus, Claude Sonnet, GPT-OSS",
+              buckets: {
+                weekly: { remainingFraction: 1, resetTime: Date.now() + 24 * 60 * 60 * 1000 },
+                "5h": { remainingFraction: 1, resetTime: Date.now() + 5 * 60 * 60 * 1000 },
+              },
+            },
+          ],
+          checkedAt: Date.now(),
+          freshness: "fresh",
+          status: "ok",
+        },
+      },
+      refreshQuota: async () => ({ ok: true, entry: snapshot(0.2) }),
+      notifyRefreshFailed: () => {},
+      showMissingThenList: async () => {},
+      goList: async () => {},
+    })
+    const setup = await testRender(
+      () =>
+        QuotaDialogView({
+          email: "one@example.com",
+          enabled: false,
+          controller,
+          colors,
+          shortcuts: () => undefined,
+          layer: (input) => {
+            commands = input().commands
+          },
+        }),
+      { width: 80, height: 24 },
+    )
+    try {
+      await setup.flush()
+      const frame = setup.captureCharFrame()
+      expect(frame).toContain("GEMINI MODELS")
+      expect(frame).toContain("Models within this group: Gemini Flash, Gemini Pro")
+      expect(frame).toContain("Weekly Limit Remaining")
+      expect(frame).toContain("65.59%")
+      expect(frame).toContain("Refreshes in")
+      expect(frame).toContain("↑/↓ scroll")
+      expect(frame).toContain("refresh ctrl+r")
+      expect(frame).not.toContain("Grouped quota unavailable")
+      expect(frame.split("\n").some((line) => /(Quota available|Refreshes in)/u.test(line) && line.includes("█"))).toBe(
+        false,
+      )
+
+      const scrollDown = commands.find((command) => command.id === "antigravity.quota.scroll-down")
+      expect(scrollDown).toBeDefined()
+      for (let index = 0; index < 5; index++) scrollDown?.run()
+      await setup.flush()
+      const lowerFrame = setup.captureCharFrame()
+      expect(lowerFrame).toContain("CLAUDE AND GPT MODELS")
+      expect(lowerFrame).toContain("Claude and GPT models · Weekly Limit Remaining")
+      expect(lowerFrame).toContain("Five Hour Limit Remaining")
+      expect(lowerFrame).toContain("Quota available")
+      expect(lowerFrame).toContain("refresh ctrl+r")
+    } finally {
+      setup.renderer.destroy()
+    }
+  })
+
   test("fills measured width, aligns metadata, and relayouts on resize without fetching", async () => {
     let calls = 0
     let backs = 0

@@ -59,6 +59,35 @@ const quotaGroupSchema = z
   })
   .strict()
 
+const quotaSummaryBucketSchema = z
+  .object({
+    remainingFraction: z.number().min(0).max(1).nullable(),
+    resetTime: z.number().finite().nullable(),
+  })
+  .strict()
+
+const quotaSummarySchema = z
+  .object({
+    groups: z.array(
+      z
+        .object({
+          displayName: z.string().max(120),
+          description: z.string().max(300).nullable(),
+          buckets: z
+            .object({
+              weekly: quotaSummaryBucketSchema,
+              "5h": quotaSummaryBucketSchema,
+            })
+            .strict(),
+        })
+        .strict(),
+    ),
+    checkedAt: z.number().finite().nullable(),
+    freshness: z.enum(["fresh", "stale", "unchecked"]),
+    status: z.enum(["ok", "error", "unknown"]),
+  })
+  .strict()
+
 const quotaAccountSchema = z
   .object({
     id: z.string(),
@@ -66,6 +95,7 @@ const quotaAccountSchema = z
     enabled: z.boolean(),
     status: z.enum(["ok", "error", "unknown"]),
     groups: z.record(z.enum(["claude", "gemini-pro", "gemini-flash"]), quotaGroupSchema),
+    quotaSummary: quotaSummarySchema.optional(),
     checkedAt: z.number().finite().nullable(),
     freshness: z.enum(["fresh", "stale", "unchecked"]),
     verificationRequired: z.boolean(),

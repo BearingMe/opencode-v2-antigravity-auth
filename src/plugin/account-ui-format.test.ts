@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 import {
   formatAccountOneLiner,
+  formatQuotaPercentage,
+  formatQuotaWindowStatus,
   formatResetCountdown,
   quotaDetailLines,
   quotaInfoRows,
@@ -64,6 +66,27 @@ describe("formatResetCountdown", () => {
   it("marks past reset times as resetting now", () => {
     const now = 1_000_000
     expect(formatResetCountdown(now - 1, now)).toBe("resetting now")
+  })
+})
+
+describe("grouped quota formatting", () => {
+  it("shows two decimal places without rounding quota availability boundaries away", () => {
+    expect(formatQuotaPercentage(0.6558833)).toBe("65.59%")
+    expect(formatQuotaPercentage(1)).toBe("100.00%")
+    expect(formatQuotaPercentage(null)).toBe("unknown")
+  })
+
+  it("formats weekly reset windows in days and hours", () => {
+    const now = 1_000_000
+    expect(formatResetCountdown(now + 25 * 3_600_000, now)).toBe("resets in 1d 1h")
+  })
+
+  it("uses Antigravity's available and refresh wording", () => {
+    const now = 1_000_000
+    expect(formatQuotaWindowStatus(1, now + 3_600_000, now)).toBe("Quota available")
+    expect(formatQuotaWindowStatus(0.5, now + 3_700_000, now)).toBe("Refreshes in 1h 1m")
+    expect(formatQuotaWindowStatus(0, null, now)).toBe("Refresh time unknown")
+    expect(formatQuotaWindowStatus(null, null, now)).toBe("Quota unknown")
   })
 })
 

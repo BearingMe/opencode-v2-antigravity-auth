@@ -333,6 +333,117 @@ describe("getQuotaPresentation", () => {
     expect(checkAccountsQuota).not.toHaveBeenCalled()
   })
 
+  it("persists grouped quota independently when the per-model probe fails", async () => {
+    loadAccounts.mockResolvedValue(storage([account({ id: "stable" })]))
+    checkAccountsQuota.mockResolvedValue([
+      {
+        index: 0,
+        status: "ok",
+        quota: {
+          groups: {},
+          modelCount: 0,
+          error: "Failed to fetch Antigravity quota",
+          quotaSummaryStatus: "ok",
+          quotaSummaryGroups: [
+            {
+              displayName: "Gemini Models",
+              description: "Models within this group: Gemini Flash, Gemini Pro",
+              buckets: {
+                weekly: { remainingFraction: 0.6558833, resetTime: "2026-10-09T18:11:34Z" },
+                "5h": { remainingFraction: 1, resetTime: "2026-10-02T23:11:34Z" },
+              },
+            },
+          ],
+        },
+      },
+    ])
+
+    const fresh = await getQuotaPresentation({} as never)
+    const saved = written.at(-1)
+
+    expect(fresh.accounts[0]).toMatchObject({
+      status: "error",
+      quotaSummary: {
+        status: "ok",
+        freshness: "fresh",
+        groups: [
+          {
+            displayName: "Gemini Models",
+            buckets: {
+              weekly: { remainingFraction: 0.6558833, resetTime: Date.parse("2026-10-09T18:11:34Z") },
+              "5h": { remainingFraction: 1, resetTime: Date.parse("2026-10-02T23:11:34Z") },
+            },
+          },
+        ],
+      },
+    })
+    expect(saved).toMatchObject({
+      accounts: [
+        {
+          cachedQuotaSummary: [{ displayName: "Gemini Models", buckets: { weekly: { remainingFraction: 0.6558833 } } }],
+          cachedQuotaSummaryUpdatedAt: expect.any(Number),
+        },
+      ],
+    })
+
+    loadAccounts.mockResolvedValue(saved)
+    checkAccountsQuota.mockResolvedValue([{ index: 0, status: "error", error: "summary unavailable" }])
+    const stale = await getQuotaPresentation({} as never, { staleAfterMs: 0 })
+    expect(stale.accounts[0]?.quotaSummary).toMatchObject({
+      status: "error",
+      freshness: "stale",
+      groups: [{ displayName: "Gemini Models", buckets: { weekly: { remainingFraction: 0.6558833 } } }],
+    })
+  })
+
+  it("returns a concurrent newer grouped snapshot instead of an older probe result", async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+    const olderSummary = [{ displayName: "Older check", buckets: { weekly: { remainingFraction: 0.2 } } }]
+    const newerSummary = [{ displayName: "Newer check", buckets: { weekly: { remainingFraction: 0.8 } } }]
+    const source = account({
+      id: "stable",
+      cachedQuotaSummary: olderSummary,
+      cachedQuotaSummaryUpdatedAt: 500,
+    })
+    loadAccounts.mockResolvedValue(storage([source]))
+    checkAccountsQuota.mockImplementationOnce(async () => {
+      vi.setSystemTime(2_000)
+      loadAccounts.mockResolvedValue(
+        storage([
+          account({
+            ...source,
+            cachedQuotaSummary: newerSummary,
+            cachedQuotaSummaryUpdatedAt: 2_000,
+          }),
+        ]),
+      )
+      return [
+        {
+          index: 0,
+          status: "ok",
+          quota: {
+            groups: {},
+            modelCount: 0,
+            quotaSummaryStatus: "ok",
+            quotaSummaryGroups: olderSummary,
+          },
+        },
+      ]
+    })
+
+    try {
+      const result = await getQuotaPresentation({} as never)
+      expect(result.accounts[0]?.quotaSummary).toMatchObject({
+        checkedAt: 2_000,
+        freshness: "fresh",
+        groups: [{ displayName: "Newer check", buckets: { weekly: { remainingFraction: 0.8 } } }],
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it.each(["delete", "reconnect", "newer check", "disable"])("does not overwrite a concurrent %s", async (change) => {
     const source = account({
       id: "stable",

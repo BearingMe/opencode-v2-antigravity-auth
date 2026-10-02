@@ -11,6 +11,8 @@ source renders as unknown.
 | `groups.<claude\|gemini-pro\|gemini-flash>.remainingFraction` | `fetchAvailableModels` → `quotaInfo.remainingFraction`, aggregated per group in `src/plugin/quota.ts` (`aggregateQuota`) | Finite `0..1` only. Valid `0` (exhausted) and `1` (full) preserved.                                                                                                                                                                                                                                                                     |
 | `groups.*.consumedPercent`                                    | Derived: `(1 - remainingFraction) * 100`, rounded to 0.1                                                                 | `null` whenever the fraction is unknown.                                                                                                                                                                                                                                                                                                |
 | `groups.*.resetTime`                                          | `fetchAvailableModels` → `quotaInfo.resetTime`, earliest timestamp per group                                             | Parsed to epoch ms; unparseable/missing → `null`.                                                                                                                                                                                                                                                                                       |
+| `quotaSummary.groups[].buckets.{weekly,5h}`                   | `retrieveUserQuotaSummary` → explicit `window`, `remainingFraction`, and `resetTime`                                     | Best-effort second probe; grouped by Antigravity's display name. Missing/invalid bucket values remain `null`.                                                                                                                                                                                                                           |
+| `quotaSummary.checkedAt`, `freshness`, `status`               | Separate grouped-summary cache timestamp and latest probe outcome                                                        | A failed summary refresh may show saved values with `status: error`; the per-model cache has independent freshness.                                                                                                                                                                                                                     |
 | `checkedAt`                                                   | `Date.now()` at check start when the fresh check was usable; otherwise `cachedQuotaUpdatedAt`                            | The start timestamp orders concurrent checks; failed refreshes retain the last good reading's timestamp.                                                                                                                                                                                                                                |
 | `freshness`                                                   | `staleAfterMs` (default 15 min) vs `cachedQuotaUpdatedAt`                                                                | `fresh` \| `stale` \| `unchecked`.                                                                                                                                                                                                                                                                                                      |
 | `status`                                                      | DTO-level rollup                                                                                                         | `ok` \| `error` \| `unknown`. `error` when the attempted check failed (missing result, `status === "error"`, or `quota.error` set); else `ok` when at least one group has a known fraction; else `unknown`. A failed refresh still shows cached values (with `status: "error"`) so partial results survive individual account failures. |
@@ -43,25 +45,33 @@ store does not fall back to the pre-check account pool.
 
 ## What is not shown (deliberate)
 
-- Quota presentation has no Gemini CLI pool. It displays only the Antigravity
-  `fetchAvailableModels` groups: `claude`, `gemini-pro`, and `gemini-flash`.
-- **No weekly / five-hour sections.** `fetchAvailableModels` exposes no
-  window labels. Grouping stays `claude` / `gemini-pro` / `gemini-flash` (a
-  model-name display aggregation, not vendor pools).
+- Quota presentation has no Gemini CLI pool. It displays Antigravity's
+  `retrieveUserQuotaSummary` groups when available; `claude`, `gemini-pro`, and
+  `gemini-flash` from `fetchAvailableModels` are only the labeled fallback.
+- `fetchAvailableModels` still exposes only the per-model five-hour values.
+  Weekly and grouped five-hour buckets come from the separate
+  `retrieveUserQuotaSummary` endpoint. The UI uses its explicit `window`
+  values; it never derives a weekly value from a per-model reset time.
+- The summary probe is best-effort and has an independent cached snapshot. If
+  it fails or returns no usable groups, the UI labels the legacy
+  `claude` / `gemini-pro` / `gemini-flash` rows as a per-model fallback.
+- The summary API is undocumented and reverse-engineered. Its response is
+  validated and bounded before it crosses the credential-free RPC boundary;
+  unknown windows, disabled buckets, and invalid fractions are omitted.
 
 ## Cancellation and timeouts
 
-- Quota cancellation is fetch-abort only: the optional `quotaSignal` covers
-  `fetchAvailableModels` combined with the internal 10 s timeout via
-  `AbortSignal.any`. Token refresh and project-context resolution always run
-  to completion.
+- Quota cancellation is fetch-abort only: the optional `quotaSignal` and
+  endpoint-specific internal timeouts cover the request through response-body
+  parsing. Token refresh and project-context resolution always run to completion.
 - `checkSingleAccountQuota` aborts its per-account fetch on timeout while
   keeping the `Promise.race` shape, so a hung fetch releases its socket;
   other accounts still resolve independently (partial results).
 
 | Bound                            | Value                                      | Where                                                     |
 | -------------------------------- | ------------------------------------------ | --------------------------------------------------------- |
-| Per-fetch internal timeout       | 10 s (`FETCH_TIMEOUT_MS`)                  | `fetchWithTimeout` in `src/plugin/quota.ts`               |
+| Per-model fetch timeout          | 10 s (`FETCH_TIMEOUT_MS`)                  | `fetchAvailableModels` in `src/plugin/quota.ts`           |
+| Grouped-summary fetch timeout    | 5 s (`SUMMARY_FETCH_TIMEOUT_MS`)           | `fetchQuotaSummary` in `src/plugin/quota.ts`              |
 | Per-account presentation timeout | `timeoutMs`, clamped 1–30 s (default 12 s) | `boundedTimeout` in `src/plugin/account-service.ts`       |
 | Staleness threshold              | `staleAfterMs` (default 15 min)            | `getQuotaPresentation` in `src/plugin/account-service.ts` |
 

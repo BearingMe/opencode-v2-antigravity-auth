@@ -132,11 +132,14 @@ fingerprint+history[5],cachedQuota+updatedAt,verification*}`.
 
 ## 2.6 Quota probing — `src/plugin/quota.ts`
 
-`fetchAvailableModels` (Antigravity UA, 10 s); `classifyQuotaGroup`
-(claude substring; gemini-3 → pro/flash via `getModelFamily`);
-per-group aggregate = min remaining + earliest reset. `checkAccountsQuota`
-refreshes expired tokens, ensures project context, fetches Antigravity quota →
-`AccountQuotaResult{index,email,status ok|disabled|error,quota,updatedAccount}`.
+`fetchAvailableModels` (10 s) and best-effort `retrieveUserQuotaSummary`
+(5 s), parallel; `classifyQuotaGroup` (claude substring; gemini-3 →
+pro/flash via `getModelFamily`); per-model aggregate = min remaining + earliest
+reset. Summary buckets retain explicit weekly/5h windows and group labels.
+Separate per-model and grouped snapshots persist in v4 with independent
+timestamps. `checkAccountsQuota` refreshes expired tokens, ensures project
+context, fetches both quota endpoints, and does not let summary failure block
+the per-model reading.
 
 ## 2.7 Storage — `src/plugin/storage.ts`
 

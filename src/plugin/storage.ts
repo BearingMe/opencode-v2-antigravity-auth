@@ -162,6 +162,22 @@ export interface AccountStorage {
 
 export type CooldownReason = "auth-failure" | "network-error" | "project-error" | "validation-required"
 
+/** Explicit quota windows returned by Antigravity's grouped summary endpoint. */
+export type QuotaSummaryWindow = "weekly" | "5h"
+
+/** One persisted Antigravity summary bucket; absent values remain unknown. */
+export interface QuotaSummaryBucket {
+  remainingFraction?: number
+  resetTime?: string
+}
+
+/** A vendor-labeled quota group with independent weekly and five-hour buckets. */
+export interface QuotaSummaryGroup {
+  displayName: string
+  description?: string
+  buckets: Partial<Record<QuotaSummaryWindow, QuotaSummaryBucket>>
+}
+
 export interface AccountMetadataV3 {
   /**
    * Durable opaque account id (e.g. a UUID) assigned by the account service.
@@ -194,6 +210,8 @@ export interface AccountMetadataV3 {
 
   cachedQuota?: Record<string, { remainingFraction?: number; resetTime?: string; modelCount: number }>
   cachedQuotaUpdatedAt?: number
+  cachedQuotaSummary?: QuotaSummaryGroup[]
+  cachedQuotaSummaryUpdatedAt?: number
 }
 
 export interface AccountStorageV3 {

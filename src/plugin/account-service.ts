@@ -12,6 +12,8 @@ import {
   type AccountMetadataV3,
   type AccountStorageV4,
   type ModelFamily,
+  type QuotaSummaryGroup,
+  type QuotaSummaryWindow,
 } from "./storage.js"
 import { verifyAccountAccess } from "./verify.js"
 import { createLogger } from "./logger.js"
@@ -78,6 +80,37 @@ export const quotaPresentationSchema = z
               })
               .strict(),
           ),
+          quotaSummary: z
+            .object({
+              groups: z.array(
+                z
+                  .object({
+                    displayName: z.string().max(120),
+                    description: z.string().max(300).nullable(),
+                    buckets: z
+                      .object({
+                        weekly: z
+                          .object({
+                            remainingFraction: z.number().min(0).max(1).nullable(),
+                            resetTime: z.number().finite().nullable(),
+                          })
+                          .strict(),
+                        "5h": z
+                          .object({
+                            remainingFraction: z.number().min(0).max(1).nullable(),
+                            resetTime: z.number().finite().nullable(),
+                          })
+                          .strict(),
+                      })
+                      .strict(),
+                  })
+                  .strict(),
+              ),
+              checkedAt: z.number().finite().nullable(),
+              freshness: z.enum(["fresh", "stale", "unchecked"]),
+              status: z.enum(["ok", "error", "unknown"]),
+            })
+            .strict(),
           checkedAt: z.number().finite().nullable(),
           freshness: z.enum(["fresh", "stale", "unchecked"]),
           verificationRequired: z.boolean(),
@@ -335,13 +368,97 @@ export async function checkQuota(
 }
 
 const QUOTA_PRESENTATION_GROUPS: QuotaPresentationGroup[] = ["claude", "gemini-pro", "gemini-flash"]
+const QUOTA_SUMMARY_WINDOWS: QuotaSummaryWindow[] = ["weekly", "5h"]
+
+/** Validates cached or fetched summary groups before they cross the RPC boundary. */
+function normalizeQuotaSummaryGroups(value: unknown): QuotaSummaryGroup[] {
+  if (!Array.isArray(value)) return []
+  const groups: QuotaSummaryGroup[] = []
+  for (const candidate of value.slice(0, 10)) {
+    if (typeof candidate !== "object" || candidate === null || Array.isArray(candidate)) continue
+    const group = candidate as Record<string, unknown>
+    if (typeof group.displayName !== "string") continue
+    const displayName = sanitizeQuotaSummaryText(group.displayName, 120)
+    if (!displayName) continue
+
+    const rawBuckets = typeof group.buckets === "object" && group.buckets !== null ? group.buckets : {}
+    const buckets: QuotaSummaryGroup["buckets"] = {}
+    for (const window of QUOTA_SUMMARY_WINDOWS) {
+      const rawBucket = (rawBuckets as Record<string, unknown>)[window]
+      if (typeof rawBucket !== "object" || rawBucket === null || Array.isArray(rawBucket)) continue
+      const bucket = rawBucket as Record<string, unknown>
+      const fraction = bucket.remainingFraction
+      const remainingFraction =
+        typeof fraction === "number" && Number.isFinite(fraction) && fraction >= 0 && fraction <= 1
+          ? fraction
+          : undefined
+      const resetTime = parseQuotaResetTime(bucket.resetTime)
+      if (remainingFraction === undefined && resetTime === null) continue
+      buckets[window] = {
+        ...(remainingFraction === undefined ? {} : { remainingFraction }),
+        ...(resetTime === null ? {} : { resetTime: new Date(resetTime).toISOString() }),
+      }
+    }
+    if (Object.keys(buckets).length === 0) continue
+
+    const description = typeof group.description === "string" ? sanitizeQuotaSummaryText(group.description, 300) : ""
+    groups.push({ displayName, ...(description ? { description } : {}), buckets })
+  }
+  return groups
+}
+
+/** Removes terminal control characters from text loaded from the account store. */
+function sanitizeQuotaSummaryText(value: string, maxLength: number): string {
+  return Array.from(value)
+    .filter((character) => {
+      const codePoint = character.codePointAt(0) ?? 0
+      return codePoint >= 0x20 && (codePoint < 0x7f || codePoint > 0x9f)
+    })
+    .join("")
+    .trim()
+    .slice(0, maxLength)
+}
+
+/** Projects saved quota data to fixed weekly and five-hour UI buckets. */
+function presentQuotaSummaryGroups(groups: QuotaSummaryGroup[]) {
+  return groups.map((group) => {
+    const buckets = Object.fromEntries(
+      QUOTA_SUMMARY_WINDOWS.map((window) => {
+        const bucket = group.buckets[window]
+        const fraction = bucket?.remainingFraction
+        return [
+          window,
+          {
+            remainingFraction:
+              typeof fraction === "number" && Number.isFinite(fraction) && fraction >= 0 && fraction <= 1
+                ? fraction
+                : null,
+            resetTime: parseQuotaResetTime(bucket?.resetTime),
+          },
+        ]
+      }),
+    ) as Record<QuotaSummaryWindow, { remainingFraction: number | null; resetTime: number | null }>
+    return {
+      displayName: group.displayName,
+      description: group.description ?? null,
+      buckets,
+    }
+  })
+}
 
 async function persistQuotaSnapshots(
   accounts: Array<AccountMetadataV3>,
   results: Array<AccountQuotaResult | undefined>,
   checkedAt: number,
 ): Promise<AccountStorageV4> {
-  if (!results.some((result) => result?.status === "ok" && result.quota && !result.quota.error)) {
+  if (
+    !results.some(
+      (result) =>
+        result?.status === "ok" &&
+        ((result.quota && !result.quota.error) ||
+          (result.quota?.quotaSummaryStatus === "ok" && result.quota.quotaSummaryGroups)),
+    )
+  ) {
     return (await loadAccounts()) ?? emptyStorage()
   }
   return updateAccounts((current) => {
@@ -356,24 +473,38 @@ async function persistQuotaSnapshots(
           source.addedAt === account.addedAt,
       )
       const result = results[index]
-      if (!result || result.status !== "ok" || !result.quota || result.quota.error) return account
-      if ((account.cachedQuotaUpdatedAt ?? 0) > checkedAt) return account
-      const groups: NonNullable<AccountMetadataV3["cachedQuota"]> = {}
-      for (const key of QUOTA_PRESENTATION_GROUPS) {
-        const group = result.quota.groups[key]
-        const fraction = group?.remainingFraction
-        if (typeof fraction !== "number" || !Number.isFinite(fraction) || fraction < 0 || fraction > 1) continue
-        const reset = parseQuotaResetTime(group?.resetTime)
-        groups[key] = {
-          remainingFraction: fraction,
-          modelCount: group?.modelCount ?? 0,
-          ...(reset === null ? {} : { resetTime: new Date(reset).toISOString() }),
+      if (!result || result.status !== "ok" || !result.quota) return account
+      let updated = account
+
+      if (!result.quota.error && (account.cachedQuotaUpdatedAt ?? 0) <= checkedAt) {
+        const groups: NonNullable<AccountMetadataV3["cachedQuota"]> = {}
+        for (const key of QUOTA_PRESENTATION_GROUPS) {
+          const group = result.quota.groups[key]
+          const fraction = group?.remainingFraction
+          if (typeof fraction !== "number" || !Number.isFinite(fraction) || fraction < 0 || fraction > 1) continue
+          const reset = parseQuotaResetTime(group?.resetTime)
+          groups[key] = {
+            remainingFraction: fraction,
+            modelCount: group?.modelCount ?? 0,
+            ...(reset === null ? {} : { resetTime: new Date(reset).toISOString() }),
+          }
+        }
+        if (Object.keys(groups).length > 0) {
+          updated = { ...updated, cachedQuota: groups, cachedQuotaUpdatedAt: checkedAt }
         }
       }
-      // An empty/invalid reading must not erase the last usable snapshot.
-      if (Object.keys(groups).length === 0) return account
+
+      const summaryGroups = normalizeQuotaSummaryGroups(result.quota.quotaSummaryGroups)
+      if (
+        result.quota.quotaSummaryStatus === "ok" &&
+        summaryGroups.length > 0 &&
+        (account.cachedQuotaSummaryUpdatedAt ?? 0) <= checkedAt
+      ) {
+        updated = { ...updated, cachedQuotaSummary: summaryGroups, cachedQuotaSummaryUpdatedAt: checkedAt }
+      }
+      if (updated === account) return account
       dirty = true
-      return { ...account, cachedQuota: groups, cachedQuotaUpdatedAt: checkedAt }
+      return updated
     })
     const storage = dirty ? { ...current, accounts: next } : current
     return { storage, result: storage }
@@ -423,9 +554,8 @@ async function checkSingleAccountQuota(
 }
 
 /**
- * Build validated, credential-free quota bars and account state for the UI.
- * Quota values are sourced only from Antigravity fetchAvailableModels; an
- * absent group/value remains null.
+ * Build credential-free quota bars and grouped quota windows for the UI.
+ * Unknown Antigravity values stay null instead of being treated as available.
  */
 export async function getQuotaPresentation(
   client: PluginClient,
@@ -501,6 +631,42 @@ export async function getQuotaPresentation(
         ]
       }),
     ) as QuotaPresentation["accounts"][number]["groups"]
+    const resultSummaryGroups = normalizeQuotaSummaryGroups(result?.quota?.quotaSummaryGroups)
+    const freshSummary =
+      result?.status === "ok" &&
+      result.quota?.quotaSummaryStatus === "ok" &&
+      resultSummaryGroups.length > 0 &&
+      (account.cachedQuotaSummaryUpdatedAt ?? 0) <= checkStartedAt
+    const cachedSummaryGroups = normalizeQuotaSummaryGroups(account.cachedQuotaSummary)
+    const summaryGroups = freshSummary ? resultSummaryGroups : cachedSummaryGroups
+    const summaryCheckedAt = freshSummary
+      ? checkStartedAt
+      : typeof account.cachedQuotaSummaryUpdatedAt === "number" && Number.isFinite(account.cachedQuotaSummaryUpdatedAt)
+        ? account.cachedQuotaSummaryUpdatedAt
+        : null
+    const summaryCacheIsStale =
+      summaryCheckedAt === null || now - summaryCheckedAt > staleAfterMs || summaryCheckedAt > now
+    const summaryCheckFailed =
+      checkAttempted && (!result || result.status === "error" || result.quota?.quotaSummaryStatus === "error")
+    let summaryStatus: "ok" | "error" | "unknown" = "unknown"
+    if (freshSummary || (summaryGroups.length > 0 && result?.quota?.quotaSummaryStatus !== "unknown")) {
+      summaryStatus = "ok"
+    }
+    if (summaryCheckFailed) summaryStatus = "error"
+    if (result?.quota?.quotaSummaryStatus === "unknown" && !freshSummary) summaryStatus = "unknown"
+
+    const quotaSummary: QuotaPresentation["accounts"][number]["quotaSummary"] = {
+      groups: presentQuotaSummaryGroups(summaryGroups),
+      checkedAt: summaryCheckedAt,
+      freshness: freshSummary
+        ? "fresh"
+        : summaryCheckedAt === null
+          ? "unchecked"
+          : summaryCacheIsStale
+            ? "stale"
+            : "fresh",
+      status: summaryStatus,
+    }
     const hasKnownQuota = Object.values(groups).some((group) => group.remainingFraction !== null)
     const status: QuotaPresentation["accounts"][number]["status"] = resultHasError
       ? "error"
@@ -524,6 +690,7 @@ export async function getQuotaPresentation(
       enabled: account.enabled !== false,
       status,
       groups,
+      quotaSummary,
       checkedAt,
       freshness,
       verificationRequired: account.verificationRequired === true,

@@ -13,6 +13,7 @@ import {
   type ModelFamily,
   type CooldownReason,
   type RemovedAccountTombstone,
+  type QuotaSummaryGroup,
 } from "./storage"
 import type { OAuthAuthDetails, RefreshParts } from "./types"
 import type { AccountSelectionStrategy } from "./config/schema"
@@ -179,6 +180,8 @@ export interface ManagedAccount {
 
   cachedQuota?: Partial<Record<QuotaGroup, QuotaGroupSummary>>
   cachedQuotaUpdatedAt?: number
+  cachedQuotaSummary?: QuotaSummaryGroup[]
+  cachedQuotaSummaryUpdatedAt?: number
   verificationRequired?: boolean
   verificationRequiredAt?: number
   verificationRequiredReason?: string
@@ -377,6 +380,8 @@ export class AccountManager {
             fingerprintHistory: acc.fingerprintHistory ?? [],
             cachedQuota: acc.cachedQuota as Partial<Record<QuotaGroup, QuotaGroupSummary>> | undefined,
             cachedQuotaUpdatedAt: acc.cachedQuotaUpdatedAt,
+            cachedQuotaSummary: acc.cachedQuotaSummary,
+            cachedQuotaSummaryUpdatedAt: acc.cachedQuotaSummaryUpdatedAt,
             verificationRequired: acc.verificationRequired,
             verificationRequiredAt: acc.verificationRequiredAt,
             verificationRequiredReason: acc.verificationRequiredReason,
@@ -1001,6 +1006,8 @@ export class AccountManager {
       fingerprintHistory: account.fingerprintHistory,
       cachedQuota: account.cachedQuota,
       cachedQuotaUpdatedAt: account.cachedQuotaUpdatedAt,
+      cachedQuotaSummary: account.cachedQuotaSummary,
+      cachedQuotaSummaryUpdatedAt: account.cachedQuotaSummaryUpdatedAt,
       verificationRequired: account.verificationRequired,
       verificationRequiredAt: account.verificationRequiredAt,
       verificationRequiredReason: account.verificationRequiredReason,
@@ -1076,6 +1083,14 @@ export class AccountManager {
           next.cachedQuota = mem.cachedQuota
           next.cachedQuotaUpdatedAt = mem.cachedQuotaUpdatedAt
         }
+        if (
+          mem.cachedQuotaSummaryUpdatedAt !== undefined &&
+          (disk.cachedQuotaSummaryUpdatedAt === undefined ||
+            mem.cachedQuotaSummaryUpdatedAt >= disk.cachedQuotaSummaryUpdatedAt)
+        ) {
+          next.cachedQuotaSummary = mem.cachedQuotaSummary
+          next.cachedQuotaSummaryUpdatedAt = mem.cachedQuotaSummaryUpdatedAt
+        }
         merged.push(next)
       }
 
@@ -1108,6 +1123,8 @@ export class AccountManager {
           fingerprintHistory: mem.fingerprintHistory,
           cachedQuota: mem.cachedQuota,
           cachedQuotaUpdatedAt: mem.cachedQuotaUpdatedAt,
+          cachedQuotaSummary: mem.cachedQuotaSummary,
+          cachedQuotaSummaryUpdatedAt: mem.cachedQuotaSummaryUpdatedAt,
           verificationRequired: mem.verificationRequired,
           verificationRequiredAt: mem.verificationRequiredAt,
           verificationRequiredReason: mem.verificationRequiredReason,

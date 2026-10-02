@@ -62,6 +62,13 @@ describe("AccountManager", () => {
           lastUsed: 2,
           lastVerificationAt: 1234,
           lastVerificationStatus: "ok",
+          cachedQuotaSummary: [
+            {
+              displayName: "Gemini Models",
+              buckets: { weekly: { remainingFraction: 0.7 } },
+            },
+          ],
+          cachedQuotaSummaryUpdatedAt: 5678,
         },
       ],
       activeIndex: 0,
@@ -71,6 +78,7 @@ describe("AccountManager", () => {
     expect(manager.getAccounts()[0]).toMatchObject({
       lastVerificationAt: 1234,
       lastVerificationStatus: "ok",
+      cachedQuotaSummaryUpdatedAt: 5678,
     })
     await manager.saveToDisk()
 
@@ -83,6 +91,8 @@ describe("AccountManager", () => {
         expect.objectContaining({
           lastVerificationAt: 1234,
           lastVerificationStatus: "ok",
+          cachedQuotaSummary: [{ displayName: "Gemini Models", buckets: { weekly: { remainingFraction: 0.7 } } }],
+          cachedQuotaSummaryUpdatedAt: 5678,
         }),
       ],
     })

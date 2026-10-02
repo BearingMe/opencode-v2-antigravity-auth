@@ -112,6 +112,58 @@ describe("createQuotaDialogController", () => {
     expect(deps.notifyRefreshFailed).toHaveBeenCalledWith(false, true)
   })
 
+  it("accepts a fresh grouped result when the per-model probe fails", async () => {
+    const cachedSummary = {
+      groups: [
+        {
+          displayName: "Gemini Models",
+          description: "Cached quota",
+          buckets: {
+            weekly: { remainingFraction: 0.5, resetTime: null },
+            "5h": { remainingFraction: 0.5, resetTime: null },
+          },
+        },
+      ],
+      checkedAt: 1_700_000_000_000,
+      freshness: "stale" as const,
+      status: "ok" as const,
+    }
+    const freshSummary = {
+      ...cachedSummary,
+      groups: [
+        {
+          ...cachedSummary.groups[0]!,
+          description: "Fresh quota",
+          buckets: {
+            weekly: { remainingFraction: 0.7, resetTime: null },
+            "5h": { remainingFraction: 1, resetTime: null },
+          },
+        },
+      ],
+      checkedAt: 1_800_000_000_000,
+      freshness: "fresh" as const,
+    }
+    const controller = createQuotaDialogController(
+      createDeps({
+        initial: { ...snapshot(), quotaSummary: cachedSummary },
+        refreshQuota: async () => ({
+          ok: true,
+          entry: { ...snapshot(), status: "error", quotaSummary: freshSummary },
+        }),
+      }),
+    )
+
+    await controller.refresh()
+
+    expect(controller.snapshot()).toMatchObject({
+      failed: true,
+      entry: {
+        groups: snapshot().groups,
+        quotaSummary: { status: "ok", freshness: "fresh", groups: [{ description: "Fresh quota" }] },
+      },
+    })
+  })
+
   it("recovers from unexpected rejection and allows retry", async () => {
     const deps = createDeps({
       refreshQuota: vi
