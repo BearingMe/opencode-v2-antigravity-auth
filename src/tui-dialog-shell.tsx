@@ -16,6 +16,7 @@ export interface DialogShellProps {
     muted: RGBA
   }
   onClose: () => void
+  paddingX?: number
   children?: JSX.Element
 }
 
@@ -26,7 +27,13 @@ export interface DialogShellProps {
  */
 export function DialogShell(props: DialogShellProps): JSX.Element {
   return (
-    <box flexDirection="column" paddingLeft={4} paddingRight={4} paddingBottom={1} gap={1}>
+    <box
+      flexDirection="column"
+      paddingLeft={props.paddingX ?? 4}
+      paddingRight={props.paddingX ?? 4}
+      paddingBottom={1}
+      gap={1}
+    >
       <box flexDirection="row" justifyContent="space-between">
         <text fg={props.colors.base}>
           <b>{props.title}</b>

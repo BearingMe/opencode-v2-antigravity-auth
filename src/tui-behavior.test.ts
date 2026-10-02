@@ -125,6 +125,7 @@ function createHarness(options: {
       rpc: vi.fn(() => ({ list: listMock, quota: quotaMock, mutate: mutateMock })),
     },
     theme: {
+      hue: { accent: { 200: "accent" } },
       background: { raised: { high: "selected" }, formfield: { focused: "inputBackground" } },
       text: {
         base: "base",
@@ -443,7 +444,7 @@ describe("show-quota on a deleted account", () => {
 })
 
 describe("standardized dialog presentation size", () => {
-  it("sets large size for the account list, quota dialog, and missing account dialog", async () => {
+  it("uses medium for quota without changing account-list and notice sizes", async () => {
     const harness = createHarness({
       listResponses: [{ accounts: [testAccount] }, { accounts: [] }],
       quotaImpl: async (input) => ({ accounts: input.refresh ? [] : [quotaEntry()] }),
@@ -451,17 +452,15 @@ describe("standardized dialog presentation size", () => {
       deferMissingAcknowledgement: true,
     })
 
-    // 1. openList and openQuota set large
     await harness.runAccounts()
-    expect(harness.setCalls).toContainEqual({ size: "large" })
+    expect(harness.setCalls).toEqual([{ size: "large" }, { size: "medium" }])
+    expect(harness.view().colors.accent).toBe("accent")
 
     // 2. Refresh detects missing account and triggers MissingAccountDialogView
     const pendingRefresh = harness.view().controller.refresh()
     await vi.waitFor(() => expect(harness.missingViews).toHaveLength(1))
 
-    // 3. Every dialog presented sets large
-    expect(harness.setCalls.every((call) => call.size === "large")).toBe(true)
-    expect(harness.setCalls.filter((call) => call.size === "large").length).toBeGreaterThanOrEqual(3)
+    expect(harness.setCalls).toEqual([{ size: "large" }, { size: "medium" }, { size: "large" }])
 
     harness.missingViews[0]!.acknowledge()
     await pendingRefresh

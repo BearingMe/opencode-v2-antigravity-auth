@@ -347,6 +347,7 @@ export default Plugin.define({
             colors: {
               base: context.theme.text.base,
               muted: context.theme.text.muted,
+              accent: context.theme.hue.accent[200],
               success: context.theme.text.feedback.success.base,
               warning: context.theme.text.feedback.warning.base,
               error: context.theme.text.feedback.error.base,
@@ -363,7 +364,7 @@ export default Plugin.define({
         },
       )
       closeQuota = quotaCloser
-      context.ui.dialog.set({ size: DIALOG_SIZE })
+      context.ui.dialog.set({ size: "medium" })
     }
 
     const openActions = async (account: ListAccount): Promise<void> => {

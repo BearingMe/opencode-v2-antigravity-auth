@@ -16,6 +16,7 @@ const snapshot = (fraction: number) => ({
 const colors = {
   base: RGBA.fromHex("#eeeeee"),
   muted: RGBA.fromHex("#888888"),
+  accent: RGBA.fromHex("#9d7cd8"),
   success: RGBA.fromHex("#00ff00"),
   warning: RGBA.fromHex("#ffff00"),
   error: RGBA.fromHex("#ff0000"),
@@ -310,7 +311,7 @@ describe("published quota view", () => {
       expect(frame).toContain("Refreshing")
       expect(frame).toContain("70%")
       expect(frame).toContain("Antigravity quota")
-      expect(frame).toContain("Not live-updated")
+      expect(frame).not.toContain("Not live-updated")
       expect(frame).toContain("refresh ctrl+r")
       expect(frame).not.toContain("back esc")
       resolve({ ok: true, entry: snapshot(0.2) })
@@ -367,7 +368,7 @@ describe("published quota view", () => {
     }
   })
 
-  test("renders grouped weekly and five-hour windows instead of per-model rows", async () => {
+  test("keeps grouped quota sections together and scrolls only when the terminal is short", async () => {
     let commands: Array<QuotaDialogKeymapCommand> = []
     const controller = createQuotaDialogController({
       initial: {
@@ -378,7 +379,7 @@ describe("published quota view", () => {
               displayName: "Gemini Models",
               description: "Models within this group: Gemini Flash, Gemini Pro",
               buckets: {
-                weekly: { remainingFraction: 0.6558833, resetTime: Date.now() + 20 * 60 * 60 * 1000 },
+                weekly: { remainingFraction: 0.6558833, resetTime: null },
                 "5h": { remainingFraction: 1, resetTime: Date.now() + 5 * 60 * 60 * 1000 },
               },
             },
@@ -413,33 +414,248 @@ describe("published quota view", () => {
             commands = input().commands
           },
         }),
-      { width: 80, height: 24 },
+      { width: 60, height: 40 },
     )
     try {
       await setup.flush()
       const frame = setup.captureCharFrame()
-      expect(frame).toContain("GEMINI MODELS")
-      expect(frame).toContain("Models within this group: Gemini Flash, Gemini Pro")
-      expect(frame).toContain("Weekly Limit Remaining")
+      expect(frame).toContain("Gemini models  Flash, Pro")
+      expect(frame).toContain("Claude + GPT models  Opus, Sonnet, GPT-OSS")
+      const spans = setup.captureSpans().lines.flatMap((line) => line.spans)
+      expect(spans.find((span) => span.text.includes("Gemini models"))?.fg).toEqual(colors.accent)
+      expect(spans.find((span) => span.text.includes("Flash, Pro"))?.fg).toEqual(colors.muted)
+      expect(spans.find((span) => span.text.includes("65.59%"))?.fg).toEqual(colors.base)
+      expect(frame).toContain("Weekly")
+      expect(frame).toContain("Five-hour")
       expect(frame).toContain("65.59%")
-      expect(frame).toContain("Refreshes in")
-      expect(frame).toContain("↑/↓ scroll")
+      expect(frame).not.toContain("Refreshes in")
+      expect(frame.match(/Weekly/gu)).toHaveLength(2)
+      expect(frame.match(/Five-hour/gu)).toHaveLength(2)
+      expect(frame.split("\n").filter((line) => line.includes("█"))).toHaveLength(4)
+      expect(
+        frame
+          .split("\n")
+          .filter((line) => line.includes("█"))
+          .every((line) => /Weekly|Five-hour/u.test(line)),
+      ).toBe(true)
+      expect(frame).not.toContain("[█")
+      const lines = frame.split("\n")
+      const firstCategory = lines.findIndex((line) => line.includes("Gemini models"))
+      const firstWeekly = lines.findIndex((line) => line.includes("Weekly"))
+      expect(firstWeekly - firstCategory).toBe(2)
+      expect(lines[firstWeekly + 1]?.trim()).toBe("")
+      expect(lines[firstWeekly + 2]).toContain("Five-hour")
+      expect(lines[firstWeekly + 3]?.trim()).toBe("")
+      expect(lines[firstWeekly + 4]?.trim()).toBe("")
+      expect(lines[firstWeekly + 5]).toContain("Claude + GPT models")
+      const footer = lines.find((line) => line.includes("refresh ctrl+r"))!
+      expect(footer).toContain("Updated")
+      const footerRow = frame.split("\n").findIndex((line) => line.includes("refresh ctrl+r"))
+      const lastQuotaRow = frame.split("\n").findLastIndex((line) => line.includes("█"))
+      expect(footerRow - lastQuotaRow).toBeLessThanOrEqual(5)
+      expect(frame).not.toContain("↑/↓ scroll")
       expect(frame).toContain("refresh ctrl+r")
       expect(frame).not.toContain("Grouped quota unavailable")
-      expect(frame.split("\n").some((line) => /(Quota available|Refreshes in)/u.test(line) && line.includes("█"))).toBe(
-        false,
-      )
+      expect(frame).not.toContain("Gemini Models ·")
+      expect(frame).not.toContain("Claude and GPT models ·")
+      expect(frame.indexOf("Gemini models")).toBeLessThan(frame.indexOf("Claude + GPT models"))
 
+      setup.resize(54, 40)
+      await setup.flush()
+      const constrainedFrame = setup.captureCharFrame()
+      expect(constrainedFrame).toContain("reset unknown")
+      const unknownResetLine = constrainedFrame.split("\n").find((line) => line.includes("reset unknown"))
+      expect(unknownResetLine?.trimEnd()).toMatch(/reset unknown$/u)
+
+      setup.resize(80, 24)
+      await setup.flush()
+      const compactFrame = setup.captureCharFrame()
+      expect(compactFrame).toContain("Gemini models")
+      expect(compactFrame).toContain("↑/↓ scroll")
+      setup.resize(80, 16)
+      await setup.flush()
+      expect(setup.captureCharFrame()).toContain("↑/↓ scroll")
       const scrollDown = commands.find((command) => command.id === "antigravity.quota.scroll-down")
       expect(scrollDown).toBeDefined()
-      for (let index = 0; index < 5; index++) scrollDown?.run()
+      const scrolledFrames: string[] = []
+      for (let index = 0; index < 20; index++) {
+        scrollDown?.run()
+        await setup.flush()
+        scrolledFrames.push(setup.captureCharFrame())
+      }
+      expect(scrolledFrames.some((frame) => frame.includes("Five-hour"))).toBe(true)
+      expect(scrolledFrames.some((frame) => frame.includes("available"))).toBe(true)
+      expect(scrolledFrames.every((frame) => frame.includes("refresh ctrl+r"))).toBe(true)
+
+      setup.resize(80, 40)
       await setup.flush()
-      const lowerFrame = setup.captureCharFrame()
-      expect(lowerFrame).toContain("CLAUDE AND GPT MODELS")
-      expect(lowerFrame).toContain("Claude and GPT models · Weekly Limit Remaining")
-      expect(lowerFrame).toContain("Five Hour Limit Remaining")
-      expect(lowerFrame).toContain("Quota available")
-      expect(lowerFrame).toContain("refresh ctrl+r")
+      expect(setup.captureCharFrame()).not.toContain("↑/↓ scroll")
+
+      const scrollUp = commands.find((command) => command.id === "antigravity.quota.scroll-up")
+      for (let index = 0; index < 10; index++) scrollUp?.run()
+      setup.resize(42, 24)
+      await setup.flush()
+      const narrowFrame = setup.captureCharFrame()
+      expect(narrowFrame).toContain("↑/↓ scroll")
+      expect(narrowFrame.split("\n").some((line) => line.includes("65.59%") && line.includes("█"))).toBe(true)
+    } finally {
+      setup.renderer.destroy()
+    }
+  })
+
+  test("gives quota lines breathing room while keeping provider and footer boundaries stronger", async () => {
+    const now = Date.now()
+    const entry = {
+      ...snapshot(0.6603),
+      quotaSummary: {
+        checkedAt: now,
+        freshness: "fresh" as const,
+        status: "ok" as const,
+        groups: [
+          {
+            displayName: "Gemini Models",
+            description: "Models within this group: Gemini Flash, Gemini Pro",
+            buckets: {
+              weekly: { remainingFraction: 0.6603, resetTime: now + 19 * 3_600_000 },
+              "5h": { remainingFraction: 0.9678, resetTime: now + 3_600_000 },
+            },
+          },
+          {
+            displayName: "Claude and GPT models",
+            description: "Models within this group: Claude Opus, Claude Sonnet, GPT-OSS",
+            buckets: {
+              weekly: { remainingFraction: 0.9899, resetTime: now + 7 * 86_400_000 },
+              "5h": { remainingFraction: 0.987, resetTime: now + 5 * 3_600_000 },
+            },
+          },
+        ],
+      },
+    }
+    const controller = createQuotaDialogController({
+      initial: entry,
+      refreshQuota: async () => ({ ok: true, entry }),
+      notifyRefreshFailed: () => {},
+      showMissingThenList: async () => {},
+      goList: async () => {},
+    })
+    const setup = await testRender(
+      () =>
+        QuotaDialogView({
+          email: "bearingme001@gmail.com",
+          enabled: true,
+          controller,
+          colors,
+          shortcuts: () => undefined,
+          layer: () => {},
+        }),
+      { width: 60, height: 40 },
+    )
+    try {
+      await setup.waitForFrame((frame) => frame.includes("98.70%") && !frame.includes("Refreshing"))
+      await setup.flush()
+      const frame = setup.captureCharFrame()
+      const lines = frame.split("\n")
+      const categoryRows = lines
+        .map((text, row) => ({ text, row }))
+        .filter(({ text }) => /Gemini models|Claude \+ GPT models/u.test(text))
+        .map(({ row }) => row)
+      const quotaRows = lines.map((text, row) => ({ text, row })).filter(({ text }) => /Weekly|Five-hour/u.test(text))
+      expect(quotaRows.map(({ row }) => row)).toEqual([
+        categoryRows[0]! + 2,
+        categoryRows[0]! + 4,
+        categoryRows[1]! + 2,
+        categoryRows[1]! + 4,
+      ])
+      expect(categoryRows[1]! - quotaRows[1]!.row).toBe(3)
+      const footerRow = lines.findIndex((line) => line.includes("refresh ctrl+r"))
+      expect(footerRow - quotaRows[3]!.row).toBe(3)
+      expect(lines[footerRow]).toContain("Updated")
+      expect(lines[footerRow + 1]?.trim()).toBe("")
+      expect(new Set(quotaRows.map(({ text }) => text.indexOf("█"))).size).toBe(1)
+      expect(quotaRows.every(({ text }) => text.search(/Weekly|Five-hour/u) === 2)).toBe(true)
+      expect(new Set(quotaRows.map(({ text }) => text.indexOf("%"))).size).toBe(1)
+      expect(quotaRows.every(({ text }) => text.match(/[█░]+/u)?.[0].length === 20)).toBe(true)
+      expect(frame).not.toContain("↑/↓ scroll")
+      expect(frame).not.toMatch(/[─━│┃]/u)
+    } finally {
+      setup.renderer.destroy()
+    }
+  })
+
+  test("keeps quota controls and bottom padding onscreen in the host's 80x24 container", async () => {
+    const bucket = { remainingFraction: 1, resetTime: null }
+    const controller = createQuotaDialogController({
+      initial: {
+        ...snapshot(1),
+        quotaSummary: {
+          checkedAt: Date.now(),
+          freshness: "stale",
+          status: "ok",
+          groups: [
+            {
+              displayName: "Gemini Models",
+              description: "Models within this group: Gemini Flash, Gemini Pro",
+              buckets: { weekly: bucket, "5h": bucket },
+            },
+            {
+              displayName: "Claude and GPT models",
+              description: "Models within this group: Claude Opus, Claude Sonnet, GPT-OSS",
+              buckets: { weekly: bucket, "5h": bucket },
+            },
+          ],
+        },
+      },
+      refreshQuota: async () => ({ ok: true, entry: snapshot(1) }),
+      notifyRefreshFailed: () => {},
+      showMissingThenList: async () => {},
+      goList: async () => {},
+    })
+    const setup = await testRender(
+      () => {
+        const backdrop = createElement("box")
+        setProp(backdrop, "height", 24)
+        setProp(backdrop, "width", 80)
+        setProp(backdrop, "paddingTop", 6)
+        const content = createElement("box")
+        setProp(content, "width", 60)
+        setProp(content, "paddingTop", 1)
+        insert(content, () =>
+          QuotaDialogView({
+            email: "one@example.com",
+            enabled: false,
+            controller,
+            colors,
+            shortcuts: () => undefined,
+            layer: () => {},
+          }),
+        )
+        insert(backdrop, content)
+        return backdrop
+      },
+      { width: 80, height: 24 },
+    )
+    try {
+      await setup.flush()
+      const lines = setup.captureCharFrame().split("\n")
+      expect(lines.findIndex((line) => line.includes("refresh ctrl+r"))).toBeLessThan(23)
+      expect(lines.some((line) => line.includes("refresh ctrl+r"))).toBe(true)
+      expect(lines.some((line) => line.includes("↑/↓ scroll"))).toBe(true)
+      const heading = lines.find((line) => line.includes("Antigravity quota"))!
+      const email = lines.find((line) => line.includes("one@example.com"))!
+      const footer = lines.find((line) => line.includes("refresh ctrl+r"))!
+      const hintRow = lines.findIndex((line) => line.includes("↑/↓ scroll"))
+      expect(heading.indexOf("Antigravity quota")).toBe(email.indexOf("one@example.com"))
+      expect(footer.indexOf("Updated")).toBe(email.indexOf("one@example.com"))
+      expect(footer.indexOf("refresh")).toBeGreaterThan(footer.indexOf("Updated"))
+      expect(footer).toContain("stale")
+      expect(hintRow).toBeGreaterThan(lines.findIndex((line) => line.includes("refresh ctrl+r")))
+      expect(hintRow).toBeLessThan(24)
+      const weeklyRow = lines.findIndex((line) => line.includes("Weekly"))
+      expect(lines[weeklyRow + 2]).toContain("Five-hour")
+      const bars = lines.filter((line) => line.includes("█"))
+      expect(bars.length).toBeGreaterThanOrEqual(2)
+      expect(bars.every((line) => (line.match(/[█░]+/u)?.[0].length ?? 0) <= 20)).toBe(true)
+      expect(heading).toContain("esc")
     } finally {
       setup.renderer.destroy()
     }
@@ -491,10 +707,10 @@ describe("published quota view", () => {
       const rows = barLines()
       expect(rows).toHaveLength(3)
       for (const row of rows) {
-        expect(row.match(/[█░]+/u)?.[0].length).toBe(width - 8 - 35)
-        expect(row.trimEnd().length).toBe(width - 4)
+        expect(row.match(/[█░]+/u)?.[0].length).toBe(width - 4 - 35)
+        expect(row.trimEnd().length).toBe(width - 2)
       }
-      expect(rows.map((row) => row.indexOf("reset unknown"))).toEqual(Array(3).fill(width - 17))
+      expect(rows.map((row) => row.indexOf("reset unknown"))).toEqual(Array(3).fill(width - 15))
       expect(rows[0]?.indexOf("70%")! + 3).toBe(rows[1]?.indexOf("0%")! + 2)
       expect(rows[2]).toContain("unknown")
     }
@@ -507,8 +723,8 @@ describe("published quota view", () => {
       setup.resize(42, 30)
       await setup.flush()
       for (const row of barLines()) {
-        expect(row.match(/[█░]+/u)?.[0].length).toBe(26)
-        expect(row.trimEnd().length).toBe(38)
+        expect(row.match(/[█░]+/u)?.[0].length).toBe(30)
+        expect(row.trimEnd().length).toBe(40)
       }
       expect(setup.captureCharFrame()).toContain("Gemini Flash")
       expect(setup.captureCharFrame()).toContain("refresh ctrl+r")
@@ -567,16 +783,16 @@ describe("published quota view", () => {
         .split("\n")
         .filter((line) => /[█░]/u.test(line))
       expect(rows).toHaveLength(3)
-      expect(rows.map((row) => row.match(/[█░]+/u)?.[0].length)).toEqual([25, 25, 25])
-      expect(rows.map((row) => row.indexOf("reset"))).toEqual([51, 51, 51])
-      for (const row of rows) expect(row.trimEnd().length).toBeLessThanOrEqual(68)
+      expect(rows.map((row) => row.match(/[█░]+/u)?.[0].length)).toEqual([29, 29, 29])
+      expect(rows.map((row) => row.indexOf("reset"))).toEqual([53, 53, 53])
+      for (const row of rows) expect(row.trimEnd().length).toBeLessThanOrEqual(70)
       setProp(container, "width", 42)
       await setup.flush()
       const narrowRows = setup
         .captureCharFrame()
         .split("\n")
         .filter((line) => /[█░]/u.test(line))
-      expect(narrowRows.map((row) => row.match(/[█░]+/u)?.[0].length)).toEqual([26, 26, 26])
+      expect(narrowRows.map((row) => row.match(/[█░]+/u)?.[0].length)).toEqual([30, 30, 30])
       expect(narrowRows.every((row) => !row.includes("reset"))).toBe(true)
     } finally {
       setup.renderer.destroy()

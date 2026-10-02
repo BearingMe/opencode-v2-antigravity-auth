@@ -130,10 +130,6 @@ export function quotaInfoRows(groups: Record<string, QuotaRowGroup>): Array<Quot
   })
 }
 
-export function quotaViewPlaceholder(): string {
-  return "Updates when opened. Not live-updated; ctrl+r to refresh."
-}
-
 export interface QuotaDetailSnapshot {
   enabled?: boolean
   groups: Record<string, QuotaRowGroup>

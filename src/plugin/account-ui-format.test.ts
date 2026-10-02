@@ -6,7 +6,6 @@ import {
   formatResetCountdown,
   quotaDetailLines,
   quotaInfoRows,
-  quotaViewPlaceholder,
   renderQuotaBar,
 } from "./account-ui-format.js"
 
@@ -145,12 +144,6 @@ describe("quotaInfoRows", () => {
       expect(row.description).toContain("unknown")
       expect(row.description).not.toContain("0%")
     }
-  })
-})
-
-describe("quotaViewPlaceholder", () => {
-  it("states cached data is not live-updated in one short line", () => {
-    expect(quotaViewPlaceholder()).toBe("Updates when opened. Not live-updated; ctrl+r to refresh.")
   })
 })
 

@@ -49,12 +49,19 @@ checks — never your real multi-account store.
 
 - [ ] `Show quota`: opens one padded `Antigravity quota` screen with grouped
       Gemini and Claude/GPT sections, each with weekly and five-hour bars,
-      descriptions, two-decimal percentages, and reset/available text. It shows
-      a last-updated timestamp, a not-live-updated note, and a footer with
-      `refresh ctrl+r` and `↑/↓ scroll`. If grouped summary is unavailable, it
-      explicitly labels the legacy per-model bars as a fallback. At 80x24, the
-      footer remains visible and scrolling reveals both groups without overlap.
-      Resize the terminal: bars relayout, and narrow layouts wrap without overflow.
+      inline muted member names, two-decimal percentages, and reset/available
+      text. The dialog is medium-sized; section names use accent and each
+      group's Weekly/Five-hour rows retain the intended breathing room. Timestamp
+      and `refresh ctrl+r` share a footer row when they fit. If grouped summary is
+      unavailable, it explicitly labels the legacy per-model bars as a fallback.
+      At 80x24, the footer and any overflow hint stay visible while quota content
+      scrolls as needed. Resize: narrow layouts
+      wrap without clipping percentages or overlapping text.
+      Bold labels, unbracketed bars (at most 20 cells), base-text percentages,
+      and muted durations share each row. Quota rows have a smaller gap than
+      provider groups; the footer is distinctly separated from the final row.
+      The dialog ends just below the footer, without a large empty bottom area.
+      Header/body/footer metadata share the same left inset; refresh is on the right.
       The header retains clickable `esc`; no duplicate footer Back/Esc appears.
       Saved bars appear immediately, then enabled accounts refresh automatically.
       Unknown windows render `unknown`, never `0%`. No submenu: the screen stays

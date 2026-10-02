@@ -61,7 +61,7 @@ generic server-unavailable toast; diagnostics stay in the host log.
 
 The quota dialog shows Antigravity's grouped **Gemini Models** and
 **Claude and GPT models** pools, each with separate weekly and five-hour
-bars. Percentages use two decimal places; full buckets say `Quota available`,
+bars. Percentages use two decimal places; full buckets say `available`,
 and other known buckets show when they refresh (including multi-day weekly
 countdowns). Unknown values remain unknown, never `0%` (`0%` means genuinely
 exhausted).
@@ -72,10 +72,13 @@ summary is unavailable, the dialog labels and displays the older per-model
 `claude` / `gemini-pro` / `gemini-flash` rows as a fallback. See the
 [quota contract](../dev/quota-contract.md) for sources and unknown semantics.
 
-Bars fill the available dialog width. Narrow terminals may wrap descriptions
-and status lines; resizing updates the layout without fetching quota. The footer
-shows only **refresh ctrl+r**; the header's **esc** control and keyboard Esc
-return to the account list.
+The medium-sized dialog uses accent group names with muted member names inline.
+Weekly and five-hour rows are adjacent, with compact bars, aligned percentages,
+and muted time-until-reset values. Narrow terminals stack the columns. The
+dialog fits its content and only scrolls when space is limited. Resizing updates
+the layout without fetching quota. The timestamp and **refresh ctrl+r** share
+one footer row when they fit, with a scroll hint only when needed; the header's
+**esc** control and keyboard Esc return to the account list.
 
 Grouped and per-model readings have independent caches and timestamps. Failed
 refreshes keep the last good reading and mark grouped values as saved/stale
@@ -83,9 +86,9 @@ when applicable. Successful readings survive visits and restarts. A refresh in
 progress ignores repeat requests. Per-account presentation timeout defaults to
 12 s (clamped 1–30 s); staleness threshold defaults to 15 min.
 
-Updates when opened. Not live-updated; press `ctrl+r` to refresh. There is
-no polling while the screen remains open. Disabled accounts retain saved
-readings but do not refresh until enabled.
+The dialog refreshes when opened and does not poll while it remains open; press
+`ctrl+r` to refresh again. Disabled accounts retain saved readings but do not
+refresh until enabled.
 
 ## Storage and safety
 

@@ -1,12 +1,7 @@
 import type { RGBA, ScrollBoxRenderable } from "@opentui/core"
-import { For, Show, createSignal, onCleanup, onMount } from "solid-js"
-import {
-  formatQuotaPercentage,
-  formatQuotaWindowStatus,
-  formatResetCountdown,
-  quotaBarParts,
-  quotaViewPlaceholder,
-} from "./plugin/account-ui-format.js"
+import { useTerminalDimensions } from "@opentui/solid"
+import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js"
+import { formatQuotaPercentage, formatResetCountdown, quotaBarParts } from "./plugin/account-ui-format.js"
 import type { QuotaDialogController } from "./tui-quota-controller.js"
 import { DialogShell } from "./tui-dialog-shell.js"
 
@@ -30,7 +25,7 @@ export interface QuotaDialogProps {
   enabled: boolean
   controller: QuotaDialogController
   layer: QuotaDialogLayer
-  colors: { base: RGBA; muted: RGBA; success: RGBA; warning: RGBA; error: RGBA }
+  colors: { base: RGBA; muted: RGBA; accent: RGBA; success: RGBA; warning: RGBA; error: RGBA }
   shortcuts: (id: string) => string | undefined
 }
 
@@ -41,9 +36,36 @@ const GROUPS = [
 ]
 
 const SUMMARY_WINDOWS = [
-  { key: "weekly", label: "Weekly Limit Remaining" },
-  { key: "5h", label: "Five Hour Limit Remaining" },
+  { key: "weekly", label: "Weekly" },
+  { key: "5h", label: "Five-hour" },
 ] as const
+
+// Header, email, metadata, footer, shell gaps, and host/inner padding.
+const QUOTA_DIALOG_RESERVED_ROWS = 8
+
+// Text occupies whole terminal rows. The approved rhythm needs one row within
+// each group and a stronger two-row boundary; fractional gaps round unevenly.
+const QUOTA_LINE_GAP = 1
+const QUOTA_GROUP_GAP = 2
+const QUOTA_SCROLL_HINT = "↑/↓ scroll"
+
+/** Keep endpoint-provided group names recognizable while matching the reference labels. */
+function quotaGroupLabel(name: string): string {
+  if (/^gemini models$/i.test(name)) return "Gemini models"
+  if (/^claude and gpt models$/i.test(name)) return "Claude + GPT models"
+  return name
+}
+
+/** Remove redundant membership prose and family prefixes, preserving the actual member list. */
+function quotaGroupMembers(description: string | null): string {
+  return (description ?? "").replace(/^Models within this group:\s*/i, "").replace(/\b(?:Gemini|Claude)\s+/g, "")
+}
+
+/** Compact reset metadata without converting unknown readings into available quota. */
+function quotaResetLabel(fraction: number | null, resetTime: number | null): string {
+  if (fraction !== null && fraction >= 1) return "available"
+  return formatResetCountdown(resetTime).replace(/^resets in /, "")
+}
 
 export interface MissingAccountDialogProps {
   email: string
@@ -78,10 +100,23 @@ export function MissingAccountDialogView(props: MissingAccountDialogProps) {
 export function QuotaDialogView(props: QuotaDialogProps) {
   const [state, setState] = createSignal(props.controller.snapshot())
   const [contentWidth, setContentWidth] = createSignal(0)
+  const [summaryViewportWidth, setSummaryViewportWidth] = createSignal(0)
+  const [summaryContentHeight, setSummaryContentHeight] = createSignal(0)
+  const terminalDimensions = useTerminalDimensions()
   let quotaScroll: ScrollBoxRenderable | undefined
   const hasSummary = () => (state().entry.quotaSummary?.groups.length ?? 0) > 0
   const summaryGroups = () => state().entry.quotaSummary?.groups ?? []
-  const summaryRows = () => summaryGroups().flatMap((group) => SUMMARY_WINDOWS.map((window) => ({ group, window })))
+  const summaryResets = () =>
+    summaryGroups().flatMap((group) =>
+      SUMMARY_WINDOWS.map((window) =>
+        quotaResetLabel(group.buckets[window.key].remainingFraction, group.buckets[window.key].resetTime),
+      ),
+    )
+  const summaryResetWidth = () => Math.max(0, ...summaryResets().map((reset) => reset.length))
+  const summaryWidth = () => summaryViewportWidth() || contentWidth()
+  const summaryCompact = () => summaryWidth() < 10 + 8 + summaryResetWidth() + 16 + 3
+  const summaryBarWidth = () =>
+    Math.max(1, Math.min(20, summaryWidth() - (summaryCompact() ? 9 : 10 + 8 + summaryResetWidth() + 3)))
   const resets = () => GROUPS.map((group) => formatResetCountdown(state().entry.groups[group.key]?.resetTime))
   const resetWidth = () => Math.max(...resets().map((reset) => reset.length))
   // Label, percentage (including "unknown"), reset column, and three gaps.
@@ -154,12 +189,80 @@ export function QuotaDialogView(props: QuotaDialogProps) {
     const freshness = hasSummary() ? entry.quotaSummary?.freshness : entry.freshness
     return checkedAt === null
       ? "Not checked yet"
-      : `Updated ${new Date(checkedAt).toLocaleString()}${freshness === "stale" ? " · stale" : ""}`
+      : `Updated ${new Date(checkedAt).toLocaleString("en-GB", { hour12: false })}${freshness === "stale" ? " · stale" : ""}`
   }
+  const quotaFooterExtraRows = () => {
+    const width = Math.max(1, contentWidth())
+    const shortcut = props.shortcuts("antigravity.quota.refresh") ?? "ctrl+r"
+    const items = [checked().length, "refresh".length + 1 + shortcut.length]
+    // Reserve for the hint while sizing; it appears only if the quota body actually overflows.
+    if (hasSummary()) items.push(QUOTA_SCROLL_HINT.length)
+    let rows = 1
+    let used = 0
+    for (const itemWidth of items) {
+      if (used > 0 && used + 1 + itemWidth > width) {
+        rows++
+        used = itemWidth
+      } else {
+        used += (used > 0 ? 1 : 0) + itemWidth
+      }
+    }
+    // Each wrapped footer row consumes its own row and a flex row gap.
+    return Math.max(0, rows - 1) * (1 + QUOTA_LINE_GAP)
+  }
+  /** Measure the children, not scrollHeight: the latter includes an expanded viewport. */
+  const measureSummaryContent = () => {
+    queueMicrotask(() => {
+      if (quotaScroll) {
+        setSummaryViewportWidth(quotaScroll.viewport.width)
+        const children = quotaScroll.content.getChildren()
+        setSummaryContentHeight(
+          children.reduce((height, child) => height + child.height, 0) +
+            Math.max(0, children.length - 1) * QUOTA_GROUP_GAP,
+        )
+      }
+    })
+  }
+  const quotaMaxHeight = () =>
+    Math.max(
+      1,
+      Math.floor(terminalDimensions().height * 0.75) -
+        QUOTA_DIALOG_RESERVED_ROWS -
+        (hasSummary() ? QUOTA_LINE_GAP : 0) -
+        (status() ? Math.ceil(status().length / Math.max(1, contentWidth())) + 1 : 0) -
+        Math.max(0, Math.ceil(props.email.length / Math.max(1, contentWidth())) - 1) -
+        quotaFooterExtraRows(),
+    )
+  const initialSummaryHeight = () =>
+    summaryGroups().reduce(
+      (height, group) =>
+        height +
+        Math.max(
+          1,
+          Math.ceil(
+            (quotaGroupLabel(group.displayName).length + 2 + quotaGroupMembers(group.description).length) /
+              Math.max(1, contentWidth() - 1),
+          ),
+        ) +
+        (summaryCompact() ? 6 : 2) +
+        QUOTA_LINE_GAP * 2,
+      0,
+    ) +
+    Math.max(0, summaryGroups().length - 1) * QUOTA_GROUP_GAP
+  const quotaHeight = () => Math.min(summaryContentHeight() || initialSummaryHeight(), quotaMaxHeight())
+  const quotaOverflow = () => summaryContentHeight() > quotaMaxHeight()
+
+  createEffect(() => {
+    if (!hasSummary()) return
+    summaryGroups()
+    contentWidth()
+    measureSummaryContent()
+  })
 
   return (
     <DialogShell
       title="Antigravity quota"
+      paddingX={2}
       colors={{ base: props.colors.base, muted: props.colors.muted }}
       onClose={() => {
         void props.controller.back()
@@ -209,69 +312,91 @@ export function QuotaDialogView(props: QuotaDialogProps) {
           <text fg={props.colors.muted}>Grouped quota unavailable; showing per-model quota.</text>
         </Show>
         <Show when={hasSummary()}>
-          <For each={summaryGroups()}>
-            {(group) => (
-              <box flexDirection="column">
-                <text fg={props.colors.base}>
-                  <b>{group.displayName.toUpperCase()}</b>
-                </text>
-                <Show when={group.description}>
-                  <text fg={props.colors.muted}>{group.description}</text>
-                </Show>
-              </box>
-            )}
-          </For>
           <scrollbox
             ref={(value) => {
               quotaScroll = value
             }}
-            maxHeight={5}
+            height={quotaHeight()}
+            flexShrink={0}
             scrollX={false}
-            contentOptions={{ flexDirection: "column" }}
+            contentOptions={{ flexDirection: "column", gap: QUOTA_GROUP_GAP }}
+            onSizeChange={measureSummaryContent}
           >
-            <For each={summaryRows()}>
-              {(row, index) => {
-                const bucket = () => row.group.buckets[row.window.key]
-                const fraction = () => bucket().remainingFraction
-                const color = () =>
-                  fraction() === null
-                    ? props.colors.muted
-                    : (fraction() ?? 0) <= 0.1
-                      ? props.colors.error
-                      : (fraction() ?? 0) <= 0.3
-                        ? props.colors.warning
-                        : props.colors.success
-                const summaryBarWidth = () => Math.max(1, contentWidth() - 12)
-                const parts = () => quotaBarParts(fraction(), summaryBarWidth())
-                return (
-                  <box id={`antigravity-quota-window-${index()}`} flexDirection="column" flexShrink={0}>
-                    <text fg={props.colors.base}>
-                      {row.group.displayName} · {row.window.label}
+            <For each={summaryGroups()}>
+              {(group) => (
+                <box flexDirection="column" gap={QUOTA_LINE_GAP} flexShrink={0}>
+                  <box flexDirection="row" gap={2} flexWrap="wrap">
+                    <text fg={props.colors.accent} flexShrink={0}>
+                      <b>{quotaGroupLabel(group.displayName)}</b>
                     </text>
-                    <box flexDirection="row" gap={0}>
-                      <text fg={props.colors.muted}>[</text>
-                      <text width={summaryBarWidth()} flexShrink={0} fg={color()}>
-                        {parts().bar}
-                      </text>
-                      <text fg={props.colors.muted}>]</text>
-                      <text fg={props.colors.muted}> {formatQuotaPercentage(fraction())}</text>
-                    </box>
-                    <text fg={props.colors.warning}>{formatQuotaWindowStatus(fraction(), bucket().resetTime)}</text>
+                    <Show when={group.description}>
+                      <text fg={props.colors.muted}>{quotaGroupMembers(group.description)}</text>
+                    </Show>
                   </box>
-                )
-              }}
+                  <box flexDirection="column" gap={QUOTA_LINE_GAP}>
+                    <For each={SUMMARY_WINDOWS}>
+                      {(window) => {
+                        const bucket = () => group.buckets[window.key]
+                        const fraction = () => bucket().remainingFraction
+                        const color = () =>
+                          fraction() === null
+                            ? props.colors.muted
+                            : (fraction() ?? 0) <= 0.1
+                              ? props.colors.error
+                              : (fraction() ?? 0) <= 0.3
+                                ? props.colors.warning
+                                : props.colors.success
+                        const parts = () => quotaBarParts(fraction(), summaryBarWidth())
+                        return (
+                          <box
+                            flexDirection={summaryCompact() ? "column" : "row"}
+                            gap={summaryCompact() ? 0 : 1}
+                            justifyContent="space-between"
+                            flexShrink={0}
+                          >
+                            <text width={summaryCompact() ? undefined : 10} flexShrink={0} fg={props.colors.base}>
+                              {/* Bold row labels follow the user-approved final quota reference. */}
+                              <b>{window.label}</b>
+                            </text>
+                            <box flexDirection="row" gap={1} flexShrink={0}>
+                              <text width={summaryBarWidth()} flexShrink={0} fg={color()}>
+                                {parts().bar}
+                              </text>
+                              <text width={8} flexShrink={0} fg={props.colors.base}>
+                                {formatQuotaPercentage(fraction()).padStart(8)}
+                              </text>
+                            </box>
+                            <text
+                              width={summaryCompact() ? undefined : summaryResetWidth()}
+                              flexShrink={0}
+                              fg={props.colors.muted}
+                            >
+                              {quotaResetLabel(fraction(), bucket().resetTime).padStart(
+                                summaryCompact() ? 0 : summaryResetWidth(),
+                              )}
+                            </text>
+                          </box>
+                        )
+                      }}
+                    </For>
+                  </box>
+                </box>
+              )}
             </For>
           </scrollbox>
         </Show>
       </box>
-      <box flexDirection="column">
+      <Show when={Boolean(status())}>
+        <text fg={state().failed ? props.colors.error : props.colors.muted}>{status()}</text>
+      </Show>
+      <box
+        flexDirection="row"
+        justifyContent="space-between"
+        flexWrap="wrap"
+        gap={1}
+        marginTop={hasSummary() ? QUOTA_LINE_GAP : 0}
+      >
         <text fg={props.colors.muted}>{checked()}</text>
-        <Show when={Boolean(status())}>
-          <text fg={state().failed ? props.colors.error : props.colors.muted}>{status()}</text>
-        </Show>
-        <text fg={props.colors.muted}>{quotaViewPlaceholder()}</text>
-      </box>
-      <box flexDirection="row" gap={2} flexWrap="wrap">
         <text
           fg={enabled() ? props.colors.base : props.colors.muted}
           onMouseUp={() => {
@@ -281,8 +406,8 @@ export function QuotaDialogView(props: QuotaDialogProps) {
           <b>refresh</b>
           <span style={{ fg: props.colors.muted }}> {props.shortcuts("antigravity.quota.refresh") ?? "ctrl+r"}</span>
         </text>
-        <Show when={hasSummary()}>
-          <text fg={props.colors.muted}>↑/↓ scroll</text>
+        <Show when={hasSummary() && quotaOverflow()}>
+          <text fg={props.colors.muted}>{QUOTA_SCROLL_HINT}</text>
         </Show>
       </box>
     </DialogShell>
