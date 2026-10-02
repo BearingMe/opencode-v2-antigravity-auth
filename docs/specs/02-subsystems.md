@@ -12,7 +12,7 @@ generatePKCE`. No I/O.
 - `exchangeAntigravity(code, state)` never throws; returns
   `success{refresh,access,expires,email?,projectId} | failed{error}`.
   Sequence: `decodeState` → `Date.now()` startTime → POST
-  `oauth2.googleapis.com/token` (form-urlencoded, GEMINI_CLI UA) → non-ok
+  `oauth2.googleapis.com/token` (form-urlencoded, Google OAuth UA) → non-ok
   yields raw-text `failed` → GET userinfo (failure tolerated → `{}`) →
   missing `refresh_token` yields `failed` → conditional
   `fetchProjectID(access)` → pack `refresh|projectId` (2 segments only) →
@@ -20,7 +20,7 @@ generatePKCE`. No I/O.
 - `fetchProjectID` POSTs `{metadata:{ideType:ANTIGRAVITY,
 platform:WINDOWS|MACOS, pluginType:GEMINI}}` to deduped
   `[...ANTIGRAVITY_LOAD_ENDPOINTS, ...ANTIGRAVITY_ENDPOINT_FALLBACKS]`
-  `v1internal:loadCodeAssist`, mixing Gemini-CLI UA with Antigravity
+  `v1internal:loadCodeAssist`, using the Google OAuth UA with Antigravity
   Client-Metadata. Accepts `cloudaicompanionProject` string or `{id}`.
   Total failure → warn + `""` (caller stores `refresh|`; resolution deferred).
 - Timeouts: only `fetchProjectID` has a 10 s `AbortController`. Token and
@@ -52,13 +52,13 @@ refreshOAuthCredential` is a thin wrapper that delegates to the unified
 ## 2.3 Request preparation — `src/plugin/request.ts`
 
 `prepareAntigravityRequest(input, init, accessToken, projectId,
-endpointOverride, headerStyle, forceThinkingRecovery, opts)`:
+endpointOverride, forceThinkingRecovery, opts)`:
 
 1. Rejects non-generative-language URLs (`isGenerativeLanguageRequest`
    hostname check); strips `x-goog-api-key / x-api-key /
-x-goog-user-project` for ALL header styles.
+x-goog-user-project` from OAuth requests.
 2. Parses `/models/([^:]+):(\w+)`; resolves via
-   `resolveModelForHeaderStyle`; builds
+   `resolveAntigravityModel`; builds
    `v1internal:streamGenerateContent?alt=sse` or `generateContent` with
    `Authorization: Bearer`.
 3. Wrapped-body `{project, request}` vs raw Gemini path.
@@ -82,7 +82,7 @@ conversation + seed-hash fallback)`, `deepFilterThinkingBlocks`,
    signature; parallels stripped), debug/synthetic thinking inject + strip.
 7. Returns `{request, init, streaming, requestedModel, effectiveModel,
 projectId, endpoint, sessionId, toolDebug*, needsSignedThinkingWarmup,
-headerStyle, thinkingRecoveryMessage}`.
+thinkingRecoveryMessage}`.
 
 ## 2.4 Schema + thinking utilities — `src/plugin/request-helpers.ts`
 
@@ -114,12 +114,13 @@ MODEL_CAPACITY_EXHAUSTED | SERVER_ERROR | UNKNOWN`.
 - `calculateBackoffMs`: quota `[60 s, 5 m, 30 m, 2 h]` by failure count;
   rate 30 s; capacity 45 s ± 15 s jitter; server 20 s; unknown 60 s;
   `Retry-After` respected (≥2 s floor).
-- `QuotaKey = claude | gemini-antigravity[:model] | gemini-cli[:model]`.
+- `QuotaKey = claude | gemini-antigravity[:model]`. Existing `gemini-cli`
+  cooldown entries in v4 stores are obsolete and ignored, not migrated away.
 - `ManagedAccount{index,email,addedAt,lastUsed,parts,access,expires,enabled,
 rateLimitResetTimes,touchedForQuota,consecutiveFailures+TTL,
 fingerprint+history[5],cachedQuota+updatedAt,verification*}`.
 - Selection: sticky / round-robin / hybrid (default hybrid) via
-  `getCurrentOrNextForFamily` with headerStyle + soft-quota + cooldown
+  `getCurrentOrNextForFamily` with Antigravity quota + soft-quota + cooldown
   filters, PID offset, cursor round-robin. Hybrid score =
   health×2 + tokens×5 + freshness×0.1 + stickiness bonus 150, switch
   threshold 100 (`rotation.ts :: selectHybridAccount`,
@@ -128,19 +129,14 @@ fingerprint+history[5],cachedQuota+updatedAt,verification*}`.
 - `src/plugin/engine.ts` adds its own capacity tiers `[5,10,20,30,60 s]`,
   `FIRST_RETRY 1 s / SWITCH 5 s`, dedup window 2 s, state reset 120 s,
   `MAX_CONSECUTIVE_FAILURES=5` → 30 s cooldown.
-- Quota fallback across header styles is allowed ONLY for the gemini family
-  (`resolveQuotaFallbackHeaderStyle`, `resolveHeaderRoutingDecision`).
 
 ## 2.6 Quota probing — `src/plugin/quota.ts`
 
-`fetchAvailableModels` (Antigravity UA, 10 s) + `fetchGeminiCliQuota`
-(GeminiCLI UA, `retrieveUserQuota`, fail → empty); `classifyQuotaGroup`
+`fetchAvailableModels` (Antigravity UA, 10 s); `classifyQuotaGroup`
 (claude substring; gemini-3 → pro/flash via `getModelFamily`);
-per-group aggregate = min remaining + earliest reset; CLI summary covers
-`gemini-3-*`/`2.5-pro` only, sorted. `checkAccountsQuota` refreshes expired
-tokens, ensures project context, fetches both pools in parallel →
-`AccountQuotaResult{index,email,status ok|disabled|error,quota,
-geminiCliQuota,updatedAccount}`.
+per-group aggregate = min remaining + earliest reset. `checkAccountsQuota`
+refreshes expired tokens, ensures project context, fetches Antigravity quota →
+`AccountQuotaResult{index,email,status ok|disabled|error,quota,updatedAccount}`.
 
 ## 2.7 Storage — `src/plugin/storage.ts`
 

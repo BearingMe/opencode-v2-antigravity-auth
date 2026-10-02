@@ -59,7 +59,7 @@ src/
     ├── transform/             # Pure per-family transforms (claude/gemini/sanitizer/resolver)
     ├── core/streaming/        # SSE transformer
     ├── thinking-recovery.ts / recovery/  # Turn repair + session-error hook
-    ├── quota.ts               # fetchAvailableModels + Gemini CLI quota probing
+    ├── quota.ts               # Antigravity fetchAvailableModels quota probing
     ├── accounts.ts / storage.ts  # Pool manager + v4 persistent store
     ├── fingerprint.ts / project.ts  # Device fingerprints + managed project context
     ├── refresh-queue.ts / rotation.ts  # Proactive refresh + health/token-bucket scoring

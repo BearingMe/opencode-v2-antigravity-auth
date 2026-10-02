@@ -20,7 +20,7 @@ Evidence: `src/v2-plugin.ts :: setup` (V2 bridge),
 
 1. Ordinary Gemini API keys do not grant Antigravity quota pools or Claude
    models served through Google's Cloud Code Assist backend. The plugin
-   supplies an OAuth path with two header styles (dual quota pools).
+   supplies an Antigravity OAuth path for supported Gemini and Claude models.
 2. Gemini 3 / Claude thinking models require exact round-tripping of encrypted
    thought signatures during function calling; OpenCode message history does
    not preserve them by default. The plugin caches, re-injects, sanitizes, and

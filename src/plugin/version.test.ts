@@ -100,7 +100,7 @@ describe("initAntigravityVersion — network failure path", () => {
     const { initAntigravityVersion } = await import("./version.ts")
     await initAntigravityVersion()
 
-    const headers = getRandomizedHeaders("antigravity")
+    const headers = getRandomizedHeaders()
     expect(headers["User-Agent"]).toContain(ANTIGRAVITY_VERSION_FALLBACK)
   })
 })

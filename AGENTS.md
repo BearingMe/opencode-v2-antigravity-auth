@@ -141,7 +141,7 @@ src/
     ├── transform/             # Pure per-family transforms (claude/gemini/sanitizer/resolver)
     ├── core/streaming/        # SSE transformer
     ├── thinking-recovery.ts / recovery/  # Turn repair + session-error hook
-    ├── quota.ts               # fetchAvailableModels + Gemini CLI quota probing
+    ├── quota.ts               # Antigravity fetchAvailableModels quota probing
     ├── accounts.ts / storage.ts  # Pool manager + v4 persistent store (tombstones)
     ├── fingerprint.ts / project.ts  # Device fingerprints + managed project context
     ├── refresh-queue.ts / rotation.ts  # Proactive refresh + health/token-bucket scoring
@@ -159,8 +159,9 @@ src/
 ### 1. Request Routing
 
 AI SDK hook + fetch bridge for `generativelanguage.googleapis.com` model
-paths only; single native engine (`executeAntigravityRequest`). Two header
-styles: `antigravity` and `gemini-cli` (dual Gemini quota pools).
+paths only; single native engine (`executeAntigravityRequest`) routes OAuth
+Gemini and Claude models through Antigravity. Ordinary Google API-key
+connections keep their configured route.
 
 ### 2. Claude Thinking Blocks
 

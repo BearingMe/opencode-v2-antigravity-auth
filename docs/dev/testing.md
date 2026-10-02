@@ -20,8 +20,8 @@ No linter or formatter is configured; style is enforced by convention
 
 ## What is covered
 
-- `constants.test.ts`: Gemini CLI header pin, Antigravity UA format/platform
-  alignment/never-Linux, header-set optionality.
+- `constants.test.ts`: Antigravity UA format/platform alignment/never-Linux
+  and header-set optionality.
 - `v2-plugin.test.ts`: plugin id/setup, `normalizeFetchBody` behaviors,
   destination/path validation, OAuth callback parsing.
 - `v2-plugin.accounts.test.ts`: delete-reselect, out-of-range no-write,

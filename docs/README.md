@@ -5,13 +5,13 @@
 
 ## User guides
 
-| Guide                                                      | Contents                                                                    |
-| ---------------------------------------------------------- | --------------------------------------------------------------------------- |
-| [user/installation.md](user/installation.md)               | Install the plugin, connect Google, verify it works                         |
-| [user/configuration.md](user/configuration.md)             | `antigravity.json` options, env overrides, recommended setups               |
-| [user/models-and-variants.md](user/models-and-variants.md) | Model inventory, variants, routing between Antigravity and Gemini CLI pools |
-| [user/accounts-and-quota.md](user/accounts-and-quota.md)   | Add/manage accounts, `/antigravity` dialog, quota bars, storage and safety  |
-| [user/troubleshooting.md](user/troubleshooting.md)         | Common errors, what to try first, how to report a bug                       |
+| Guide                                                      | Contents                                                                   |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------- |
+| [user/installation.md](user/installation.md)               | Install the plugin, connect Google, verify it works                        |
+| [user/configuration.md](user/configuration.md)             | `antigravity.json` options, env overrides, recommended setups              |
+| [user/models-and-variants.md](user/models-and-variants.md) | Antigravity model inventory, compatibility aliases, and variants           |
+| [user/accounts-and-quota.md](user/accounts-and-quota.md)   | Add/manage accounts, `/antigravity` dialog, quota bars, storage and safety |
+| [user/troubleshooting.md](user/troubleshooting.md)         | Common errors, what to try first, how to report a bug                      |
 
 User guides describe **what you can do**. They do not track implementation
 progress, task gates, or host internals.

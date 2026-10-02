@@ -46,8 +46,7 @@ streaming transformer`.
 2. V2: normalize Request clone via `normalizeFetchBody`
    (method/headers/body/signal preserved without consuming original);
    re-`getAuth()`; empty pool → throw login error.
-3. `while(true)` loop per §02.5: route (`resolveHeaderRoutingDecision`;
-   gemini-only cross-style fallback) → select
+3. `while(true)` loop per §02.5: select
    (`getCurrentOrNextForFamily`) → soft-quota gate (wait
    `getMinWaitTimeForSoftQuota` capped by `max_rate_limit_wait_seconds` or
    throw quota-protection) → `refreshAccessToken` (`invalid_grant` →
@@ -69,8 +68,8 @@ via response, throw (quota/auth/abort), or fatal error.
 
 Trigger: `antigravity_accounts{check_quota|verify}` tool or automatic
 post-login sweep. `checkAccountsQuota` refreshes expired tokens,
-ensures project context, probes BOTH pools in parallel, returns per-account
-`{status, quota, geminiCliQuota, updatedAccount}`. `verify` maps
+ensures project context, probes Antigravity quota, returns per-account
+`{status, quota, updatedAccount}`. `verify` maps
 blocked → disabled + verification fields + URL; ok → clears flags; error →
 records without disabling; always persists + invalidates fetch.
 

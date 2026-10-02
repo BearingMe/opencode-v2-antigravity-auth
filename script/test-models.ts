@@ -3,20 +3,20 @@ import { spawn } from "child_process"
 
 interface ModelTest {
   model: string
-  category: "gemini-cli" | "antigravity-gemini" | "antigravity-claude"
+  category: "google-api-key" | "antigravity-gemini" | "antigravity-claude"
 }
 
 const MODELS: ModelTest[] = [
-  // Gemini CLI (direct Google API)
-  { model: "google/gemini-3-flash-preview", category: "gemini-cli" },
-  { model: "google/gemini-3-pro-preview", category: "gemini-cli" },
-  { model: "google/gemini-2.5-pro", category: "gemini-cli" },
-  { model: "google/gemini-2.5-flash", category: "gemini-cli" },
+  // Unsupported through Antigravity OAuth; these need ordinary Google API-key auth.
+  { model: "google/gemini-2.5-pro", category: "google-api-key" },
+  { model: "google/gemini-2.5-flash", category: "google-api-key" },
 
-  // Antigravity Gemini
+  // Antigravity Gemini, including verified legacy preview aliases.
   { model: "google/antigravity-gemini-3-pro-low", category: "antigravity-gemini" },
   { model: "google/antigravity-gemini-3-pro-high", category: "antigravity-gemini" },
   { model: "google/antigravity-gemini-3-flash", category: "antigravity-gemini" },
+  { model: "google/gemini-3-flash-preview", category: "antigravity-gemini" },
+  { model: "google/gemini-3-pro-preview", category: "antigravity-gemini" },
 
   // Antigravity Claude
   { model: "google/antigravity-claude-sonnet-4-6", category: "antigravity-claude" },
@@ -105,7 +105,7 @@ Usage:
 
 Options:
   --model <model>      Test specific model
-  --category <cat>     Test by category (gemini-cli, antigravity-gemini, antigravity-claude)
+  --category <cat>     Test by category (google-api-key, antigravity-gemini, antigravity-claude)
   --timeout <ms>       Timeout per model (default: 120000)
   --dry-run            List models without testing
   --help, -h           Show this help

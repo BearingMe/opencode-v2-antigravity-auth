@@ -1,4 +1,4 @@
-import { ANTIGRAVITY_ENDPOINT_FALLBACKS, ANTIGRAVITY_ENDPOINT_PROD, type HeaderStyle } from "../constants.js"
+import { ANTIGRAVITY_ENDPOINT_FALLBACKS } from "../constants.js"
 import { accessTokenExpired } from "./auth.js"
 import type { AccountManager } from "./accounts.js"
 import {
@@ -10,10 +10,14 @@ import {
 } from "./accounts.js"
 import { createSyntheticErrorResponse, isEmptyResponseBody } from "./request-helpers.js"
 import { EmptyResponseError } from "./errors.js"
-import { buildThinkingWarmupBody, prepareAntigravityRequest, transformAntigravityResponse } from "./request.js"
+import {
+  assertAntigravityModelSupported,
+  buildThinkingWarmupBody,
+  prepareAntigravityRequest,
+  transformAntigravityResponse,
+} from "./request.js"
 import { AntigravityTokenRefreshError, refreshAccessToken } from "./token.js"
 import { ensureProjectContext } from "./project.js"
-import { resolveModelWithTier } from "./transform/model-resolver.js"
 import { getHealthTracker, getTokenTracker } from "./rotation.js"
 import {
   isDebugEnabled,
@@ -163,9 +167,8 @@ function resetRateLimitState(accountIndex: number, quotaKey: string): void {
   rateLimitStateByAccountQuota.delete(stateKey)
 }
 
-function headerStyleToQuotaKey(headerStyle: HeaderStyle, family: ModelFamily): string {
-  if (family === "claude") return "claude"
-  return headerStyle === "antigravity" ? "gemini-antigravity" : "gemini-cli"
+function quotaKeyForFamily(family: ModelFamily): string {
+  return family === "claude" ? "claude" : "gemini-antigravity"
 }
 
 function trackAccountFailure(accountIndex: number): { failures: number; shouldCooldown: boolean; cooldownMs: number } {
@@ -258,68 +261,6 @@ export function getModelFamilyFromUrl(urlString: string): ModelFamily {
     logModelFamily(urlString, model, family)
   }
   return family
-}
-
-export function resolveQuotaFallbackHeaderStyle(input: {
-  family: ModelFamily
-  headerStyle: HeaderStyle
-  alternateStyle: HeaderStyle | null
-}): HeaderStyle | null {
-  if (input.family !== "gemini") {
-    return null
-  }
-  if (!input.alternateStyle || input.alternateStyle === input.headerStyle) {
-    return null
-  }
-  return input.alternateStyle
-}
-
-export type HeaderRoutingDecision = {
-  cliFirst: boolean
-  preferredHeaderStyle: HeaderStyle
-  explicitQuota: boolean
-  allowQuotaFallback: boolean
-}
-
-export function resolveHeaderRoutingDecision(
-  urlString: string,
-  family: ModelFamily,
-  config: AntigravityConfig,
-): HeaderRoutingDecision {
-  const cliFirst = getCliFirst(config)
-  const preferredHeaderStyle = getHeaderStyleFromUrl(urlString, family, cliFirst)
-  const explicitQuota = isExplicitQuotaFromUrl(urlString)
-  return {
-    cliFirst,
-    preferredHeaderStyle,
-    explicitQuota,
-    allowQuotaFallback: family === "gemini",
-  }
-}
-
-function getCliFirst(config: AntigravityConfig): boolean {
-  return (config as AntigravityConfig & { cli_first?: boolean }).cli_first ?? false
-}
-
-export function getHeaderStyleFromUrl(urlString: string, family: ModelFamily, cliFirst: boolean = false): HeaderStyle {
-  if (family === "claude") {
-    return "antigravity"
-  }
-  const modelWithSuffix = extractModelFromUrlWithSuffix(urlString)
-  if (!modelWithSuffix) {
-    return cliFirst ? "gemini-cli" : "antigravity"
-  }
-  const { quotaPreference } = resolveModelWithTier(modelWithSuffix, { cli_first: cliFirst })
-  return quotaPreference ?? "antigravity"
-}
-
-function isExplicitQuotaFromUrl(urlString: string): boolean {
-  const modelWithSuffix = extractModelFromUrlWithSuffix(urlString)
-  if (!modelWithSuffix) {
-    return false
-  }
-  const { explicitQuota } = resolveModelWithTier(modelWithSuffix)
-  return explicitQuota ?? false
 }
 
 function retryAfterMsFromResponse(response: Response, defaultRetryMs: number = 60_000): number {
@@ -537,8 +478,11 @@ export async function executeAntigravityRequest(
   const fetchImpl = options.fetchImpl ?? fetch
 
   const urlString = toUrlString(input)
-  const family = getModelFamilyFromUrl(urlString)
   const model = extractModelFromUrl(urlString)
+  if (model) {
+    assertAntigravityModelSupported(model)
+  }
+  const family = getModelFamilyFromUrl(urlString)
   const debugLines: string[] = []
   const pushDebug = (line: string) => {
     if (!isDebugEnabled()) return
@@ -591,18 +535,10 @@ export async function executeAntigravityRequest(
     }
   }
 
-  const hasOtherAccountWithAntigravity = (currentAccount: ManagedAccount): boolean => {
-    if (family !== "gemini") return false
-    return accountManager.hasOtherAccountWithAntigravityAvailable(currentAccount.index, family, model)
-  }
-
   while (true) {
     checkAborted()
 
     const accountCount = accountManager.getAccountCount()
-    const routingDecision = resolveHeaderRoutingDecision(urlString, family, config)
-    const { preferredHeaderStyle, allowQuotaFallback } = routingDecision
-
     if (accountCount === 0) {
       throw new Error("No Antigravity accounts available. Run `opencode auth login`.")
     }
@@ -616,29 +552,10 @@ export async function executeAntigravityRequest(
       family,
       model,
       config.account_selection_strategy,
-      preferredHeaderStyle,
       config.pid_offset_enabled,
       config.soft_quota_threshold_percent,
       softQuotaCacheTtlMs,
     )
-
-    if (!account && allowQuotaFallback) {
-      const alternateHeaderStyle: HeaderStyle = preferredHeaderStyle === "antigravity" ? "gemini-cli" : "antigravity"
-      account = accountManager.getCurrentOrNextForFamily(
-        family,
-        model,
-        config.account_selection_strategy,
-        alternateHeaderStyle,
-        config.pid_offset_enabled,
-        config.soft_quota_threshold_percent,
-        softQuotaCacheTtlMs,
-      )
-      if (account) {
-        pushDebug(
-          `selected-by-fallback idx=${account.index} preferred=${preferredHeaderStyle} alternate=${alternateHeaderStyle}`,
-        )
-      }
-    }
 
     if (!account) {
       if (
@@ -677,8 +594,7 @@ export async function executeAntigravityRequest(
         continue
       }
 
-      const strictWait = !allowQuotaFallback
-      const waitMs = accountManager.getMinWaitTimeForFamily(family, model, preferredHeaderStyle, strictWait) || 60_000
+      const waitMs = accountManager.getMinWaitTimeForFamily(family, model) || 60_000
       const waitSecValue = Math.max(1, Math.ceil(waitMs / 1000))
 
       pushDebug(`all-rate-limited family=${family} accounts=${accountCount} waitMs=${waitMs}`)
@@ -751,7 +667,7 @@ export async function executeAntigravityRequest(
           lastError = new Error("Antigravity token refresh failed")
           if (shouldCooldown) {
             accountManager.markAccountCoolingDown(account, cooldownMs, "auth-failure")
-            accountManager.markRateLimited(account, cooldownMs, family, "antigravity", model)
+            accountManager.markRateLimited(account, cooldownMs, family, model)
             pushDebug(`token-refresh-failed: cooldown ${cooldownMs}ms after ${failures} failures`)
           }
           continue
@@ -800,7 +716,7 @@ export async function executeAntigravityRequest(
         lastError = error instanceof Error ? error : new Error(String(error))
         if (shouldCooldown) {
           accountManager.markAccountCoolingDown(account, cooldownMs, "auth-failure")
-          accountManager.markRateLimited(account, cooldownMs, family, "antigravity", model)
+          accountManager.markRateLimited(account, cooldownMs, family, model)
           pushDebug(`token-refresh-error: cooldown ${cooldownMs}ms after ${failures} failures`)
         }
         continue
@@ -826,7 +742,7 @@ export async function executeAntigravityRequest(
       lastError = error instanceof Error ? error : new Error(String(error))
       if (shouldCooldown) {
         accountManager.markAccountCoolingDown(account, cooldownMs, "project-error")
-        accountManager.markRateLimited(account, cooldownMs, family, "antigravity", model)
+        accountManager.markRateLimited(account, cooldownMs, family, model)
         pushDebug(`project-context-error: cooldown ${cooldownMs}ms after ${failures} failures`)
       }
       continue
@@ -910,53 +826,15 @@ export async function executeAntigravityRequest(
 
     let shouldSwitchAccount = false
 
-    let headerStyle = preferredHeaderStyle
-    pushDebug(`headerStyle=${headerStyle} explicit=${routingDecision.explicitQuota}`)
     if (account.fingerprint) {
       pushDebug(
         `fingerprint: quotaUser=${account.fingerprint.quotaUser} deviceId=${account.fingerprint.deviceId.slice(0, 8)}...`,
       )
     }
 
-    if (accountManager.isRateLimitedForHeaderStyle(account, family, headerStyle, model)) {
-      if (allowQuotaFallback && family === "gemini" && headerStyle === "antigravity") {
-        if (accountManager.hasOtherAccountWithAntigravityAvailable(account.index, family, model)) {
-          pushDebug(`antigravity rate-limited on account ${account.index}, but available on other accounts. Switching.`)
-          shouldSwitchAccount = true
-        } else {
-          const alternateStyle = accountManager.getAvailableHeaderStyle(account, family, model)
-          const fallbackStyle = resolveQuotaFallbackHeaderStyle({
-            family,
-            headerStyle,
-            alternateStyle,
-          })
-          if (fallbackStyle) {
-            await showToast(`Antigravity quota exhausted on all accounts. Using Gemini CLI quota.`, "warning")
-            headerStyle = fallbackStyle
-            pushDebug(`all-accounts antigravity exhausted, quota fallback: ${headerStyle}`)
-          } else {
-            shouldSwitchAccount = true
-          }
-        }
-      } else if (allowQuotaFallback && family === "gemini") {
-        const alternateStyle = accountManager.getAvailableHeaderStyle(account, family, model)
-        const fallbackStyle = resolveQuotaFallbackHeaderStyle({
-          family,
-          headerStyle,
-          alternateStyle,
-        })
-        if (fallbackStyle) {
-          const quotaName = headerStyle === "gemini-cli" ? "Gemini CLI" : "Antigravity"
-          const altQuotaName = fallbackStyle === "gemini-cli" ? "Gemini CLI" : "Antigravity"
-          await showToast(`${quotaName} quota exhausted, using ${altQuotaName} quota`, "warning")
-          headerStyle = fallbackStyle
-          pushDebug(`quota fallback: ${headerStyle}`)
-        } else {
-          shouldSwitchAccount = true
-        }
-      } else {
-        shouldSwitchAccount = true
-      }
+    if (accountManager.isRateLimitedForFamily(account, family, model)) {
+      pushDebug(`selected account ${account.index} became rate-limited before dispatch`)
+      shouldSwitchAccount = true
     }
 
     while (!shouldSwitchAccount) {
@@ -974,11 +852,6 @@ export async function executeAntigravityRequest(
         const currentEndpoint = ANTIGRAVITY_ENDPOINT_FALLBACKS[i]
         if (!currentEndpoint) continue
 
-        if (headerStyle === "gemini-cli" && currentEndpoint !== ANTIGRAVITY_ENDPOINT_PROD) {
-          pushDebug(`Skipping sandbox endpoint ${currentEndpoint} for gemini-cli headerStyle`)
-          continue
-        }
-
         try {
           const prepared = prepareAntigravityRequest(
             input,
@@ -986,7 +859,6 @@ export async function executeAntigravityRequest(
             accessToken,
             projectContext.effectiveProjectId,
             currentEndpoint,
-            headerStyle,
             forceThinkingRecovery,
             {
               claudeToolHardening: config.claude_tool_hardening,
@@ -1039,7 +911,6 @@ export async function executeAntigravityRequest(
           log.info("dispatching Antigravity request", {
             destination: new URL(toUrlString(prepared.request)).hostname,
             model: prepared.effectiveModel ?? prepared.requestedModel,
-            headerStyle,
           })
           const response = await fetchImpl(prepared.request, prepared.init)
           pushDebug(`status=${response.status} ${response.statusText}`)
@@ -1090,7 +961,7 @@ export async function executeAntigravityRequest(
               }
             }
 
-            const quotaKey = headerStyleToQuotaKey(headerStyle, family)
+            const quotaKey = quotaKeyForFamily(family)
             const { attempt, delayMs } = getRateLimitBackoff(account.index, quotaKey, serverRetryMs)
 
             const smartBackoffMs = calculateBackoffMs(rateLimitReason, account.consecutiveFailures ?? 0, serverRetryMs)
@@ -1127,14 +998,7 @@ export async function executeAntigravityRequest(
                     `Waiting ${Math.ceil(effectiveDelayMs / 1000)}s for same account (prompt cache preserved)...`,
                     "info",
                   )
-                  accountManager.markRateLimitedWithReason(
-                    account,
-                    family,
-                    headerStyle,
-                    model,
-                    rateLimitReason,
-                    serverRetryMs,
-                  )
+                  accountManager.markRateLimitedWithReason(account, family, model, rateLimitReason, serverRetryMs)
                   await sleep(effectiveDelayMs, abortSignal)
                   i -= 1
                   continue
@@ -1148,7 +1012,6 @@ export async function executeAntigravityRequest(
                 accountManager.markRateLimitedWithReason(
                   account,
                   family,
-                  headerStyle,
                   model,
                   rateLimitReason,
                   serverRetryMs,
@@ -1165,7 +1028,6 @@ export async function executeAntigravityRequest(
             accountManager.markRateLimitedWithReason(
               account,
               family,
-              headerStyle,
               model,
               rateLimitReason,
               serverRetryMs,
@@ -1173,58 +1035,6 @@ export async function executeAntigravityRequest(
             )
 
             accountManager.requestSaveToDisk()
-
-            if (family === "gemini") {
-              if (headerStyle === "antigravity") {
-                if (hasOtherAccountWithAntigravity(account)) {
-                  pushDebug(
-                    `antigravity exhausted on account ${account.index}, but available on others. Switching account.`,
-                  )
-                  await showToast(`Rate limited again. Switching account in 5s...`, "warning")
-                  await sleep(SWITCH_ACCOUNT_DELAY_MS, abortSignal)
-                  shouldSwitchAccount = true
-                  break
-                }
-
-                if (allowQuotaFallback) {
-                  const alternateStyle = accountManager.getAvailableHeaderStyle(account, family, model)
-                  const fallbackStyle = resolveQuotaFallbackHeaderStyle({
-                    family,
-                    headerStyle,
-                    alternateStyle,
-                  })
-                  if (fallbackStyle) {
-                    const safeModelName = model || "this model"
-                    await showToast(
-                      `Antigravity quota exhausted for ${safeModelName}. Switching to Gemini CLI quota...`,
-                      "warning",
-                    )
-                    headerStyle = fallbackStyle
-                    pushDebug(`quota fallback: ${headerStyle}`)
-                    continue
-                  }
-                }
-              } else if (headerStyle === "gemini-cli") {
-                if (allowQuotaFallback) {
-                  const alternateStyle = accountManager.getAvailableHeaderStyle(account, family, model)
-                  const fallbackStyle = resolveQuotaFallbackHeaderStyle({
-                    family,
-                    headerStyle,
-                    alternateStyle,
-                  })
-                  if (fallbackStyle) {
-                    const safeModelName = model || "this model"
-                    await showToast(
-                      `Gemini CLI quota exhausted for ${safeModelName}. Switching to Antigravity quota...`,
-                      "warning",
-                    )
-                    headerStyle = fallbackStyle
-                    pushDebug(`quota fallback: ${headerStyle}`)
-                    continue
-                  }
-                }
-              }
-            }
 
             if (accountCount > 1) {
               const quotaMsg = bodyInfo.quotaResetTime ? ` (quota resets ${bodyInfo.quotaResetTime})` : ``
@@ -1243,7 +1053,7 @@ export async function executeAntigravityRequest(
             break
           }
 
-          const quotaKey = headerStyleToQuotaKey(headerStyle, family)
+          const quotaKey = quotaKeyForFamily(family)
           resetRateLimitState(account.index, quotaKey)
           resetAccountFailureState(account.index)
 
@@ -1260,7 +1070,7 @@ export async function executeAntigravityRequest(
 
               accountManager.markAccountVerificationRequired(account.index, verificationReason, extracted.verifyUrl)
               accountManager.markAccountCoolingDown(account, cooldownMs, "validation-required")
-              accountManager.markRateLimited(account, cooldownMs, family, headerStyle, model)
+              accountManager.markRateLimited(account, cooldownMs, family, model)
 
               const label = account.email || `Account ${account.index + 1}`
               if (accountManager.shouldShowAccountToast(account.index, 60000)) {
@@ -1409,7 +1219,7 @@ export async function executeAntigravityRequest(
           lastError = error instanceof Error ? error : new Error(String(error))
           if (shouldCooldown) {
             accountManager.markAccountCoolingDown(account, cooldownMs, "network-error")
-            accountManager.markRateLimited(account, cooldownMs, family, headerStyle, model)
+            accountManager.markRateLimited(account, cooldownMs, family, model)
             pushDebug(`endpoint-error: cooldown ${cooldownMs}ms after ${failures} failures`)
           }
           shouldSwitchAccount = true

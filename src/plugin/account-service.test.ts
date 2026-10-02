@@ -392,10 +392,9 @@ describe("getQuotaPresentation", () => {
               index: 0,
               status: "ok",
               quota: { groups: { claude: { remainingFraction: 0, resetTime: "2030-01-02T03:04:05Z" } }, modelCount: 1 },
-              geminiCliQuota: { models: [] },
             },
           ]
-        : [{ index: 0, status: "ok", quota: { groups: {}, modelCount: 0 }, geminiCliQuota: { models: [] } }]
+        : [{ index: 0, status: "ok", quota: { groups: {}, modelCount: 0 } }]
     })
 
     const dto = await getQuotaPresentation({} as never)
@@ -414,7 +413,7 @@ describe("getQuotaPresentation", () => {
     expect(dto.accounts[1]?.status).toBe("unknown")
     expect(dto.accounts[1]?.groups.claude?.remainingFraction).toBeNull()
     expect(dto.accounts[1]?.groups.claude?.consumedPercent).toBeNull()
-    // Empty Gemini CLI buckets do not imply exhausted Antigravity quota.
+    // Missing quota groups remain unknown rather than appearing exhausted.
     expect(dto.accounts[1]?.groups["gemini-pro"]?.consumedPercent).toBeNull()
   })
 
@@ -546,7 +545,6 @@ describe("getQuotaPresentation", () => {
                 },
             modelCount: 3,
           },
-          geminiCliQuota: { models: [] },
         },
       ]
     })
@@ -607,7 +605,6 @@ describe("getQuotaPresentation", () => {
           },
           modelCount: 3,
         },
-        geminiCliQuota: { models: [] },
       },
     ])
 
@@ -1063,7 +1060,6 @@ describe("legacy tool adapter parity (check_quota, verify, delete_all)", () => {
       email: "one@example.com",
       status: "ok" as const,
       quota: { groups: {}, modelCount: 0 },
-      geminiCliQuota: { models: [] },
     }
     checkAccountsQuota.mockResolvedValue([
       quotaPayload,
@@ -1079,7 +1075,7 @@ describe("legacy tool adapter parity (check_quota, verify, delete_all)", () => {
     const result = await manageAccounts({ action: "check_quota" }, {} as never, vi.fn(), vi.fn())
     const parsed = JSON.parse(result.content) as Array<Record<string, unknown>>
 
-    // Pre-extraction shape preserved minus the redacted credential field.
+    // Quota shape is preserved minus the redacted credential field.
     expect(parsed).toHaveLength(2)
     expect(parsed[0]).toMatchObject(quotaPayload)
     expect(parsed[1]).not.toHaveProperty("updatedAccount")

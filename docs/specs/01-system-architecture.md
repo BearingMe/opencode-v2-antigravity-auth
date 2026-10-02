@@ -4,7 +4,7 @@
 
 | Part            | Paths                                                          | Responsibility                                                                                                                                               |
 | --------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Shared identity | `src/constants.ts`, `src/shims.d.ts`, `src/google-sdk.ts`      | OAuth client id/secret/scopes/redirect, endpoint orders, header styles, version pinning, hardening prompts, search tuning                                    |
+| Shared identity | `src/constants.ts`, `src/shims.d.ts`, `src/google-sdk.ts`      | OAuth client id/secret/scopes/redirect, endpoint orders, Antigravity headers, version pinning, hardening prompts, search tuning                              |
 | Native engine   | `src/plugin/engine.ts`                                         | Request execution + rotation loop (sole router), unified OAuth refresh, thinking warmup                                                                      |
 | V2 bridge       | `src/v2-plugin.ts`                                             | V2 `integration/provider/model/aisdk/tool/session/event` transforms; routes via the native engine                                                            |
 | OAuth leaf      | `src/antigravity/oauth.ts`                                     | PKCE URL build + code exchange + `loadCodeAssist` project discovery                                                                                          |
@@ -32,7 +32,7 @@ transform/*, request-helpers ──should stay──> pure re: I/O
 native engine: `aisdk.hook("sdk") → antigravityFetch →
 executeAntigravityRequest` (`src/plugin/engine.ts`: rotation,
 soft-quota gate, Retry-After/RetryInfo, thinking
-warmup, toasts, `invalid_grant` eviction, gemini-only dual-pool fallback).
+warmup, toasts, and `invalid_grant` eviction).
 No parallel router, no legacy fallback.
 
 **Rationale:** Single routing implementation; prevents quota/signature drift.
@@ -73,9 +73,8 @@ in `request.ts`, `accounts.ts`, `storage.ts`, `quota.ts`, `project.ts`.
 
 ## Extension points
 
-- `HeaderStyle = "antigravity" | "gemini-cli"` + per-model `quotaPreference`
-  (`src/constants.ts :: getRandomizedHeaders`,
-  `src/plugin/transform/model-resolver.ts :: resolveModelWithTier`).
+- Single Antigravity OAuth content route; ordinary Google API-key connections
+  keep their configured route (`src/plugin/engine.ts`, `src/v2-plugin.ts`).
 - `account_selection_strategy = sticky | round-robin | hybrid` (default
   `hybrid`) + health/token-bucket trackers (`src/plugin/rotation.ts`).
 - `TransformContext/Result`, `StreamingCallbacks/SignatureStore`

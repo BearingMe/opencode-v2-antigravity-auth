@@ -69,11 +69,8 @@ Narrow terminals stack the label and reset text around the bar. Resizing updates
 the layout without fetching quota. The footer shows only **refresh ctrl+r**;
 the header's **esc** control and keyboard Esc return to the account list.
 
-The Gemini CLI pool is fetched for routing fallback but intentionally not
-folded into these bars — it uses a separate model list and reset semantics,
-and merging them would misattribute consumption. Only the Antigravity
-`fetchAvailableModels` groups are shown. There are no weekly/five-hour pool
-sections: no consumed API field backs such a split (see
+Only Antigravity `fetchAvailableModels` groups are shown. There are no
+weekly/five-hour pool sections: no consumed API field backs such a split (see
 [dev/quota-contract.md](../dev/quota-contract.md)).
 
 Quota caching: the presentation prefers a usable fresh check, otherwise the

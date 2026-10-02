@@ -1,13 +1,10 @@
 import crypto from "node:crypto"
 import {
   ANTIGRAVITY_ENDPOINT,
-  GEMINI_CLI_ENDPOINT,
-  GEMINI_CLI_HEADERS,
   EMPTY_SCHEMA_PLACEHOLDER_NAME,
   EMPTY_SCHEMA_PLACEHOLDER_DESCRIPTION,
   SKIP_THOUGHT_SIGNATURE,
   getRandomizedHeaders,
-  type HeaderStyle,
 } from "../constants"
 import { CLAUDE_TOOL_SYSTEM_INSTRUCTION, CLAUDE_DESCRIPTION_PROMPT, ANTIGRAVITY_SYSTEM_INSTRUCTION } from "../constants"
 import { cacheSignature, getCachedSignature } from "./cache"
@@ -50,7 +47,7 @@ import { isGemini3Model, isImageGenerationModel, buildImageGenerationConfig, app
 import {
   resolveModelWithTier,
   resolveModelWithVariant,
-  resolveModelForHeaderStyle,
+  resolveAntigravityModel,
   isClaudeModel,
   isClaudeThinkingModel,
   CLAUDE_THINKING_MAX_OUTPUT_TOKENS,
@@ -725,13 +722,30 @@ export interface PrepareRequestOptions {
   fingerprint?: Fingerprint
 }
 
+const UNSUPPORTED_ANTIGRAVITY_GEMINI_MODELS = new Set(["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-image"])
+
+/**
+ * Reject OAuth model IDs that need a Google API-key connection instead.
+ */
+export function assertAntigravityModelSupported(model: string): void {
+  const normalizedModel = model
+    .replace(/^antigravity-/i, "")
+    .replace(/-(minimal|low|medium|high)$/i, "")
+    .toLowerCase()
+
+  if (UNSUPPORTED_ANTIGRAVITY_GEMINI_MODELS.has(normalizedModel)) {
+    throw new Error(
+      `Model "${model}" is not available through Antigravity OAuth. Use a supported antigravity-gemini-* model or a Google API-key connection.`,
+    )
+  }
+}
+
 export function prepareAntigravityRequest(
   input: RequestInfo,
   init: RequestInit | undefined,
   accessToken: string,
   projectId: string,
   endpointOverride?: string,
-  headerStyle: HeaderStyle = "antigravity",
   forceThinkingRecovery = false,
   options?: PrepareRequestOptions,
 ): {
@@ -747,7 +761,6 @@ export function prepareAntigravityRequest(
   toolDebugSummary?: string
   toolDebugPayload?: string
   needsSignedThinkingWarmup?: boolean
-  headerStyle: HeaderStyle
   thinkingRecoveryMessage?: string
 } {
   const baseInit: RequestInit = { ...init }
@@ -765,7 +778,6 @@ export function prepareAntigravityRequest(
       request: input,
       init: { ...baseInit, headers },
       streaming: false,
-      headerStyle,
     }
   }
 
@@ -775,7 +787,7 @@ export function prepareAntigravityRequest(
   headers.delete("x-api-key")
   // Strip x-goog-user-project header to prevent 403 auth/license conflicts.
   // This header is added by OpenCode/AI SDK and can force project-level checks
-  // that are not required for Antigravity/Gemini CLI OAuth requests.
+  // that are not required for Antigravity OAuth requests.
   headers.delete("x-goog-user-project")
 
   const requestUrl = typeof input === "string" ? input : input.url
@@ -785,19 +797,19 @@ export function prepareAntigravityRequest(
       request: input,
       init: { ...baseInit, headers },
       streaming: false,
-      headerStyle,
     }
   }
 
   const [, rawModel = "", rawAction = ""] = match
   const requestedModel = rawModel
 
-  const resolved = resolveModelForHeaderStyle(rawModel, headerStyle)
+  assertAntigravityModelSupported(rawModel)
+
+  const resolved = resolveAntigravityModel(rawModel)
   const effectiveModel = resolved.actualModel
 
   const streaming = rawAction === STREAM_ACTION
-  const defaultEndpoint = headerStyle === "gemini-cli" ? GEMINI_CLI_ENDPOINT : ANTIGRAVITY_ENDPOINT
-  const baseEndpoint = endpointOverride ?? defaultEndpoint
+  const baseEndpoint = endpointOverride ?? ANTIGRAVITY_ENDPOINT
   const transformedUrl = `${baseEndpoint}/v1internal:${rawAction}${streaming ? "?alt=sse" : ""}`
 
   const isClaude = isClaudeModel(resolved.actualModel)
@@ -1468,37 +1480,34 @@ export function prepareAntigravityRequest(
         stripInjectedDebugFromRequestPayload(requestPayload)
         sanitizeRequestPayloadForAntigravity(requestPayload)
 
-        const effectiveProjectId =
-          projectId?.trim() || (headerStyle === "antigravity" ? generateSyntheticProjectId() : "")
+        const effectiveProjectId = projectId?.trim() || generateSyntheticProjectId()
         resolvedProjectId = effectiveProjectId
 
         // Inject Antigravity system instruction with role "user" (CLIProxyAPI v6.6.89 compatibility)
         // This sets request.systemInstruction.role = "user" and request.systemInstruction.parts[0].text
-        if (headerStyle === "antigravity") {
-          const existingSystemInstruction = requestPayload.systemInstruction
-          if (existingSystemInstruction && typeof existingSystemInstruction === "object") {
-            const sys = existingSystemInstruction as Record<string, unknown>
-            sys.role = "user"
-            if (Array.isArray(sys.parts) && sys.parts.length > 0) {
-              const firstPart = sys.parts[0] as Record<string, unknown>
-              if (firstPart && typeof firstPart.text === "string") {
-                firstPart.text = ANTIGRAVITY_SYSTEM_INSTRUCTION + "\n\n" + firstPart.text
-              } else {
-                sys.parts = [{ text: ANTIGRAVITY_SYSTEM_INSTRUCTION }, ...sys.parts]
-              }
+        const existingSystemInstruction = requestPayload.systemInstruction
+        if (existingSystemInstruction && typeof existingSystemInstruction === "object") {
+          const sys = existingSystemInstruction as Record<string, unknown>
+          sys.role = "user"
+          if (Array.isArray(sys.parts) && sys.parts.length > 0) {
+            const firstPart = sys.parts[0] as Record<string, unknown>
+            if (firstPart && typeof firstPart.text === "string") {
+              firstPart.text = ANTIGRAVITY_SYSTEM_INSTRUCTION + "\n\n" + firstPart.text
             } else {
-              sys.parts = [{ text: ANTIGRAVITY_SYSTEM_INSTRUCTION }]
-            }
-          } else if (typeof existingSystemInstruction === "string") {
-            requestPayload.systemInstruction = {
-              role: "user",
-              parts: [{ text: ANTIGRAVITY_SYSTEM_INSTRUCTION + "\n\n" + existingSystemInstruction }],
+              sys.parts = [{ text: ANTIGRAVITY_SYSTEM_INSTRUCTION }, ...sys.parts]
             }
           } else {
-            requestPayload.systemInstruction = {
-              role: "user",
-              parts: [{ text: ANTIGRAVITY_SYSTEM_INSTRUCTION }],
-            }
+            sys.parts = [{ text: ANTIGRAVITY_SYSTEM_INSTRUCTION }]
+          }
+        } else if (typeof existingSystemInstruction === "string") {
+          requestPayload.systemInstruction = {
+            role: "user",
+            parts: [{ text: ANTIGRAVITY_SYSTEM_INSTRUCTION + "\n\n" + existingSystemInstruction }],
+          }
+        } else {
+          requestPayload.systemInstruction = {
+            role: "user",
+            parts: [{ text: ANTIGRAVITY_SYSTEM_INSTRUCTION }],
           }
         }
 
@@ -1508,11 +1517,9 @@ export function prepareAntigravityRequest(
           request: requestPayload,
         }
 
-        if (headerStyle === "antigravity") {
-          wrappedBody.requestType = "agent"
-          wrappedBody.userAgent = "antigravity"
-          wrappedBody.requestId = "agent-" + crypto.randomUUID()
-        }
+        wrappedBody.requestType = "agent"
+        wrappedBody.userAgent = "antigravity"
+        wrappedBody.requestId = "agent-" + crypto.randomUUID()
         if (wrappedBody.request && typeof wrappedBody.request === "object") {
           // Use stable session ID for signature caching across multi-turn conversations
           sessionId = signatureSessionKey
@@ -1545,23 +1552,11 @@ export function prepareAntigravityRequest(
     }
   }
 
-  if (headerStyle === "antigravity") {
-    // Use randomized headers as the fallback pool for Antigravity mode
-    const selectedHeaders = getRandomizedHeaders("antigravity", requestedModel)
+  const selectedHeaders = getRandomizedHeaders()
+  const fingerprint = options?.fingerprint ?? getSessionFingerprint()
+  const fingerprintHeaders = buildFingerprintHeaders(fingerprint)
 
-    // Antigravity mode: Match Antigravity Manager behavior
-    // AM only sends User-Agent on content requests — no X-Goog-Api-Client, no Client-Metadata header
-    // (ideType=ANTIGRAVITY goes in request body metadata via project.ts, not as a header)
-    const fingerprint = options?.fingerprint ?? getSessionFingerprint()
-    const fingerprintHeaders = buildFingerprintHeaders(fingerprint)
-
-    headers.set("User-Agent", fingerprintHeaders["User-Agent"] || selectedHeaders["User-Agent"])
-  } else {
-    // Gemini CLI mode: match opencode-gemini-auth Code Assist header set exactly
-    headers.set("User-Agent", GEMINI_CLI_HEADERS["User-Agent"])
-    headers.set("X-Goog-Api-Client", GEMINI_CLI_HEADERS["X-Goog-Api-Client"])
-    headers.set("Client-Metadata", GEMINI_CLI_HEADERS["Client-Metadata"])
-  }
+  headers.set("User-Agent", fingerprintHeaders["User-Agent"] || selectedHeaders["User-Agent"])
   return {
     request: transformedUrl,
     init: {
@@ -1579,7 +1574,6 @@ export function prepareAntigravityRequest(
     toolDebugSummary: toolDebugSummaries.slice(0, 20).join(" | "),
     toolDebugPayload,
     needsSignedThinkingWarmup,
-    headerStyle,
     thinkingRecoveryMessage,
   }
 }

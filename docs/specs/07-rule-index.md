@@ -95,7 +95,7 @@ FR2` — interleaving is a 400) (Strong + External).
 - `hooks/*` MUST NOT gain auth/quota/storage deps (SHOULD, §01).
 - New code MUST use `getAntigravityHeaders()/getAntigravityVersion()/
 invalidatePackage()` over deprecated exports (Explicit).
-- `x-goog-user-project` MUST be stripped for all header styles; content
+- `x-goog-user-project` MUST be stripped from OAuth requests; content
   requests MUST NOT send QuotaUser/Device-Id/Api-Client/Client-Metadata
   (Explicit, §06 items 9–10).
 - `debug` gates file logging only; `debug_tui` gates TUI logging only

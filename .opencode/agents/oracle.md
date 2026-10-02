@@ -53,7 +53,7 @@ Runtime and version facts you MUST NOT get wrong (verify against the repo if the
 - Project runtime is Bun 1.4.2 / TypeScript (strict, `verbatimModuleSyntax`) / Vitest. Never reference Python `.venv`, UV, or unrelated ecosystems.
 - Mocked Vitest tests verify local transformation logic only — never cite them as proof of live vendor auth or wire-protocol correctness.
 - UI model-catalog visibility after an isolated smoke run is schema discovery only, not backend proof.
-- Critical parity invariants: session recovery via synthetic `tool_result` injection, dual Gemini quota pools (`antigravity` + `gemini-cli` headers with endpoint fallback), multi-account rotation, Google OAuth exchange/refresh, SSE stream decoding.
+- Critical parity invariants: session recovery via synthetic `tool_result` injection, Antigravity-only Gemini/Claude OAuth routing, multi-account rotation, Google OAuth exchange/refresh, SSE stream decoding.
 
 Boundaries:
 

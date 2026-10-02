@@ -43,28 +43,18 @@ store does not fall back to the pre-check account pool.
 
 ## What is not shown (deliberate)
 
-- **Gemini CLI pool** (`geminiCliQuota`: `retrieveUserQuota` buckets for
-  `gemini-3-*` / `gemini-2.5-pro`) is fetched for routing fallback but not
-  represented in `QuotaPresentation`, which models only the Antigravity
-  `fetchAvailableModels` groups. Separate model list, separate reset
-  semantics — folding them together would misattribute consumption.
-- **No weekly / five-hour sections.** The `retrieveUserQuota` buckets carry
-  a `tokenType` field, but no code path consumes it and no fixture documents
-  its values; `fetchAvailableModels` exposes no window labels at all. An
-  earlier report of Google-models vs Claude/GPT-OSS pools with 5-hour and
-  weekly windows found no such shape in the repo, so no regrouping was made.
-  Grouping stays `claude` / `gemini-pro` / `gemini-flash` (a model-name
-  display aggregation, not vendor pools). To revisit, capture anonymized
-  raw `fetchAvailableModels` and `retrieveUserQuota` JSON (tokens redacted)
-  plus which Antigravity surface shows those labels and which models each
-  covers.
+- Quota presentation has no Gemini CLI pool. It displays only the Antigravity
+  `fetchAvailableModels` groups: `claude`, `gemini-pro`, and `gemini-flash`.
+- **No weekly / five-hour sections.** `fetchAvailableModels` exposes no
+  window labels. Grouping stays `claude` / `gemini-pro` / `gemini-flash` (a
+  model-name display aggregation, not vendor pools).
 
 ## Cancellation and timeouts
 
 - Quota cancellation is fetch-abort only: the optional `quotaSignal` covers
-  the two quota fetch calls (`fetchAvailableModels`, `fetchGeminiCliQuota`)
-  combined with the internal 10 s timeout via `AbortSignal.any`. Token
-  refresh and project-context resolution always run to completion.
+  `fetchAvailableModels` combined with the internal 10 s timeout via
+  `AbortSignal.any`. Token refresh and project-context resolution always run
+  to completion.
 - `checkSingleAccountQuota` aborts its per-account fetch on timeout while
   keeping the `Promise.race` shape, so a hung fetch releases its socket;
   other accounts still resolve independently (partial results).

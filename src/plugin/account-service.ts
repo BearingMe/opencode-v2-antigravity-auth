@@ -425,11 +425,7 @@ async function checkSingleAccountQuota(
 /**
  * Build validated, credential-free quota bars and account state for the UI.
  * Quota values are sourced only from Antigravity fetchAvailableModels; an
- * absent group/value remains null, and Gemini CLI's empty buckets are ignored.
- * The Gemini-CLI quota pool (`geminiCliQuota` on the raw check result) is
- * intentionally not represented here: it carries a separate model list with
- * its own buckets, and the presentation DTO models only the Antigravity
- * fetchAvailableModels groups (claude, gemini-pro, gemini-flash).
+ * absent group/value remains null.
  */
 export async function getQuotaPresentation(
   client: PluginClient,

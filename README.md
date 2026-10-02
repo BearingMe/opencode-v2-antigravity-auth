@@ -1,11 +1,11 @@
-# Antigravity + Gemini CLI OAuth Plugin for OpenCode V2
+# Antigravity OAuth Plugin for OpenCode V2
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Authenticate OpenCode V2 against **Antigravity** (Google's IDE backend) via
 OAuth and use Antigravity quota for `gemini-3` / `claude-4.6` models with
-your Google credentials. Multi-account rotation, dual Gemini quota pools,
-thinking support, and session recovery included.
+your Google credentials. Multi-account rotation, thinking support, and
+session recovery included.
 
 > **Maintained V2 port.** This is a fork of
 > [`NoeFabris/opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth)
@@ -28,7 +28,7 @@ thinking support, and session recovery included.
 - **Claude Opus 4.6 / Sonnet 4.6** and **Gemini 3 / 3.1 Pro/Flash** via
   Google OAuth
 - **Multi-account rotation** across up to 10 Google accounts
-- **Dual Gemini quota pools** (Antigravity + Gemini CLI, automatic fallback)
+- **One Antigravity quota pool** for supported Gemini and Claude models
 - **Thinking models** with configurable variants
 - **Auto-recovery** from interrupted tool calls
 - **Model-declared web search** sanitized by the pipeline (no dedicated
@@ -81,15 +81,20 @@ opencode run "Hello" --model=google/antigravity-gemini-3-flash
 Create `~/.config/opencode/antigravity.json` (project override:
 `.opencode/antigravity.json`). Defaults work for most users.
 
-| Area              | Key options                                                                                                    |
-| ----------------- | -------------------------------------------------------------------------------------------------------------- |
-| Thinking/recovery | `keep_thinking` (default `false`), `session_recovery` (`true`), `auto_resume` (`false`), `cli_first` (`false`) |
-| Rotation          | `account_selection_strategy` (`hybrid`), `scheduling_mode` (`cache_first`), `pid_offset_enabled` (`false`)     |
-| Quota protection  | `soft_quota_threshold_percent` (`90`), `quota_refresh_interval_minutes` (`15`)                                 |
-| Behavior          | `quiet_mode` (`false`), `toast_scope` (`root_only`), `debug` / `debug_tui` (`false`), `auto_update` (`true`)   |
+| Area              | Key options                                                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------------------------------ |
+| Thinking/recovery | `keep_thinking` (default `false`), `session_recovery` (`true`), `auto_resume` (`false`)                      |
+| Rotation          | `account_selection_strategy` (`hybrid`), `scheduling_mode` (`cache_first`), `pid_offset_enabled` (`false`)   |
+| Quota protection  | `soft_quota_threshold_percent` (`90`), `quota_refresh_interval_minutes` (`15`)                               |
+| Behavior          | `quiet_mode` (`false`), `toast_scope` (`root_only`), `debug` / `debug_tui` (`false`), `auto_update` (`true`) |
 
 Full reference: [docs/user/configuration.md](docs/user/configuration.md).
 Schema: `assets/antigravity.schema.json`.
+
+Gemini CLI-only model IDs such as `gemini-2.5-pro` and `gemini-2.5-flash`
+are not served through Antigravity OAuth. Use a registered
+`antigravity-gemini-*` model instead, or keep using those IDs with an ordinary
+Google API-key connection. Verified Gemini preview aliases remain supported.
 
 ## Docs
 

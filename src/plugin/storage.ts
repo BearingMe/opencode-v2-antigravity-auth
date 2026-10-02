@@ -13,7 +13,6 @@ import { dirname, join } from "node:path"
 import { homedir } from "node:os"
 import { createHash, randomBytes } from "node:crypto"
 import lockfile from "proper-lockfile"
-import type { HeaderStyle } from "../constants"
 import { createLogger } from "./logger"
 
 const log = createLogger("storage")
@@ -112,7 +111,6 @@ export function ensureGitignoreSync(configDir: string): void {
 }
 
 export type ModelFamily = "claude" | "gemini"
-export type { HeaderStyle }
 
 export interface RateLimitState {
   claude?: number
@@ -122,6 +120,7 @@ export interface RateLimitState {
 export interface RateLimitStateV3 {
   claude?: number
   "gemini-antigravity"?: number
+  /** Legacy Gemini CLI cooldown retained when reading existing stores. */
   "gemini-cli"?: number
   [key: string]: number | undefined
 }
