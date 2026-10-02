@@ -106,18 +106,21 @@ describe("V2 Antigravity runtime bridge", () => {
     mockNativeFetch.mockImplementation(async () => new Response("native-ok"))
   })
 
-  it("registers Antigravity models on Google and routes SDK JSON through the native engine", async () => {
+  it("registers a standalone Antigravity provider and routes its SDK requests through the native engine", async () => {
     let modelDefinitions: Array<Record<string, unknown>> = []
     let integrationMethod: Record<string, unknown> | undefined
-    const inheritedKey = { type: "key", label: "API key" }
-    const inheritedEnv = { type: "env", names: ["GOOGLE_API_KEY"] }
-    const otherOAuth = { type: "oauth", id: "other-oauth", label: "Other OAuth" }
-    const listMethods = vi.fn(() => [inheritedKey, inheritedEnv, otherOAuth])
-    const removeMethod = vi.fn()
-    const googleProviderInfo: { activation?: string; package?: string } = {
-      activation: "auto",
-      package: "@opencode/ai/providers/google",
-    }
+    const integrationName: { name?: string } = {}
+    const updateIntegration = vi.fn((_id: string, update: (integration: { name?: string }) => void) =>
+      update(integrationName),
+    )
+    let antigravityProviderInfo: { id?: string; name?: string; activation?: string; package?: string } | undefined
+    const getProvider = vi.fn(() => undefined)
+    const addProvider = vi.fn(
+      (input: { info: typeof antigravityProviderInfo; models: Array<Record<string, unknown>> }) => {
+        antigravityProviderInfo = input.info ?? undefined
+        modelDefinitions = input.models
+      },
+    )
     let sdkHook:
       | ((event: {
           package: string
@@ -128,7 +131,7 @@ describe("V2 Antigravity runtime bridge", () => {
       | undefined
     let cleanup: (() => void) | void
 
-    const connection = { id: "google-connection" }
+    const connection = { id: "antigravity-connection" }
     let activeConnection: typeof connection | undefined = connection
     let credential: unknown = {
       type: "oauth",
@@ -147,10 +150,9 @@ describe("V2 Antigravity runtime bridge", () => {
         transform: async (callback: (editor: unknown) => void) => {
           replayIntegration = () =>
             callback({
-              update: vi.fn(),
+              get: vi.fn(),
+              update: updateIntegration,
               method: {
-                list: listMethods,
-                remove: removeMethod,
                 update: (value: Record<string, unknown>) => {
                   integrationMethod = value
                 },
@@ -159,34 +161,24 @@ describe("V2 Antigravity runtime bridge", () => {
           replayIntegration()
         },
         connection: {
-          active: vi.fn(async () => activeConnection),
+          active: vi.fn(async (integrationID: string) =>
+            integrationID === "antigravity" ? activeConnection : undefined,
+          ),
           resolve: vi.fn(async () => credential),
         },
       },
       provider: {
         transform: async (callback: (editor: unknown) => void) =>
           callback({
-            get: () => ({
-              models: new Map([
-                [
-                  "antigravity-gemini-3.8-flash-tiered",
-                  {
-                    id: "antigravity-gemini-3.8-flash-tiered",
-                    package: "@opencode/ai/providers/google",
-                    settings: {},
-                  },
-                ],
-              ]),
-              info: googleProviderInfo,
-            }),
+            get: getProvider,
             update: (_id: string, update: (provider: { activation?: string; package?: string }) => void) =>
-              update(googleProviderInfo),
+              update(antigravityProviderInfo ?? {}),
             models: {
               set: (_id: string, models: Array<Record<string, unknown>>) => {
                 modelDefinitions = models
               },
             },
-            add: vi.fn(),
+            add: addProvider,
           }),
       },
       model: {
@@ -215,12 +207,22 @@ describe("V2 Antigravity runtime bridge", () => {
     cleanup = await plugin.setup(ctx as never)
 
     expect(modelDefinitions.length).toBeGreaterThan(0)
-    expect(googleProviderInfo.activation).toBe("enabled")
-    expect(googleProviderInfo.package).toBe(`aisdk:${sdkPackage}`)
+    expect(addProvider).toHaveBeenCalledOnce()
+    expect(antigravityProviderInfo).toMatchObject({
+      id: "antigravity",
+      name: "Antigravity",
+      activation: "enabled",
+      package: `aisdk:${sdkPackage}`,
+    })
+    expect(getProvider).toHaveBeenCalledWith("antigravity")
+    expect(updateIntegration).toHaveBeenCalledExactlyOnceWith("antigravity", expect.any(Function))
+    expect(ctx.integration.connection.active.mock.calls.every(([id]) => id === "antigravity")).toBe(true)
+    expect(integrationName.name).toBe("Antigravity")
+    expect(ctx.aisdk.hook).toHaveBeenCalledWith("sdk", expect.any(Function), { providerID: "antigravity" })
     const claudeModel = modelDefinitions.find((model) => model.id === "antigravity-claude-opus-4-6-thinking")
-    const customGeminiModel = modelDefinitions.find((model) => model.id === "antigravity-gemini-3.8-flash-tiered")
+    const geminiPreviewAlias = modelDefinitions.find((model) => model.id === "gemini-3-flash-preview")
     expect(claudeModel?.package).toBe(`aisdk:${sdkPackage}`)
-    expect(customGeminiModel?.package).toBe(`aisdk:${sdkPackage}`)
+    expect(geminiPreviewAlias?.package).toBe(`aisdk:${sdkPackage}`)
     expect((claudeModel?.settings as Record<string, unknown>)?.fetch).toBeUndefined()
     expect(sdkHook).toEqual(expect.any(Function))
     const rpcRegister = ctx.rpc.register as unknown as {
@@ -248,9 +250,8 @@ describe("V2 Antigravity runtime bridge", () => {
     expect(label({ refresh: "other-token", metadata: { email: "connected@example.com" } })).toBe(
       "connected@example.com",
     )
-    expect(listMethods).toHaveBeenCalledWith("google")
-    expect(removeMethod).toHaveBeenCalledExactlyOnceWith("google", inheritedKey)
-    expect(removeMethod.mock.calls[0]?.[1]).toBe(inheritedKey)
+    expect(integrationMethod?.integrationID).toBe("antigravity")
+    expect(integrationMethod?.method).toMatchObject({ id: "antigravity-oauth" })
     expect(integrationMethod?.method).toMatchObject({
       form: [
         {
@@ -278,23 +279,12 @@ describe("V2 Antigravity runtime bridge", () => {
     await sdkHook?.(unnormalizedSdkEvent)
     expect(unnormalizedSdkEvent.sdk).toBeUndefined()
 
-    // API-key passthrough is preserved: ordinary Gemini models keep their own route.
-    credential = { type: "api", key: "google-api-key" }
-    loadAccounts.mockResolvedValue({
-      version: 4,
-      accounts: [{ email: "saved@example.com", refreshToken: "saved-refresh", addedAt: 1, lastUsed: 2 }],
-      activeIndex: 0,
-    })
-    const ordinaryGeminiOptions = { apiKey: "real-google-api-key" }
-    const ordinaryGeminiEvent = {
-      package: sdkPackage,
-      model: { id: "gemini-2.5-flash" },
-      options: ordinaryGeminiOptions,
-    }
-    await sdkHook?.(ordinaryGeminiEvent)
-    expect(ordinaryGeminiEvent.options).toBe(ordinaryGeminiOptions)
-    expect(ordinaryGeminiEvent.options.apiKey).toBe("real-google-api-key")
-    expect("fetch" in ordinaryGeminiEvent.options).toBe(false)
+    // Google SDK events aren't handled by this provider-scoped bridge.
+    const googleOptions = { apiKey: "google-api-key" }
+    const googleEvent = { package: "@ai-sdk/google", model: { id: "gemini-2.5-flash" }, options: googleOptions }
+    await sdkHook?.(googleEvent)
+    expect(googleEvent.options).toBe(googleOptions)
+    expect(ctx.integration.connection.active).not.toHaveBeenCalled()
 
     activeConnection = undefined
     loadAccounts.mockResolvedValue({ version: 4, accounts: [], activeIndex: 0 })
@@ -454,6 +444,7 @@ describe("V2 Antigravity runtime bridge", () => {
       options: sdkOptions,
     }
     await sdkHook?.(sdkEvent)
+    expect(ctx.integration.connection.active).toHaveBeenCalledWith("antigravity")
     expect(sdkEvent.sdk).toBeDefined()
     expect(sdkOptions.apiKey).toBe("antigravity-oauth")
     const fetchModel = sdkOptions as { fetch: (input: string, init: RequestInit) => Promise<Response> }
@@ -473,7 +464,7 @@ describe("V2 Antigravity runtime bridge", () => {
     expect(mockNativeFetch).toHaveBeenCalledOnce()
     expect(mockNativeFetch.mock.calls[0]?.[0]).toBe(requestUrl)
     expect(mockNativeFetch.mock.calls[0]?.[1]?.body).toBe(payload)
-    expect(mockNativeFetch.mock.calls[0]?.[2]).toMatchObject({ providerId: "google" })
+    expect(mockNativeFetch.mock.calls[0]?.[2]).toMatchObject({ providerId: "antigravity" })
     expect(mockRefreshQueue.setAccountManager).toHaveBeenCalledOnce()
     expect(mockRefreshQueue.start).toHaveBeenCalledOnce()
 
@@ -490,7 +481,7 @@ describe("V2 Antigravity runtime bridge", () => {
       access: "old-access",
       refresh: "old-refresh|old-project",
       expires: 1,
-      methodID: "google-oauth",
+      methodID: "antigravity-oauth",
     }
     mockUnifiedRefresh.mockResolvedValueOnce({ ...credential, access: "new-access" })
     const refreshed = await refreshOAuthCredential(credential, {} as never)

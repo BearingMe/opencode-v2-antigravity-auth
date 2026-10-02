@@ -26,13 +26,18 @@ checks — never your real multi-account store.
 - [ ] Login shows the required Add/reconnect selection and saved-account
       summary before opening the browser. Ctrl+C opens no browser and writes
       nothing. No Exit option or custom host build is required.
-- [ ] Stock host: selecting Add opens consent once. After completion the host exits;
-      another login shows the updated count. There is no repeated-add loop.
+- [ ] Stock host: select Antigravity, then Add opens consent once. After
+      completion the host exits; another login shows the updated count. There
+      is no repeated-add loop.
 
 - [ ] Empty state with no saved accounts: alert pointing to
       `opencode auth login` (no crash, no empty select).
 - [ ] Repeated login with the same Google account reconnects: still one
       entry, quota works, durable id preserved.
+- [ ] Antigravity login registers under its own integration; Google provider,
+      Google sign-in methods, and active Google connections remain unchanged.
+- [ ] Existing `google/<model>` selections for Antigravity models are migrated
+      to `antigravity/<model>`; ordinary Google API-key models retain their route.
 - [ ] Already-saved account at 10/10 reconnects instead of failing (count
       stays 10, no capacity error for the duplicate).
 - [ ] Genuinely new account at 10/10 fails cleanly with the capacity

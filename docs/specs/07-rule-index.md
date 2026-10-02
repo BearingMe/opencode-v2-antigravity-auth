@@ -10,8 +10,11 @@ Inferred (likely intent). Details live in the referenced sections.
   all model traffic through the native engine (`src/plugin/engine.ts`).
   No parallel router, no legacy fallback. The name is historical; the
   requirement is the current native engine.
-- R-ARCH-NO-BYPASS-SDK (Explicit, §01): OAuth models MUST use
-  `aisdk:<google-sdk.js>`; API-key Gemini MUST NOT receive `options.fetch`.
+- R-ARCH-ANTIGRAVITY-AUTH-ISOLATION (Explicit, §01): Antigravity MUST use its
+  own provider and OAuth integration; OpenCode's `google` provider and
+  integration MUST remain untouched.
+- R-ARCH-NO-BYPASS-SDK (Explicit, §01): Antigravity models MUST use
+  `aisdk:<google-sdk.js>`; Google provider models remain outside this plugin.
 - R-FETCH-SCOPE (Explicit, §05): only absolute http(s) GL model paths
   (`generateContent|streamGenerateContent|countTokens`) are routed;
   non-model GL throws; external origins are stripped and direct-fetched.

@@ -2,9 +2,9 @@
 
 ## F1 — First login (OAuth)
 
-Trigger: `opencode auth login` (one account per command, up to 10 saved
-accounts; rerun the command to add another).
-Participants: V2 `google-oauth` pre-authorization form → `antigravity/oauth.ts` →
+Trigger: `opencode auth login` (select Antigravity; one account per command,
+up to 10 saved accounts; rerun the command to add another).
+Participants: V2 `antigravity` / `antigravity-oauth` pre-authorization form → `antigravity/oauth.ts` →
 `storage.ts` (via `account-service.ts`) → `project.ts` → `quota.ts`.
 The method declares one required selection field (no Skip option).
 

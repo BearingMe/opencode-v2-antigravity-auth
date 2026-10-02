@@ -12,17 +12,17 @@ const MODELS: ModelTest[] = [
   { model: "google/gemini-2.5-flash", category: "google-api-key" },
 
   // Antigravity Gemini, including verified legacy preview aliases.
-  { model: "google/antigravity-gemini-3-pro-low", category: "antigravity-gemini" },
-  { model: "google/antigravity-gemini-3-pro-high", category: "antigravity-gemini" },
-  { model: "google/antigravity-gemini-3-flash", category: "antigravity-gemini" },
-  { model: "google/gemini-3-flash-preview", category: "antigravity-gemini" },
-  { model: "google/gemini-3-pro-preview", category: "antigravity-gemini" },
+  { model: "antigravity/antigravity-gemini-3-pro-low", category: "antigravity-gemini" },
+  { model: "antigravity/antigravity-gemini-3-pro-high", category: "antigravity-gemini" },
+  { model: "antigravity/antigravity-gemini-3-flash", category: "antigravity-gemini" },
+  { model: "antigravity/gemini-3-flash-preview", category: "antigravity-gemini" },
+  { model: "antigravity/gemini-3-pro-preview", category: "antigravity-gemini" },
 
   // Antigravity Claude
-  { model: "google/antigravity-claude-sonnet-4-6", category: "antigravity-claude" },
-  { model: "google/antigravity-claude-opus-4-6-thinking-low", category: "antigravity-claude" },
-  { model: "google/antigravity-claude-opus-4-6-thinking-medium", category: "antigravity-claude" },
-  { model: "google/antigravity-claude-opus-4-6-thinking-high", category: "antigravity-claude" },
+  { model: "antigravity/antigravity-claude-sonnet-4-6", category: "antigravity-claude" },
+  { model: "antigravity/antigravity-claude-opus-4-6-thinking-low", category: "antigravity-claude" },
+  { model: "antigravity/antigravity-claude-opus-4-6-thinking-medium", category: "antigravity-claude" },
+  { model: "antigravity/antigravity-claude-opus-4-6-thinking-high", category: "antigravity-claude" },
 ]
 
 const TEST_PROMPT = "Reply with exactly one word: WORKING"
@@ -112,7 +112,7 @@ Options:
 
 Examples:
   bun run script/test-models.ts --dry-run
-  bun run script/test-models.ts --model google/gemini-3-flash-preview
+  bun run script/test-models.ts --model antigravity/gemini-3-flash-preview
   bun run script/test-models.ts --category antigravity-claude
 `)
 }

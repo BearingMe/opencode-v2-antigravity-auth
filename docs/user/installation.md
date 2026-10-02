@@ -27,25 +27,27 @@ becomes `"plugins": ["opencode-v2-antigravity-auth@latest"]`.
 > OpenCode V2 uses the `plugins` (plural) key. `plugin` (singular) is not
 > valid V2 configuration.
 
-## Connect Google
+## Connect Antigravity
 
 ```bash
 opencode auth login
 ```
 
-Each run adds or reconnects **one** account (up to 10). To add another
-account, run the command again. Cancelling the browser flow writes nothing.
+Choose **Antigravity** in the sign-in list. Each run adds or reconnects **one**
+account (up to 10). To add another account, run the command again. Cancelling
+the browser flow writes nothing. This is the plugin's own integration and does
+not replace or modify OpenCode's Google sign-in.
 
 Before the browser opens, login shows saved accounts and a real
 Add/reconnect selection. Only Add starts consent; Ctrl+C cancels without
 changes. This uses standard OpenCode, with no custom host build required.
-Complete Google sign-in, then paste either the authorization code or the full
-`localhost` redirect URL when prompted.
+Complete Google consent for Antigravity, then paste either the authorization
+code or the full `localhost` redirect URL when prompted.
 
 ## Verify
 
 ```bash
-opencode run "Hello" --model=google/antigravity-gemini-3-flash
+opencode run "Hello" --model=antigravity/antigravity-gemini-3-flash
 ```
 
 Models are registered automatically by the plugin — no manual model

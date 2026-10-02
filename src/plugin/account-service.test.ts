@@ -186,7 +186,7 @@ describe("checkQuota", () => {
   })
 
   it("strips updatedAccount credential material from results", async () => {
-    const outcome = await checkQuota({} as never, "google")
+    const outcome = await checkQuota({} as never, "antigravity")
 
     expect(outcome.results).toHaveLength(2)
     expect(outcome.results[1]).not.toHaveProperty("updatedAccount")
@@ -195,7 +195,7 @@ describe("checkQuota", () => {
   })
 
   it("persists rotated token metadata without touching other fields", async () => {
-    const outcome = await checkQuota({} as never, "google")
+    const outcome = await checkQuota({} as never, "antigravity")
 
     expect(outcome.persistedUpdates).toBe(1)
     expect(updateAccounts).toHaveBeenCalledOnce()
@@ -218,7 +218,7 @@ describe("checkQuota", () => {
       },
     ])
 
-    const outcome = await checkQuota({} as never, "google")
+    const outcome = await checkQuota({} as never, "antigravity")
 
     expect(outcome.persistedUpdates).toBe(0)
     // The rotation matched nothing inside the transaction, so no replacement
@@ -651,7 +651,7 @@ describe("verifyAccount", () => {
   })
 
   it("marks blocked accounts disabled and records the verification link", async () => {
-    const outcome = await verifyAccount({ index: 0 }, {} as never, "google")
+    const outcome = await verifyAccount({ index: 0 }, {} as never, "antigravity")
 
     expect(outcome).toMatchObject({
       index: 0,
@@ -682,7 +682,7 @@ describe("verifyAccount", () => {
     )
     verifyAccountAccess.mockResolvedValue({ status: "ok", message: "Account verification check passed." })
 
-    const outcome = await verifyAccount({ index: 0 }, {} as never, "google")
+    const outcome = await verifyAccount({ index: 0 }, {} as never, "antigravity")
 
     expect(outcome).toMatchObject({ status: "ok", checkedAt: expect.any(Number) })
     const writtenCleared = written[0] as { accounts: Array<Record<string, unknown>> }
@@ -693,7 +693,7 @@ describe("verifyAccount", () => {
   it("records errors without disabling and resolves by durable id", async () => {
     verifyAccountAccess.mockResolvedValue({ status: "error", message: "network unavailable" })
 
-    const outcome = await verifyAccount({ id: "acc-two" }, {} as never, "google")
+    const outcome = await verifyAccount({ id: "acc-two" }, {} as never, "antigravity")
 
     expect(outcome).toMatchObject({ index: 1, status: "error" })
     const writtenVerifyError = written[0] as { accounts: Array<Record<string, unknown>> }
@@ -701,7 +701,7 @@ describe("verifyAccount", () => {
   })
 
   it("does not write for unresolvable targets", async () => {
-    const outcome = await verifyAccount({ index: 8 }, {} as never, "google")
+    const outcome = await verifyAccount({ index: 8 }, {} as never, "antigravity")
 
     expect(outcome).toMatchObject({ ok: false })
     expect(updateAccounts).not.toHaveBeenCalled()
@@ -715,7 +715,7 @@ describe("verifyAccount", () => {
     )
     verifyAccountAccess.mockResolvedValue({ status: "ok", message: "Account verification check passed." })
 
-    const outcome = await verifyAccount({ id: "acc-one" }, {} as never, "google")
+    const outcome = await verifyAccount({ id: "acc-one" }, {} as never, "antigravity")
 
     expect(outcome).toMatchObject({ ok: false, kind: "not-found" })
     expect(written).toHaveLength(0)

@@ -1,8 +1,23 @@
 # Models and variants
 
-Models are registered automatically by the plugin on the `google` provider.
+Models are registered automatically by the plugin on the `antigravity` provider.
 Explicit model definitions are optional; the inventory below matches
 `src/plugin/config/models.ts`.
+
+## Migrate existing model references
+
+Antigravity models now use a dedicated provider ID. Change only the provider
+prefix on old Antigravity selections, for example:
+
+```text
+google/antigravity-gemini-3-pro → antigravity/antigravity-gemini-3-pro
+google/gemini-3-flash-preview  → antigravity/gemini-3-flash-preview
+```
+
+Ordinary Google models such as `google/gemini-2.5-flash` keep their existing
+provider and connection. The plugin does not migrate, read, or remove Google
+credentials. Existing Antigravity accounts in the plugin's v4 account store
+remain available.
 
 ## Antigravity models
 
@@ -27,13 +42,14 @@ remain supported as compatibility aliases:
 Gemini 2.5 IDs such as `gemini-2.5-flash`, `gemini-2.5-pro`, and
 `gemini-2.5-flash-image` are not supported through Antigravity OAuth. Use a
 registered `antigravity-gemini-*` model instead, or use those IDs with an
-ordinary Google API-key connection. API-key connections are not rerouted by
-this plugin; `gemini-2.5-flash-image` is only available through the Google API.
+ordinary Google API-key connection on OpenCode's separate `google` provider.
+This plugin does not alter that provider; `gemini-2.5-flash-image` is only
+available through the Google API.
 
 Use a variant like this:
 
 ```bash
-opencode run "Hello" --model=google/antigravity-claude-opus-4-6-thinking --variant=max
+opencode run "Hello" --model=antigravity/antigravity-claude-opus-4-6-thinking --variant=max
 ```
 
 ## Variant formats

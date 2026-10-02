@@ -3,17 +3,18 @@
 ## Adding accounts
 
 ```bash
-opencode auth login   # add or reconnect Google accounts (max 10)
+opencode auth login   # select Antigravity; add or reconnect an account (max 10)
 ```
 
 Before opening the browser, login shows saved accounts and an interactive
 **Add or reconnect an account** selection. Only Add/reconnect starts
-Google authorization. At 10/10 the action is labeled **Reconnect a saved
+Antigravity authorization. At 10/10 the action is labeled **Reconnect a saved
 account**. Press Ctrl+C to cancel before authorization without changing accounts.
 Stock OpenCode completes one account per command; rerun login to add another.
-No custom host build or login-menu patch is needed.
+No custom host build or login-menu patch is needed. This is the plugin's own
+OAuth integration; OpenCode's Google integration is left unchanged.
 
-Signing in again with an already-saved Google account reconnects it in place
+Signing in again with an already-saved account reconnects it in place
 (token refreshes, entry count unchanged, durable id preserved). A genuinely
 new account at 10/10 fails cleanly with a capacity message. Cancelling the
 browser flow writes nothing.

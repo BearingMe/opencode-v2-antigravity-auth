@@ -56,23 +56,23 @@ tombstoneMatchesAccount`): equal ids match only with a corroborating
   stale snapshot — accepted to keep the file small given the 10-account cap.
   There is no "unreappearable" subset worth pruning preferentially.
 
-## Credential precedence (known limitation)
+## Credential source
 
-`getAuth()` in `src/v2-plugin.ts` resolves the active host `google`
-connection **first**. An explicit non-OAuth Google connection (for example
-an API key) returns `{ type: "none" }` and shadows the saved Antigravity
-pool for ordinary Gemini traffic. While a host OAuth connection resolves, it
-likewise takes precedence over `currentAuth` and the saved selection.
+`getAuth()` in `src/v2-plugin.ts` resolves the active host `antigravity`
+connection first, then the in-memory `currentAuth`, then the selected saved
+account. It never reads OpenCode's `google` connection. This integration only
+registers the plugin's own OAuth method; a non-OAuth active Antigravity
+connection defensively returns `{ type: "none" }` rather than silently using
+a saved OAuth account.
 
 Consequences:
 
-- Selection mutations persist to the plugin store and take effect once the
-  host connection no longer resolves — but they do not reroute traffic
-  while it does.
+- Account mutations persist to the plugin store. The native engine selects
+  from that account pool; the integration credential only supplies OAuth
+  identity for the request path.
 - The server plugin context exposes only `connection.active` /
-  `connection.resolve` (no credential removal). Host-side removal needs host
-  work; the plugin must not touch host credentials. Tombstones cover the
-  plugin store only.
+  `connection.resolve` (no credential removal). The plugin must not touch
+  OpenCode's Google credentials. Tombstones cover the plugin store only.
 
 ## Refresh packing
 

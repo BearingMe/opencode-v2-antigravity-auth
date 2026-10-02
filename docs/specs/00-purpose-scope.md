@@ -10,6 +10,9 @@ Gemini and Claude models. It intercepts `fetch()` calls aimed at
 `v1internal:streamGenerateContent` / `generateContent` calls, manages a pool
 of up to 10 Google accounts with per-account quota rotation, and repairs
 thinking-signature / tool-result failures that would otherwise break sessions.
+It registers a dedicated `antigravity` provider and OAuth integration; the
+OpenCode `google` provider, integration, and credentials remain outside the
+plugin's ownership.
 
 Evidence: `src/v2-plugin.ts :: setup` (V2 bridge),
 `src/plugin/engine.ts :: executeAntigravityRequest` (sole native router),
@@ -35,6 +38,8 @@ In scope:
 
 - OAuth PKCE authorize + code exchange + refresh (`src/antigravity/oauth.ts`,
   `src/plugin/token.ts`, `src/v2-plugin.ts :: refreshOAuthCredential`).
+- Dedicated provider/integration registration without reading or mutating
+  OpenCode's Google provider or sign-in connection.
 - Request interception, model resolution, payload transforms, streaming
   transform (`src/plugin/request.ts`, `src/plugin/transform/*`,
   `src/plugin/request-helpers.ts`, `src/plugin/core/streaming/*`).

@@ -142,15 +142,15 @@ describe("refreshOAuthCredentialUnified (D-REFRESH-DUAL)", () => {
       access: "old-access",
       refresh: "old|proj",
       expires: 1,
-      methodID: "google-oauth",
+      methodID: "antigravity-oauth",
     }
-    const refreshed = await refreshOAuthCredentialUnified(credential, client, "google")
+    const refreshed = await refreshOAuthCredentialUnified(credential, client, "antigravity")
     expect(mockRefreshAccessToken).toHaveBeenCalledOnce()
     expect(refreshed).toMatchObject({
       access: "new-access",
       refresh: "rotated|proj",
       expires: 4242,
-      methodID: "google-oauth",
+      methodID: "antigravity-oauth",
     })
   })
 })
@@ -194,7 +194,7 @@ describe("executeAntigravityRequest", () => {
         { method: "POST" },
         {
           client: makeClient(),
-          providerId: "google",
+          providerId: "antigravity",
           config: { ...DEFAULT_CONFIG },
           accountManager: manager,
         },
@@ -218,7 +218,7 @@ describe("executeAntigravityRequest", () => {
           { method: "POST", body: JSON.stringify({ contents: [] }) },
           {
             client: makeClient(),
-            providerId: "google",
+            providerId: "antigravity",
             config: { ...DEFAULT_CONFIG },
             accountManager: manager,
             fetchImpl,
@@ -246,7 +246,7 @@ describe("executeAntigravityRequest", () => {
       { method: "POST", body: "{}" },
       {
         client: makeClient(),
-        providerId: "google",
+        providerId: "antigravity",
         config: { ...DEFAULT_CONFIG },
         accountManager: manager,
         fetchImpl: fetchImpl as unknown as typeof fetch,
@@ -287,7 +287,7 @@ describe("executeAntigravityRequest", () => {
       { method: "POST" },
       {
         client: makeClient(),
-        providerId: "google",
+        providerId: "antigravity",
         config: { ...DEFAULT_CONFIG },
         accountManager: manager,
         fetchImpl: fetchImpl as unknown as typeof fetch,
@@ -314,7 +314,7 @@ describe("executeAntigravityRequest", () => {
       { method: "POST" },
       {
         client: makeClient(),
-        providerId: "google",
+        providerId: "antigravity",
         config: { ...DEFAULT_CONFIG },
         accountManager: manager,
         fetchImpl: fetchImpl as unknown as typeof fetch,
@@ -343,7 +343,7 @@ describe("executeAntigravityRequest", () => {
       { method: "POST" },
       {
         client: makeClient(),
-        providerId: "google",
+        providerId: "antigravity",
         config: { ...DEFAULT_CONFIG },
         accountManager: manager,
         fetchImpl: fetchImpl as unknown as typeof fetch,
@@ -382,7 +382,7 @@ describe("executeAntigravityRequest", () => {
       { method: "POST" },
       {
         client,
-        providerId: "google",
+        providerId: "antigravity",
         config: { ...DEFAULT_CONFIG, quiet_mode: false },
         accountManager: manager,
         fetchImpl: fetchImpl as unknown as typeof fetch,
@@ -416,7 +416,7 @@ describe("executeAntigravityRequest", () => {
       { method: "POST" },
       {
         client,
-        providerId: "google",
+        providerId: "antigravity",
         config: { ...DEFAULT_CONFIG, quiet_mode: true },
         accountManager: manager,
         fetchImpl: fetchImpl as unknown as typeof fetch,

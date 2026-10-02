@@ -135,10 +135,9 @@ event` transforms. V2 API explicitly "may change before stable".
    `formatRefreshParts({refreshToken: result.refresh, ...})` for
    `currentAuth` — double-encoding hazard contained only by tolerant
    parsing. Handle both 2- and 3-segment forms on any auth-format change.
-3. D-AUTH-SHADOW: an explicit non-OAuth Google connection returns
-   `{type:"none"}` and shadows the saved Antigravity pool for ordinary
-   Gemini (intentional precedence, but surprising — MUST be preserved or
-   changed deliberately with UX sign-off).
+3. D-AUTH-ISOLATION: Antigravity reads credentials only from its own
+   integration and saved account pool. Changes to OpenCode's Google
+   integration or connection MUST NOT affect Antigravity routing.
 4. D-SEARCH-MUTEX: `googleSearch + functionDeclarations` are mutually
    exclusive on Gemini — `web_search` is dropped with `console.warn` when
    functions exist. Reviewers MUST NOT "fix" this by sending both.
