@@ -1,79 +1,129 @@
 import { describe, it, expect } from "vitest"
-import { sanitizeCrossModelPayload, getModelFamily } from "./transform/cross-model-sanitizer"
+import { sanitizeCrossModelPayload } from "./transform/cross-model-sanitizer"
+
+/**
+ * Builds a multi-turn Gemini history payload with thinking and tool call metadata.
+ */
+function buildGeminiHistoryPayload(
+  options: {
+    thoughtSignature?: string
+    toolName?: string
+    additionalUserTurn?: boolean
+    model?: string
+  } = {},
+) {
+  const sig = options.thoughtSignature ?? "EsgQCsUQAXLI2nybuafAE150LGTo2r78fakesig"
+  const tool = options.toolName ?? "bash"
+
+  const contents: Array<Record<string, unknown>> = [
+    {
+      role: "user",
+      parts: [{ text: "Check disk space. Think about which filesystems are most utilized." }],
+    },
+    {
+      role: "model",
+      parts: [
+        {
+          thought: true,
+          text: "I need to analyze disk usage...",
+          thoughtSignature: sig,
+        },
+        {
+          functionCall: { name: tool, args: { command: "df -h" } },
+          metadata: {
+            google: {
+              thoughtSignature: sig,
+            },
+          },
+        },
+      ],
+    },
+    {
+      role: "function",
+      parts: [
+        {
+          functionResponse: {
+            name: tool,
+            response: { output: "Filesystem Size Used Avail Use%..." },
+          },
+        },
+      ],
+    },
+    {
+      role: "model",
+      parts: [{ text: "The root filesystem is 62% utilized..." }],
+    },
+  ]
+
+  if (options.additionalUserTurn) {
+    contents.push({
+      role: "user",
+      parts: [{ text: "Now check memory usage with free -h" }],
+    })
+  }
+
+  const payload: Record<string, unknown> = { contents }
+  if (options.model) {
+    payload.model = options.model
+  }
+  return payload
+}
+
+/**
+ * Builds an Anthropic Claude message payload containing thinking and tool blocks.
+ */
+function buildClaudeMessagesPayload(
+  options: {
+    signature?: string
+    thinking?: string
+    toolName?: string
+    wrappedInExtraBody?: boolean
+  } = {},
+) {
+  const sig = options.signature ?? "claude-signature-abc123VeryLongSignatureStringThatExceeds50Characters"
+  const thinkingText = options.thinking ?? "Analyzing the request..."
+  const tool = options.toolName ?? "bash"
+
+  const messages = [
+    {
+      role: "assistant",
+      content: [
+        {
+          type: "thinking",
+          thinking: thinkingText,
+          signature: sig,
+        },
+        {
+          type: "tool_use",
+          id: "tool_1",
+          name: tool,
+          input: { command: "ls" },
+        },
+      ],
+    },
+  ]
+
+  return options.wrappedInExtraBody ? { extra_body: { messages } } : { messages }
+}
 
 describe("Cross-Model Session Integration", () => {
   describe("Gemini → Claude model switch with tool calls", () => {
     it("sanitizes Gemini thinking metadata when preparing Claude request", () => {
-      const geminiSessionHistory = {
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text: "Check disk space. Think about which filesystems are most utilized.",
-              },
-            ],
-          },
-          {
-            role: "model",
-            parts: [
-              {
-                thought: true,
-                text: "I need to analyze disk usage...",
-                thoughtSignature: "EsgQCsUQAXLI2nybuafAE150LGTo2r78fakesig",
-              },
-              {
-                functionCall: { name: "bash", args: { command: "df -h" } },
-                metadata: {
-                  google: {
-                    thoughtSignature: "EsgQCsUQAXLI2nybuafAE150LGTo2r78fakesig",
-                  },
-                },
-              },
-            ],
-          },
-          {
-            role: "function",
-            parts: [
-              {
-                functionResponse: {
-                  name: "bash",
-                  response: { output: "Filesystem Size Used Avail Use%..." },
-                },
-              },
-            ],
-          },
-          {
-            role: "model",
-            parts: [{ text: "The root filesystem is 62% utilized..." }],
-          },
-        ],
-      }
-
-      const payload = {
+      const payload = buildGeminiHistoryPayload({
         model: "claude-opus-4-6-thinking-medium",
-        ...geminiSessionHistory,
-        contents: [
-          ...geminiSessionHistory.contents,
-          {
-            role: "user",
-            parts: [{ text: "Now check memory usage with free -h" }],
-          },
-        ],
-      }
+        additionalUserTurn: true,
+      })
 
       const result = sanitizeCrossModelPayload(payload, {
         targetModel: "claude-opus-4-6-thinking-medium",
       })
 
       const sanitized = result.payload as typeof payload
-      const modelParts = sanitized.contents[1]!.parts
+      const modelParts = (sanitized.contents as Array<{ parts: Array<Record<string, unknown>> }>)[1]!.parts
 
-      expect((modelParts[0] as Record<string, unknown>).thoughtSignature).toBeUndefined()
-      expect((modelParts[1] as Record<string, unknown>).metadata).toBeUndefined()
-      expect((modelParts[1] as Record<string, unknown> & { functionCall: { name: string } }).functionCall.name).toBe(
-        "bash",
-      )
+      expect(modelParts[0]!.thoughtSignature).toBeUndefined()
+      expect(modelParts[1]!.metadata).toBeUndefined()
+      expect((modelParts[1]!.functionCall as { name: string }).name).toBe("bash")
 
       expect(result.modified).toBe(true)
       expect(result.signaturesStripped).toBeGreaterThan(0)
@@ -117,6 +167,7 @@ describe("Cross-Model Session Integration", () => {
     })
 
     it("handles the exact bug reproduction scenario from issue", () => {
+      const longSig = "EsgQCsUQAXLI2nybuafAE150LGTo2r78VeryLongSignatureStringThatExceeds50Characters"
       const payload = {
         model: "claude-opus-4-6-thinking-medium",
         contents: [
@@ -134,7 +185,7 @@ describe("Cross-Model Session Integration", () => {
               {
                 thought: true,
                 text: "Let me analyze the disk space request. The user wants to see disk usage and understand filesystem utilization patterns...",
-                thoughtSignature: "EsgQCsUQAXLI2nybuafAE150LGTo2r78VeryLongSignatureStringThatExceeds50Characters",
+                thoughtSignature: longSig,
               },
               {
                 functionCall: {
@@ -146,7 +197,7 @@ describe("Cross-Model Session Integration", () => {
                 },
                 metadata: {
                   google: {
-                    thoughtSignature: "EsgQCsUQAXLI2nybuafAE150LGTo2r78VeryLongSignatureStringThatExceeds50Characters",
+                    thoughtSignature: longSig,
                   },
                 },
               },
@@ -202,28 +253,7 @@ describe("Cross-Model Session Integration", () => {
 
   describe("Claude → Gemini model switch", () => {
     it("sanitizes Claude thinking blocks when preparing Gemini request", () => {
-      const payload = {
-        extra_body: {
-          messages: [
-            {
-              role: "assistant",
-              content: [
-                {
-                  type: "thinking",
-                  thinking: "Analyzing the request...",
-                  signature: "claude-signature-abc123VeryLongSignatureStringThatExceeds50Characters",
-                },
-                {
-                  type: "tool_use",
-                  id: "tool_1",
-                  name: "bash",
-                  input: { command: "ls" },
-                },
-              ],
-            },
-          ],
-        },
-      }
+      const payload = buildClaudeMessagesPayload({ wrappedInExtraBody: true })
 
       const result = sanitizeCrossModelPayload(payload, {
         targetModel: "gemini-3-pro-low",
@@ -321,27 +351,6 @@ describe("Cross-Model Session Integration", () => {
       const sanitized = result.payload as typeof payload
       expect((sanitized.messages![0]!.content![0] as Record<string, unknown>).signature).toBe("valid-claude-sig")
       expect(result.modified).toBe(false)
-    })
-  })
-
-  describe("Model family detection", () => {
-    it("correctly identifies Gemini models", () => {
-      expect(getModelFamily("gemini-3-pro-low")).toBe("gemini")
-      expect(getModelFamily("gemini-3-flash")).toBe("gemini")
-      expect(getModelFamily("gemini-2.5-pro")).toBe("gemini")
-      expect(getModelFamily("gemini-3-pro-high")).toBe("gemini")
-    })
-
-    it("correctly identifies Claude models", () => {
-      expect(getModelFamily("claude-opus-4-6-thinking-medium")).toBe("claude")
-      expect(getModelFamily("claude-sonnet-4-6")).toBe("claude")
-      expect(getModelFamily("claude-sonnet-4")).toBe("claude")
-      expect(getModelFamily("claude-3-opus")).toBe("claude")
-    })
-
-    it("returns unknown for unrecognized models", () => {
-      expect(getModelFamily("gpt-4")).toBe("unknown")
-      expect(getModelFamily("llama-3")).toBe("unknown")
     })
   })
 

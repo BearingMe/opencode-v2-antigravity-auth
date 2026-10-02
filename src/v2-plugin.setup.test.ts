@@ -57,10 +57,6 @@ updateAccounts.mockImplementation(
   },
 )
 
-beforeEach(() => {
-  written.length = 0
-})
-
 vi.mock("./plugin/verify.js", () => ({
   verifyAccountAccess,
 }))
@@ -92,6 +88,7 @@ const sdkPackage = new URL("./google-sdk.js", import.meta.url).href
 describe("V2 Antigravity runtime bridge", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    written.length = 0
     loadAccounts.mockResolvedValue({
       version: 4,
       accounts: [

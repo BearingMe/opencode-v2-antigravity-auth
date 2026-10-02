@@ -85,6 +85,11 @@ export function invalidatePackage(packageName: string = PACKAGE_NAME): boolean {
   }
 }
 
+/**
+ * Invalidate cached package.
+ *
+ * @deprecated Use `invalidatePackage` instead.
+ */
 export function invalidateCache(): boolean {
   console.warn("[auto-update-checker] WARNING: invalidateCache is deprecated, use invalidatePackage")
   return invalidatePackage()

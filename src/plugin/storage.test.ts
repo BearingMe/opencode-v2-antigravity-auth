@@ -7,8 +7,47 @@ import {
   migrateV2ToV3,
   loadAccounts,
   type AccountMetadata,
+  type AccountMetadataV3,
   type AccountStorage,
+  type AccountStorageV4,
 } from "./storage"
+
+/**
+ * Creates an AccountMetadata fixture for testing.
+ */
+function testAccount(overrides: Partial<AccountMetadata> = {}): AccountMetadata {
+  return {
+    refreshToken: "r1",
+    addedAt: 1000,
+    lastUsed: 2000,
+    ...overrides,
+  }
+}
+
+/**
+ * Creates an AccountStorage (V2) fixture for testing.
+ */
+function testStorageV2(accounts: AccountMetadata[], activeIndex = 0): AccountStorage {
+  return {
+    version: 2,
+    accounts,
+    activeIndex,
+  }
+}
+
+/**
+ * Creates an AccountStorageV4 fixture for testing.
+ */
+function testStorageV4(
+  accounts: AccountMetadataV3[] = [{ refreshToken: "r1", addedAt: 1, lastUsed: 2 }],
+  activeIndex = 0,
+): AccountStorageV4 {
+  return {
+    version: 4,
+    accounts,
+    activeIndex,
+  }
+}
 
 vi.mock("proper-lockfile", () => ({
   default: {
@@ -24,12 +63,9 @@ describe("deduplicateAccountsByEmail", () => {
 
   it("returns single account unchanged", () => {
     const accounts: AccountMetadata[] = [
-      {
+      testAccount({
         email: "test@example.com",
-        refreshToken: "r1",
-        addedAt: 1000,
-        lastUsed: 2000,
-      },
+      }),
     ]
     const result = deduplicateAccountsByEmail(accounts)
     expect(result).toEqual(accounts)
@@ -37,8 +73,8 @@ describe("deduplicateAccountsByEmail", () => {
 
   it("keeps accounts without email (cannot deduplicate)", () => {
     const accounts: AccountMetadata[] = [
-      { refreshToken: "r1", addedAt: 1000, lastUsed: 2000 },
-      { refreshToken: "r2", addedAt: 1100, lastUsed: 2100 },
+      testAccount({ refreshToken: "r1", addedAt: 1000, lastUsed: 2000 }),
+      testAccount({ refreshToken: "r2", addedAt: 1100, lastUsed: 2100 }),
     ]
     const result = deduplicateAccountsByEmail(accounts)
     expect(result).toHaveLength(2)
@@ -48,18 +84,18 @@ describe("deduplicateAccountsByEmail", () => {
 
   it("deduplicates accounts with same email, keeping newest by lastUsed", () => {
     const accounts: AccountMetadata[] = [
-      {
+      testAccount({
         email: "test@example.com",
         refreshToken: "old-token",
         addedAt: 1000,
         lastUsed: 1000,
-      },
-      {
+      }),
+      testAccount({
         email: "test@example.com",
         refreshToken: "new-token",
         addedAt: 2000,
         lastUsed: 3000,
-      },
+      }),
     ]
     const result = deduplicateAccountsByEmail(accounts)
     expect(result).toHaveLength(1)
@@ -69,18 +105,18 @@ describe("deduplicateAccountsByEmail", () => {
 
   it("deduplicates accounts with same email, keeping newest by addedAt when lastUsed is equal", () => {
     const accounts: AccountMetadata[] = [
-      {
+      testAccount({
         email: "test@example.com",
         refreshToken: "old-token",
         addedAt: 1000,
         lastUsed: 0,
-      },
-      {
+      }),
+      testAccount({
         email: "test@example.com",
         refreshToken: "new-token",
         addedAt: 2000,
         lastUsed: 0,
-      },
+      }),
     ]
     const result = deduplicateAccountsByEmail(accounts)
     expect(result).toHaveLength(1)
@@ -89,36 +125,36 @@ describe("deduplicateAccountsByEmail", () => {
 
   it("handles multiple duplicate emails correctly", () => {
     const accounts: AccountMetadata[] = [
-      {
+      testAccount({
         email: "alice@example.com",
         refreshToken: "alice-old",
         addedAt: 1000,
         lastUsed: 1000,
-      },
-      {
+      }),
+      testAccount({
         email: "bob@example.com",
         refreshToken: "bob-old",
         addedAt: 1000,
         lastUsed: 1000,
-      },
-      {
+      }),
+      testAccount({
         email: "alice@example.com",
         refreshToken: "alice-new",
         addedAt: 2000,
         lastUsed: 3000,
-      },
-      {
+      }),
+      testAccount({
         email: "bob@example.com",
         refreshToken: "bob-new",
         addedAt: 2000,
         lastUsed: 3000,
-      },
-      {
+      }),
+      testAccount({
         email: "alice@example.com",
         refreshToken: "alice-mid",
         addedAt: 1500,
         lastUsed: 2000,
-      },
+      }),
     ]
     const result = deduplicateAccountsByEmail(accounts)
     expect(result).toHaveLength(2)
@@ -132,24 +168,24 @@ describe("deduplicateAccountsByEmail", () => {
 
   it("preserves order of kept accounts based on newest entry index", () => {
     const accounts: AccountMetadata[] = [
-      {
+      testAccount({
         email: "first@example.com",
         refreshToken: "first-old",
         addedAt: 1000,
         lastUsed: 1000,
-      },
-      {
+      }),
+      testAccount({
         email: "second@example.com",
         refreshToken: "second-new",
         addedAt: 3000,
         lastUsed: 3000,
-      },
-      {
+      }),
+      testAccount({
         email: "first@example.com",
         refreshToken: "first-new",
         addedAt: 2000,
         lastUsed: 2000,
-      },
+      }),
     ]
     const result = deduplicateAccountsByEmail(accounts)
     expect(result).toHaveLength(2)
@@ -160,20 +196,20 @@ describe("deduplicateAccountsByEmail", () => {
 
   it("mixes accounts with and without email correctly", () => {
     const accounts: AccountMetadata[] = [
-      {
+      testAccount({
         email: "test@example.com",
         refreshToken: "r1",
         addedAt: 1000,
         lastUsed: 1000,
-      },
-      { refreshToken: "no-email-1", addedAt: 1500, lastUsed: 1500 },
-      {
+      }),
+      testAccount({ refreshToken: "no-email-1", addedAt: 1500, lastUsed: 1500 }),
+      testAccount({
         email: "test@example.com",
         refreshToken: "r2",
         addedAt: 2000,
         lastUsed: 2000,
-      },
-      { refreshToken: "no-email-2", addedAt: 2500, lastUsed: 2500 },
+      }),
+      testAccount({ refreshToken: "no-email-2", addedAt: 2500, lastUsed: 2500 }),
     ]
     const result = deduplicateAccountsByEmail(accounts)
     expect(result).toHaveLength(3)
@@ -190,12 +226,14 @@ describe("deduplicateAccountsByEmail", () => {
     // Simulate user logging in 11 times with the same account
     const accounts: AccountMetadata[] = []
     for (let i = 0; i < 11; i++) {
-      accounts.push({
-        email: "user@example.com",
-        refreshToken: `token-${i}`,
-        addedAt: 1000 + i * 100,
-        lastUsed: 1000 + i * 100,
-      })
+      accounts.push(
+        testAccount({
+          email: "user@example.com",
+          refreshToken: `token-${i}`,
+          addedAt: 1000 + i * 100,
+          lastUsed: 1000 + i * 100,
+        }),
+      )
     }
 
     const result = deduplicateAccountsByEmail(accounts)
@@ -227,26 +265,25 @@ vi.mock("node:fs", async () => {
 })
 
 describe("Storage Migration", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   const now = Date.now()
   const future = now + 100000
   const past = now - 100000
 
   describe("migrateV2ToV3", () => {
     it("converts gemini rate limits to gemini-antigravity", () => {
-      const v2: AccountStorage = {
-        version: 2,
-        accounts: [
-          {
-            refreshToken: "r1",
-            addedAt: now,
-            lastUsed: now,
-            rateLimitResetTimes: {
-              gemini: future,
-            },
+      const v2 = testStorageV2([
+        testAccount({
+          addedAt: now,
+          lastUsed: now,
+          rateLimitResetTimes: {
+            gemini: future,
           },
-        ],
-        activeIndex: 0,
-      }
+        }),
+      ])
 
       const v3 = migrateV2ToV3(v2)
 
@@ -261,20 +298,15 @@ describe("Storage Migration", () => {
     })
 
     it("preserves claude rate limits", () => {
-      const v2: AccountStorage = {
-        version: 2,
-        accounts: [
-          {
-            refreshToken: "r1",
-            addedAt: now,
-            lastUsed: now,
-            rateLimitResetTimes: {
-              claude: future,
-            },
+      const v2 = testStorageV2([
+        testAccount({
+          addedAt: now,
+          lastUsed: now,
+          rateLimitResetTimes: {
+            claude: future,
           },
-        ],
-        activeIndex: 0,
-      }
+        }),
+      ])
 
       const v3 = migrateV2ToV3(v2)
       const account = v3.accounts[0]
@@ -286,21 +318,16 @@ describe("Storage Migration", () => {
     })
 
     it("handles mixed rate limits correctly", () => {
-      const v2: AccountStorage = {
-        version: 2,
-        accounts: [
-          {
-            refreshToken: "r1",
-            addedAt: now,
-            lastUsed: now,
-            rateLimitResetTimes: {
-              claude: future,
-              gemini: future,
-            },
+      const v2 = testStorageV2([
+        testAccount({
+          addedAt: now,
+          lastUsed: now,
+          rateLimitResetTimes: {
+            claude: future,
+            gemini: future,
           },
-        ],
-        activeIndex: 0,
-      }
+        }),
+      ])
 
       const v3 = migrateV2ToV3(v2)
       const account = v3.accounts[0]
@@ -313,21 +340,16 @@ describe("Storage Migration", () => {
     })
 
     it("filters out expired rate limits", () => {
-      const v2: AccountStorage = {
-        version: 2,
-        accounts: [
-          {
-            refreshToken: "r1",
-            addedAt: now,
-            lastUsed: now,
-            rateLimitResetTimes: {
-              claude: past,
-              gemini: future,
-            },
+      const v2 = testStorageV2([
+        testAccount({
+          addedAt: now,
+          lastUsed: now,
+          rateLimitResetTimes: {
+            claude: past,
+            gemini: future,
           },
-        ],
-        activeIndex: 0,
-      }
+        }),
+      ])
 
       const v3 = migrateV2ToV3(v2)
       const account = v3.accounts[0]
@@ -340,21 +362,16 @@ describe("Storage Migration", () => {
     })
 
     it("removes rateLimitResetTimes object if all keys are expired", () => {
-      const v2: AccountStorage = {
-        version: 2,
-        accounts: [
-          {
-            refreshToken: "r1",
-            addedAt: now,
-            lastUsed: now,
-            rateLimitResetTimes: {
-              claude: past,
-              gemini: past,
-            },
+      const v2 = testStorageV2([
+        testAccount({
+          addedAt: now,
+          lastUsed: now,
+          rateLimitResetTimes: {
+            claude: past,
+            gemini: past,
           },
-        ],
-        activeIndex: 0,
-      }
+        }),
+      ])
 
       const v3 = migrateV2ToV3(v2)
       const account = v3.accounts[0]
@@ -365,25 +382,16 @@ describe("Storage Migration", () => {
   })
 
   describe("loadAccounts migration integration", () => {
-    beforeEach(() => {
-      vi.clearAllMocks()
-    })
-
     it("migrates V2 storage on load and persists V4", async () => {
-      const v2Data = {
-        version: 2,
-        accounts: [
-          {
-            refreshToken: "r1",
-            addedAt: now,
-            lastUsed: now,
-            rateLimitResetTimes: {
-              gemini: future,
-            },
+      const v2Data = testStorageV2([
+        testAccount({
+          addedAt: now,
+          lastUsed: now,
+          rateLimitResetTimes: {
+            gemini: future,
           },
-        ],
-        activeIndex: 0,
-      }
+        }),
+      ])
 
       // Mock readFile to return different values based on path
       vi.mocked(fs.readFile).mockImplementation((path) => {
@@ -427,10 +435,6 @@ describe("Storage Migration", () => {
 
   describe("ensureGitignore", () => {
     const configDir = "/tmp/opencode-test"
-
-    beforeEach(() => {
-      vi.clearAllMocks()
-    })
 
     it("creates .gitignore when file does not exist", async () => {
       vi.mocked(fs.readFile).mockRejectedValue({ code: "ENOENT" })
@@ -490,10 +494,6 @@ describe("Storage Migration", () => {
   describe("ensureGitignoreSync", () => {
     const configDir = "/tmp/opencode-test-sync"
 
-    beforeEach(() => {
-      vi.clearAllMocks()
-    })
-
     it("creates .gitignore when file does not exist", async () => {
       vi.mocked(existsSync).mockReturnValue(false)
 
@@ -549,11 +549,7 @@ describe("Storage Migration", () => {
       "antigravity-signature-cache.json",
       "antigravity-logs/",
     ].join("\n")
-    const stored = {
-      version: 4,
-      accounts: [{ refreshToken: "r1", addedAt: 1, lastUsed: 2 }],
-      activeIndex: 0,
-    }
+    const stored = testStorageV4()
 
     beforeEach(() => {
       vi.clearAllMocks()
@@ -628,13 +624,7 @@ describe("Storage Migration", () => {
         return Promise.reject(ioError)
       })
 
-      await expect(
-        saveAccountsReplace({
-          version: 4,
-          accounts: [],
-          activeIndex: 0,
-        }),
-      ).rejects.toThrow(AccountStoreUnreadableError)
+      await expect(saveAccountsReplace(testStorageV4([], 0))).rejects.toThrow(AccountStoreUnreadableError)
       expect(fs.writeFile).not.toHaveBeenCalled()
       expect(fs.rename).not.toHaveBeenCalled()
     })

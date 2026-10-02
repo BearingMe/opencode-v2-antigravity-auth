@@ -34,25 +34,6 @@ interface CacheData {
   }
 }
 
-interface CacheStats {
-  memoryHits: number
-  diskHits: number
-  misses: number
-  writes: number
-  memoryEntries: number
-  dirty: boolean
-  diskEnabled: boolean
-}
-
-/**
- * Full thinking content with signature (for recovery)
- */
-export interface ThinkingCacheData {
-  text: string
-  signature: string
-  toolIds?: string[]
-}
-
 // =============================================================================
 // Path Utilities
 // =============================================================================
@@ -116,13 +97,6 @@ export class SignatureCache {
   // ===========================================================================
 
   /**
-   * Generate a cache key from sessionId and modelId.
-   */
-  static makeKey(sessionId: string, modelId: string): string {
-    return `${sessionId}:${modelId}`
-  }
-
-  /**
    * Store a signature in the cache.
    */
   store(key: string, signature: string): void {
@@ -170,78 +144,6 @@ export class SignatureCache {
     return age <= this.memoryTtlMs
   }
 
-  // ===========================================================================
-  // Full Thinking Cache (ported from LLM-API-Key-Proxy)
-  // ===========================================================================
-
-  /**
-   * Store full thinking content with signature.
-   * This enables recovery even after thinking text is stripped by compaction.
-   *
-   * Port of LLM-API-Key-Proxy's _cache_thinking()
-   */
-  storeThinking(key: string, thinkingText: string, signature: string, toolIds?: string[]): void {
-    if (!this.enabled || !thinkingText || !signature) return
-
-    this.cache.set(key, {
-      value: signature,
-      timestamp: Date.now(),
-      thinkingText,
-      textPreview: thinkingText.slice(0, 100),
-      toolIds,
-    })
-    this.dirty = true
-  }
-
-  /**
-   * Retrieve full thinking content by key.
-   * Returns null if not found or expired.
-   */
-  retrieveThinking(key: string): ThinkingCacheData | null {
-    if (!this.enabled) return null
-
-    const entry = this.cache.get(key)
-    if (!entry || !entry.thinkingText) return null
-
-    const age = Date.now() - entry.timestamp
-    if (age > this.memoryTtlMs) {
-      this.cache.delete(key)
-      return null
-    }
-
-    this.stats.memoryHits++
-    return {
-      text: entry.thinkingText,
-      signature: entry.value,
-      toolIds: entry.toolIds,
-    }
-  }
-
-  /**
-   * Check if full thinking content exists for a key.
-   */
-  hasThinking(key: string): boolean {
-    if (!this.enabled) return false
-
-    const entry = this.cache.get(key)
-    if (!entry || !entry.thinkingText) return false
-
-    const age = Date.now() - entry.timestamp
-    return age <= this.memoryTtlMs
-  }
-
-  /**
-   * Get cache statistics.
-   */
-  getStats(): CacheStats {
-    return {
-      ...this.stats,
-      memoryEntries: this.cache.size,
-      dirty: this.dirty,
-      diskEnabled: this.enabled,
-    }
-  }
-
   /**
    * Manually trigger a disk save.
    */
@@ -256,24 +158,6 @@ export class SignatureCache {
     this.writeTimer = null
     this.cleanupTimer = null
     return this.flush()
-  }
-
-  /**
-   * Graceful shutdown: stop timers and flush to disk.
-   */
-  shutdown(): void {
-    if (this.writeTimer) {
-      clearInterval(this.writeTimer)
-      this.writeTimer = null
-    }
-    if (this.cleanupTimer) {
-      clearInterval(this.cleanupTimer)
-      this.cleanupTimer = null
-    }
-
-    if (this.dirty && this.enabled) {
-      this.saveToDisk()
-    }
   }
 
   // ===========================================================================
