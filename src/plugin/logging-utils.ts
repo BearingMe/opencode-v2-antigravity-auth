@@ -1,4 +1,5 @@
-export type LogLevel = "debug" | "info" | "warn" | "error"
+export { writeConsoleLog } from "../lib/logger/index.js"
+export type { LogLevel } from "../lib/logger/index.js"
 
 export interface DebugPolicyInput {
   configDebug: boolean
@@ -98,21 +99,4 @@ export function formatBodyPreviewForLog(body: BodyInit | null | undefined, maxCh
   }
 
   return `[${body.constructor?.name ?? typeof body} payload omitted]`
-}
-
-export function writeConsoleLog(level: LogLevel, ...args: unknown[]): void {
-  switch (level) {
-    case "debug":
-      console.debug(...args)
-      break
-    case "info":
-      console.info(...args)
-      break
-    case "warn":
-      console.warn(...args)
-      break
-    case "error":
-      console.error(...args)
-      break
-  }
 }

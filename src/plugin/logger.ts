@@ -1,17 +1,16 @@
-import type { PluginClient } from "./types"
+import {
+  createLogger as createLibraryLogger,
+  writeConsoleLog,
+  type Logger,
+  type LogEntry,
+} from "../lib/logger/index.js"
 import { isDebugTuiEnabled } from "./debug"
-import { isTruthyFlag, writeConsoleLog } from "./logging-utils"
+import { isTruthyFlag } from "./logging-utils"
+import type { PluginClient } from "./types"
 
-type LogLevel = "debug" | "info" | "warn" | "error"
+export type { Logger } from "../lib/logger/index.js"
 
 const ENV_CONSOLE_LOG = "OPENCODE_ANTIGRAVITY_CONSOLE_LOG"
-
-export interface Logger {
-  debug(message: string, extra?: Record<string, unknown>): void
-  info(message: string, extra?: Record<string, unknown>): void
-  warn(message: string, extra?: Record<string, unknown>): void
-  error(message: string, extra?: Record<string, unknown>): void
-}
 
 let _client: PluginClient | null = null
 
@@ -31,6 +30,36 @@ export function initLogger(client: PluginClient): void {
 }
 
 /**
+ * Sends an event to the currently enabled plugin logging destinations.
+ * TUI and console output remain independently controlled by their existing flags.
+ */
+function dispatchLogEntry(entry: LogEntry): void {
+  if (isDebugTuiEnabled()) {
+    const app = _client?.app
+    if (app && typeof app.log === "function") {
+      app
+        .log({
+          body: {
+            service: entry.service,
+            level: entry.level,
+            message: entry.message,
+            extra: entry.extra,
+          },
+        })
+        .catch(() => {
+          // TUI logging is best effort; a failed host write must not affect the caller.
+        })
+    }
+  }
+
+  if (isConsoleLogEnabled()) {
+    const prefix = `[${entry.service}]`
+    const args = entry.extra ? [prefix, entry.message, entry.extra] : [prefix, entry.message]
+    writeConsoleLog(entry.level, ...args)
+  }
+}
+
+/**
  * Create a logger instance for a specific module.
  *
  * @example
@@ -41,36 +70,19 @@ export function initLogger(client: PluginClient): void {
  * ```
  */
 export function createLogger(module: string): Logger {
-  const service = `antigravity.${module}`
-
-  const log = (level: LogLevel, message: string, extra?: Record<string, unknown>): void => {
-    // TUI logging: controlled only by debug_tui policy
-    if (isDebugTuiEnabled()) {
-      const app = _client?.app
-      if (app && typeof app.log === "function") {
-        app
-          .log({
-            body: { service, level, message, extra },
-          })
-          .catch(() => {
-            // Silently ignore logging errors
-          })
-      }
+  let logger: Logger | undefined
+  /** Defers library logger creation until the first log call. */
+  const getLogger = (): Logger => {
+    if (!logger) {
+      logger = createLibraryLogger(`antigravity.${module}`, [dispatchLogEntry])
     }
-
-    // Console fallback: when env var is set (independent of debug flags)
-    if (isConsoleLogEnabled()) {
-      const prefix = `[${service}]`
-      const args = extra ? [prefix, message, extra] : [prefix, message]
-      writeConsoleLog(level, ...args)
-    }
-    // If neither TUI nor console logging is enabled, log is silently discarded
+    return logger
   }
 
   return {
-    debug: (message, extra) => log("debug", message, extra),
-    info: (message, extra) => log("info", message, extra),
-    warn: (message, extra) => log("warn", message, extra),
-    error: (message, extra) => log("error", message, extra),
+    debug: (message, extra) => getLogger().debug(message, extra),
+    info: (message, extra) => getLogger().info(message, extra),
+    warn: (message, extra) => getLogger().warn(message, extra),
+    error: (message, extra) => getLogger().error(message, extra),
   }
 }

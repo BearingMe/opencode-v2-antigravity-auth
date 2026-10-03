@@ -1,7 +1,8 @@
-import { createWriteStream, mkdirSync, readdirSync, statSync, unlinkSync } from "node:fs"
+import { mkdirSync, readdirSync, statSync, unlinkSync } from "node:fs"
 import { join } from "node:path"
 import { env } from "node:process"
 import { homedir } from "node:os"
+import { createTimestampedFileWriter } from "../lib/logger/file.js"
 import type { AntigravityConfig } from "./config"
 import {
   deriveDebugPolicy,
@@ -102,27 +103,6 @@ function cleanupOldLogs(logsDir: string, maxFiles: number): void {
 }
 
 /**
- * Creates a log writer function that writes to a file.
- */
-function createLogWriter(filePath?: string): (line: string) => void {
-  if (!filePath) {
-    return () => {}
-  }
-
-  try {
-    const stream = createWriteStream(filePath, { flags: "a" })
-    stream.on("error", () => {})
-    return (line: string) => {
-      const timestamp = new Date().toISOString()
-      const formatted = `[${timestamp}] ${line}`
-      stream.write(`${formatted}\n`)
-    }
-  } catch {
-    return () => {}
-  }
-}
-
-/**
  * Initialize or reinitialize debug state with the given config.
  * Call this once at plugin startup after loading config.
  */
@@ -137,7 +117,7 @@ export function initializeDebug(config: AntigravityConfig): void {
   })
   const debugTuiEnabled = config.debug_tui || isTruthyFlag(env.OPENCODE_ANTIGRAVITY_DEBUG_TUI)
   const logFilePath = debugEnabled ? createLogFilePath(config.log_dir) : undefined
-  const logWriter = createLogWriter(logFilePath)
+  const logWriter = createTimestampedFileWriter(logFilePath)
 
   if (debugEnabled) {
     ensureGitignoreSync(getConfigDir())
@@ -166,7 +146,7 @@ function getDebugState(): DebugState {
     })
     const debugTuiEnabled = isTruthyFlag(env.OPENCODE_ANTIGRAVITY_DEBUG_TUI)
     const logFilePath = debugEnabled ? createLogFilePath() : undefined
-    const logWriter = createLogWriter(logFilePath)
+    const logWriter = createTimestampedFileWriter(logFilePath)
 
     debugState = {
       debugEnabled,
