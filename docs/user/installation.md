@@ -47,12 +47,12 @@ code or the full `localhost` redirect URL when prompted.
 ## Verify
 
 ```bash
-opencode run "Hello" --model=antigravity/antigravity-gemini-3-flash
+opencode run "Hello" --model=antigravity/antigravity-gemini-3.8-flash
 ```
 
 Models are registered automatically by the plugin — no manual model
-definitions are required, although you may still declare them explicitly
-(see [models-and-variants.md](models-and-variants.md)).
+definitions are required. See [models-and-variants.md](models-and-variants.md)
+for the fixed catalog.
 
 ## Manage accounts
 

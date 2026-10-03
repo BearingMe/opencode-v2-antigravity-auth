@@ -114,13 +114,14 @@ describe("V2 Antigravity runtime bridge", () => {
       update(integrationName),
     )
     let antigravityProviderInfo: { id?: string; name?: string; activation?: string; package?: string } | undefined
-    const getProvider = vi.fn(() => undefined)
+    const getProvider = vi.fn((): { models: Map<string, unknown> } | undefined => undefined)
     const addProvider = vi.fn(
       (input: { info: typeof antigravityProviderInfo; models: Array<Record<string, unknown>> }) => {
         antigravityProviderInfo = input.info ?? undefined
         modelDefinitions = input.models
       },
     )
+    let providerTransform: ((editor: unknown) => void) | undefined
     let sdkHook:
       | ((event: {
           package: string
@@ -168,7 +169,8 @@ describe("V2 Antigravity runtime bridge", () => {
         },
       },
       provider: {
-        transform: async (callback: (editor: unknown) => void) =>
+        transform: async (callback: (editor: unknown) => void) => {
+          providerTransform = callback
           callback({
             get: getProvider,
             update: (_id: string, update: (provider: { activation?: string; package?: string }) => void) =>
@@ -179,7 +181,8 @@ describe("V2 Antigravity runtime bridge", () => {
               },
             },
             add: addProvider,
-          }),
+          })
+        },
       },
       model: {
         transform: async (callback: (editor: unknown) => void) =>
@@ -206,7 +209,15 @@ describe("V2 Antigravity runtime bridge", () => {
 
     cleanup = await plugin.setup(ctx as never)
 
-    expect(modelDefinitions.length).toBeGreaterThan(0)
+    expect(modelDefinitions.map((model) => String(model.id)).sort()).toEqual([
+      "antigravity-claude-opus-4-6-thinking",
+      "antigravity-claude-sonnet-4-6-thinking",
+      "antigravity-gemini-3.1-pro",
+      "antigravity-gemini-3.6-flash",
+      "antigravity-gemini-3.7-flash",
+      "antigravity-gemini-3.8-flash",
+      "antigravity-gpt-oss-120b-medium",
+    ])
     expect(addProvider).toHaveBeenCalledOnce()
     expect(antigravityProviderInfo).toMatchObject({
       id: "antigravity",
@@ -215,14 +226,34 @@ describe("V2 Antigravity runtime bridge", () => {
       package: `aisdk:${sdkPackage}`,
     })
     expect(getProvider).toHaveBeenCalledWith("antigravity")
+    const geminiFlash = modelDefinitions.find((model) => model.id === "antigravity-gemini-3.8-flash")
+    const geminiPreviewAlias = modelDefinitions.find((model) => model.id === "gemini-3-flash-preview")
+    expect(geminiFlash?.name).toBe("Gemini 3.8 Flash")
+    expect(geminiFlash?.package).toBe(`aisdk:${sdkPackage}`)
+    expect(geminiPreviewAlias).toBeUndefined()
+
+    const replaceModels = vi.fn((_providerID: string, models: Array<Record<string, unknown>>) => {
+      modelDefinitions = models
+    })
+    getProvider.mockReturnValue({ models: new Map([["api-only-model", { id: "api-only-model" }]]) })
+    if (!providerTransform) throw new Error("expected provider transform")
+    providerTransform({
+      get: getProvider,
+      update: (_id: string, update: (provider: { activation?: string; package?: string }) => void) =>
+        update(antigravityProviderInfo ?? {}),
+      models: { set: replaceModels },
+      add: addProvider,
+    })
+    expect(replaceModels).toHaveBeenCalledOnce()
+    expect(modelDefinitions.some((model) => model.id === "api-only-model")).toBe(false)
+    expect(addProvider).toHaveBeenCalledOnce()
+
     expect(updateIntegration).toHaveBeenCalledExactlyOnceWith("antigravity", expect.any(Function))
     expect(ctx.integration.connection.active.mock.calls.every(([id]) => id === "antigravity")).toBe(true)
     expect(integrationName.name).toBe("Antigravity")
     expect(ctx.aisdk.hook).toHaveBeenCalledWith("sdk", expect.any(Function), { providerID: "antigravity" })
     const claudeModel = modelDefinitions.find((model) => model.id === "antigravity-claude-opus-4-6-thinking")
-    const geminiPreviewAlias = modelDefinitions.find((model) => model.id === "gemini-3-flash-preview")
     expect(claudeModel?.package).toBe(`aisdk:${sdkPackage}`)
-    expect(geminiPreviewAlias?.package).toBe(`aisdk:${sdkPackage}`)
     expect((claudeModel?.settings as Record<string, unknown>)?.fetch).toBeUndefined()
     expect(sdkHook).toEqual(expect.any(Function))
     const rpcRegister = ctx.rpc.register as unknown as {

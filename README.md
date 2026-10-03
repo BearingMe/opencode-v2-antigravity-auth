@@ -25,11 +25,11 @@ session recovery included.
 
 ## What you get
 
-- **Claude Opus 4.6 / Sonnet 4.6** and **Gemini 3 / 3.1 Pro/Flash** via
-  Antigravity's own Google OAuth integration
+- **Gemini 3.6/3.7/3.8 Flash, Gemini 3.1 Pro, Claude Opus/Sonnet 4.6
+  Thinking, and GPT-OSS 120B Medium** via Antigravity's Google OAuth
 - **Multi-account rotation** across up to 10 Google accounts
-- **One Antigravity quota pool** for supported Gemini and Claude models
-- **Thinking models** with configurable variants
+- **One Antigravity quota pool** for supported models
+- **Gemini thinking variants** for low/medium/high levels where supported
 - **Auto-recovery** from interrupted tool calls
 - **Model-declared web search** sanitized by the pipeline (no dedicated
   search tool is registered)
@@ -60,11 +60,11 @@ optional `@version` pins are all accepted. The V2 key is `plugins`
 opencode auth login   # one account per run; repeat to add more (max 10)
 ```
 
-Then manage saved accounts inside OpenCode with `/antigravity`. Models are
-registered automatically — verify with:
+Then manage saved accounts inside OpenCode with `/antigravity`. The plugin
+registers a fixed model catalog — verify with:
 
 ```bash
-opencode run "Hello" --model=antigravity/antigravity-gemini-3-flash
+opencode run "Hello" --model=antigravity/antigravity-gemini-3.8-flash
 ```
 
 ## Multi-account in 30 seconds

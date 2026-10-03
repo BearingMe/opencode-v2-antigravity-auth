@@ -974,8 +974,8 @@ export function prepareAntigravityRequest(
           Array.isArray(requestPayload.contents) &&
           requestPayload.contents.some((c: any) => c?.role === "model" || c?.role === "assistant")
 
-        // Claude Sonnet 4.6 is non-thinking only.
-        // Ignore any client-provided thinkingConfig for this model.
+        // The legacy bare Sonnet 4.6 ID is non-thinking.
+        // Ignore any client-provided thinkingConfig for that model.
         const lowerEffective = effectiveModel.toLowerCase()
         const isClaudeSonnetNonThinking = lowerEffective === "claude-sonnet-4-6"
         const effectiveUserThinkingConfig = isClaudeSonnetNonThinking || isImageModel ? undefined : userThinkingConfig

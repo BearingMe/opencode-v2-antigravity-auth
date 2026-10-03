@@ -80,8 +80,8 @@ describe("updateOpencodeConfig", () => {
     const writtenConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"))
     expect(writtenConfig.providers.google).toEqual(existingConfig.providers.google)
     expect(writtenConfig.providers.antigravity.models["old-model"]).toBeUndefined()
-    expect(writtenConfig.providers.antigravity.models["antigravity-gemini-3-pro"]).toBeDefined()
-    expect(writtenConfig.providers.antigravity.models["antigravity-claude-sonnet-4-6"]).toBeDefined()
+    expect(writtenConfig.providers.antigravity.models["antigravity-gemini-3.8-flash"]).toBeDefined()
+    expect(writtenConfig.providers.antigravity.models["antigravity-claude-sonnet-4-6-thinking"]).toBeDefined()
   })
 
   test("preserves non-google provider sections", async () => {
@@ -244,15 +244,16 @@ describe("updateOpencodeConfig", () => {
     for (const modelKey of Object.keys(OPENCODE_MODEL_DEFINITIONS)) {
       expect(models[modelKey]).toBeDefined()
     }
-    expect(models["antigravity-gemini-3-pro"].variants).toEqual([
+    expect(models["antigravity-gemini-3.1-pro"].variants).toEqual([
       { id: "low", settings: { thinkingLevel: "low" } },
       { id: "high", settings: { thinkingLevel: "high" } },
     ])
-    expect(models["antigravity-gemini-3-pro"].capabilities).toEqual({
+    expect(models["antigravity-gemini-3.1-pro"].capabilities).toEqual({
       tools: true,
       input: ["text", "image", "pdf"],
       output: ["text"],
     })
+    expect(Object.keys(models).sort()).toEqual(Object.keys(OPENCODE_MODEL_DEFINITIONS).sort())
   })
 
   test("parses existing jsonc config files with comments and trailing commas", async () => {
@@ -279,7 +280,7 @@ describe("updateOpencodeConfig", () => {
     expect(writtenConfig.plugins).toContain("other-plugin")
     expect(writtenConfig.plugins).toContain("opencode-v2-antigravity-auth@latest")
     expect(writtenConfig.providers.antigravity.region).toBe("us-central1")
-    expect(writtenConfig.providers.antigravity.models["antigravity-gemini-3-pro"]).toBeDefined()
+    expect(writtenConfig.providers.antigravity.models["antigravity-gemini-3.8-flash"]).toBeDefined()
   })
 
   test("prefers existing opencode.jsonc when using default config path", async () => {

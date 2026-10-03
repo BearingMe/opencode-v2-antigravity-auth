@@ -472,11 +472,10 @@ export default Plugin.define({
 
     await ctx.provider.transform((editor) => {
       const existing = editor.get(ANTIGRAVITY_PROVIDER)
-      const models = new Map(existing?.models ?? [])
-      for (const [id, definition] of Object.entries(OPENCODE_MODEL_DEFINITIONS)) {
+      const models = Object.entries(OPENCODE_MODEL_DEFINITIONS).map(([id, definition]) => {
         const modelID = Schema.decodeUnknownSync(ModelID)(id)
         const model = ModelInfo.default(ANTIGRAVITY_PROVIDER, modelID)
-        models.set(id, {
+        return {
           ...model,
           name: definition.name,
           package: `aisdk:${ANTIGRAVITY_SDK}`,
@@ -487,15 +486,15 @@ export default Plugin.define({
             id: Schema.decodeUnknownSync(ModelVariantID)(variantID),
             settings: settings as Record<string, unknown>,
           })),
-        })
-      }
+        }
+      })
 
       if (existing) {
         editor.update(ANTIGRAVITY_PROVIDER, (provider) => {
           provider.activation = "enabled"
           provider.package = `aisdk:${ANTIGRAVITY_SDK}`
         })
-        editor.models.set(ANTIGRAVITY_PROVIDER, [...models.values()])
+        editor.models.set(ANTIGRAVITY_PROVIDER, models)
       } else {
         editor.add({
           info: {
@@ -504,7 +503,7 @@ export default Plugin.define({
             activation: "enabled",
             package: `aisdk:${ANTIGRAVITY_SDK}`,
           },
-          models: [...models.values()],
+          models,
         })
       }
     })
