@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, unlinkSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { existsSync, mkdirSync, readFileSync } from "node:fs"
+import { dirname } from "node:path"
 import { tmpdir } from "node:os"
+import { replaceFileSync } from "../storage/file.js"
 
 interface CacheEntry {
   value: string
@@ -183,20 +184,10 @@ export class PersistentCache {
         },
       }
 
-      const temporaryPath = join(tmpdir(), `persistent-cache-${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`)
-      writeFileSync(temporaryPath, JSON.stringify(cacheFile, null, 2), "utf-8")
-
-      try {
-        renameSync(temporaryPath, this.options.filePath)
-      } catch {
-        // The temporary directory may be on another volume, notably on Windows.
-        writeFileSync(this.options.filePath, readFileSync(temporaryPath))
-        try {
-          unlinkSync(temporaryPath)
-        } catch {
-          // A leftover temporary file is harmless if cleanup is unavailable.
-        }
-      }
+      replaceFileSync(this.options.filePath, JSON.stringify(cacheFile, null, 2), {
+        temporaryDirectory: tmpdir(),
+        copyFallback: true,
+      })
 
       this.stats.writes++
       this.dirty = false

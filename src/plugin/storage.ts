@@ -11,8 +11,9 @@ import {
 } from "node:fs"
 import { dirname, join } from "node:path"
 import { homedir } from "node:os"
-import { createHash, randomBytes } from "node:crypto"
-import lockfile from "proper-lockfile"
+import { createHash } from "node:crypto"
+import { replaceFile } from "../lib/storage/file.js"
+import { withFileLock as runWithFileLock } from "../lib/storage/lock.js"
 import { createLogger } from "./logger"
 
 const log = createLogger("storage")
@@ -599,6 +600,7 @@ async function ensureSecurePermissions(path: string): Promise<void> {
   }
 }
 
+/** Creates an empty v4 account store so proper-lockfile can lock the path. */
 async function ensureFileExists(path: string): Promise<void> {
   try {
     await fs.access(path)
@@ -611,21 +613,13 @@ async function ensureFileExists(path: string): Promise<void> {
   }
 }
 
+/** Prepares the plugin store, then runs one transaction under its configured lock. */
 async function withFileLock<T>(path: string, fn: () => Promise<T>): Promise<T> {
   await ensureFileExists(path)
-  let release: (() => Promise<void>) | null = null
-  try {
-    release = await lockfile.lock(path, LOCK_OPTIONS)
-    return await fn()
-  } finally {
-    if (release) {
-      try {
-        await release()
-      } catch (unlockError) {
-        log.warn("Failed to release lock", { error: String(unlockError) })
-      }
-    }
-  }
+  return runWithFileLock(path, fn, {
+    lockOptions: LOCK_OPTIONS,
+    onReleaseError: (unlockError) => log.warn("Failed to release lock", { error: String(unlockError) }),
+  })
 }
 
 function mergeAccountStorage(existing: AccountStorageV4, incoming: AccountStorageV4): AccountStorageV4 {
@@ -919,21 +913,8 @@ export async function saveAccounts(storage: AccountStorageV4): Promise<void> {
       removedAccounts: tombstones,
     }
 
-    const tempPath = `${path}.${randomBytes(6).toString("hex")}.tmp`
     const content = JSON.stringify(filtered, null, 2)
-
-    try {
-      await fs.writeFile(tempPath, content, { encoding: "utf-8", mode: 0o600 })
-      await fs.rename(tempPath, path)
-    } catch (error) {
-      // Clean up temp file on failure to prevent accumulation
-      try {
-        await fs.unlink(tempPath)
-      } catch {
-        // Ignore cleanup errors (file may not exist)
-      }
-      throw error
-    }
+    await replaceFile(path, content, { mode: 0o600 })
   })
 }
 
@@ -962,7 +943,6 @@ export async function saveAccountsReplace(
   await ensureGitignore(configDir)
 
   await withFileLock(path, async () => {
-    const tempPath = `${path}.${randomBytes(6).toString("hex")}.tmp`
     // Replace writes still honor tombstones: current disk tombstones are
     // merged in, so a stale snapshot passed here can never resurrect a
     // deleted account. Pass { clearTombstones: true } only for intentional
@@ -981,18 +961,7 @@ export async function saveAccountsReplace(
       removedAccounts: tombstones,
     }
     const content = JSON.stringify(filtered, null, 2)
-
-    try {
-      await fs.writeFile(tempPath, content, { encoding: "utf-8", mode: 0o600 })
-      await fs.rename(tempPath, path)
-    } catch (error) {
-      try {
-        await fs.unlink(tempPath)
-      } catch {
-        // Ignore cleanup errors
-      }
-      throw error
-    }
+    await replaceFile(path, content, { mode: 0o600 })
   })
 }
 
@@ -1049,20 +1018,8 @@ export async function updateAccounts<T>(
       removedAccounts: tombstones,
     }
 
-    const tempPath = `${path}.${randomBytes(6).toString("hex")}.tmp`
     const content = JSON.stringify(filtered, null, 2)
-
-    try {
-      await fs.writeFile(tempPath, content, { encoding: "utf-8", mode: 0o600 })
-      await fs.rename(tempPath, path)
-    } catch (error) {
-      try {
-        await fs.unlink(tempPath)
-      } catch {
-        // Ignore cleanup errors
-      }
-      throw error
-    }
+    await replaceFile(path, content, { mode: 0o600 })
     return result
   })
 }
