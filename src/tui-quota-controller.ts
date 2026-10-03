@@ -50,7 +50,11 @@ export function createQuotaDialogController(deps: QuotaDialogDeps) {
       refreshing = false
       if (result.ok) {
         if (result.entry.status === "error") {
-          if (result.entry.enabled !== undefined) entry = { ...entry, enabled: result.entry.enabled }
+          entry = {
+            ...entry,
+            ...(result.entry.enabled === undefined ? {} : { enabled: result.entry.enabled }),
+            ...(result.entry.quotaSummary === undefined ? {} : { quotaSummary: result.entry.quotaSummary }),
+          }
           failed = true
           emit()
           deps.notifyRefreshFailed(false, true)

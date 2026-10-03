@@ -26,13 +26,18 @@ checks — never your real multi-account store.
 - [ ] Login shows the required Add/reconnect selection and saved-account
       summary before opening the browser. Ctrl+C opens no browser and writes
       nothing. No Exit option or custom host build is required.
-- [ ] Stock host: selecting Add opens consent once. After completion the host exits;
-      another login shows the updated count. There is no repeated-add loop.
+- [ ] Stock host: select Antigravity, then Add opens consent once. After
+      completion the host exits; another login shows the updated count. There
+      is no repeated-add loop.
 
 - [ ] Empty state with no saved accounts: alert pointing to
       `opencode auth login` (no crash, no empty select).
 - [ ] Repeated login with the same Google account reconnects: still one
       entry, quota works, durable id preserved.
+- [ ] Antigravity login registers under its own integration; Google provider,
+      Google sign-in methods, and active Google connections remain unchanged.
+- [ ] Existing `google/<model>` selections for Antigravity models are migrated
+      to `antigravity/<model>`; ordinary Google API-key models retain their route.
 - [ ] Already-saved account at 10/10 reconnects instead of failing (count
       stays 10, no capacity error for the duplicate).
 - [ ] Genuinely new account at 10/10 fails cleanly with the capacity
@@ -42,20 +47,32 @@ checks — never your real multi-account store.
 
 ## Management actions (per account)
 
-- [ ] `Show quota`: opens one padded `Antigravity quota` screen with themed
-      bars per group (`Claude` / `Gemini Pro` / `Gemini Flash`), last-updated
-      timestamp, a not-live-updated note, and a refresh-only `refresh ctrl+r` footer.
-      Bars fill the available width with aligned percentage/reset columns. Resize
-      the terminal: bars relayout, and narrow layouts stack without overflow.
+- [ ] `Show quota`: opens one padded `Antigravity quota` screen with grouped
+      Gemini and Claude/GPT sections, each with weekly and five-hour bars,
+      inline muted member names, two-decimal percentages, and reset/available
+      text. The dialog is medium-sized; section names use accent and each
+      group's Weekly/Five-hour rows retain the intended breathing room. Timestamp
+      and `refresh ctrl+r` share a footer row when they fit. If grouped summary is
+      unavailable, it explicitly labels the legacy per-model bars as a fallback.
+      At 80x24, the footer and any overflow hint stay visible while quota content
+      scrolls as needed. Resize: narrow layouts
+      wrap without clipping percentages or overlapping text.
+      Bold labels, unbracketed bars (at most 20 cells), base-text percentages,
+      and muted durations share each row. Quota rows have a smaller gap than
+      provider groups; the footer is distinctly separated from the final row.
+      The dialog ends just below the footer, without a large empty bottom area.
+      Header/body/footer metadata share the same left inset; refresh is on the right.
       The header retains clickable `esc`; no duplicate footer Back/Esc appears.
       Saved bars appear immediately, then enabled accounts refresh automatically.
-      Unknown groups render `unknown`,
-      never `0%`. No submenu: the screen stays open across refreshes.
+      Unknown windows render `unknown`, never `0%`. No submenu: the screen stays
+      open across refreshes.
 - [ ] `Refresh quota` via `ctrl+r` on the quota screen: `Refreshing…`
-      appears inline, then the bars update in place with no dialog
+      appears inline, then the available bars update in place with no dialog
       closing. Repeat presses during a fetch are ignored (no duplicate fetch).
-      Clicking refresh is equivalent. Failures show `Refresh failed — showing last saved values.` inline plus an
-      error toast, keep cached values, and stay on the screen.
+      Clicking refresh is equivalent. Partial failures show source-specific
+      inline status and keep cached values. Overall quota errors also show an
+      error toast and stay on the screen. A successful grouped summary still
+      updates even if the per-model probe failed.
 - [ ] Back from the quota screen (`esc`) returns to the main account list —
       never to a quota submenu. Dismissing the list ends the flow with no toast
       and no state change.
@@ -83,25 +100,26 @@ checks — never your real multi-account store.
       and return to the refreshed list.
 - [ ] RPC server unavailable (plugin disabled mid-session, invoke via
       palette history): `Antigravity server unavailable...` error toast.
-- [ ] Refresh quota with no network: error toast; cached values remain via
-      Show quota with `stale` freshness.
+- [ ] Refresh quota with no network: error toast; cached grouped and per-model
+      values remain visible with stale/error status.
 - [ ] `ctrl+r` scope: outside the quota view, `ctrl+r` keeps its host
       behavior (session rename); inside the quota view it refreshes. Esc from
       the quota view returns to the account list; Esc from actions closes with
       no toast and no state change.
 - [ ] Narrow terminal (~60 cols): text bars wrap/truncate without renderer
       errors.
-- [ ] Reset countdown sanity: future resets show `resets in Xh Ym` /
-      `resets in Xm` / `resets in <1m`; missing data shows `reset unknown` —
-      never a past date presented as upcoming.
+- [ ] Reset countdown sanity: grouped buckets show `Refreshes in Xh Ym` /
+      `Refreshes in Xm` / `Refreshes now`; full buckets say `Quota available`,
+      unknown values stay unknown, and no past date is presented as upcoming.
 
 ## Persistence and packaged install
 
 - [ ] Restart persistence: disable one account, remove another, restart
       opencode, reopen `/antigravity` — same list, flags, selection, and quota
       cache timestamps.
-- [ ] Refresh quota successfully, close/reopen, then restart: saved readings
-      survive. Offline refresh and empty readings do not erase the saved cache.
+- [ ] Refresh quota successfully, close/reopen, then restart: grouped and
+      per-model readings survive. Offline refresh and empty readings do not
+      erase either saved cache.
 - [ ] Disabled-account quota shows saved bars and the refresh-paused message.
 - [ ] Plugin reload with quota open closes it without reopening the list.
 - [ ] Replacing quota with another host dialog does not reopen the account

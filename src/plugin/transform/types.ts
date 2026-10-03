@@ -1,5 +1,3 @@
-import type { HeaderStyle } from "../../constants"
-
 export type ModelFamily = "claude" | "gemini-flash" | "gemini-pro"
 
 export type ThinkingTier = "low" | "medium" | "high"
@@ -103,10 +101,6 @@ export interface ResolvedModel {
   isThinkingModel?: boolean
 
   isImageModel?: boolean
-
-  quotaPreference?: HeaderStyle
-
-  explicitQuota?: boolean
 
   configSource?: "variant" | "tier"
 

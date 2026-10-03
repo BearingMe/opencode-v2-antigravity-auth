@@ -15,9 +15,9 @@ export interface UpdateConfigResult {
 
 export interface OpencodeConfig {
   $schema?: string
-  plugin?: string[]
-  provider?: {
-    google?: {
+  plugins?: Array<string | { package: string; options?: Record<string, unknown> }>
+  providers?: {
+    antigravity?: {
       models?: Record<string, unknown>
       [key: string]: unknown
     }
@@ -45,6 +45,33 @@ function stripJsonCommentsAndTrailingCommas(json: string): string {
       group ? "" : match,
     )
     .replace(/,(\s*[}\]])/g, "$1")
+}
+
+/**
+ * Converts the shared model catalog into the shape accepted by V2 config.
+ */
+function toConfigModels(): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(OPENCODE_MODEL_DEFINITIONS).map(([id, definition]) => [
+      id,
+      {
+        name: definition.name,
+        limit: {
+          context: definition.limit.context,
+          output: definition.limit.output,
+        },
+        capabilities: {
+          tools: true,
+          input: definition.modalities.input,
+          output: definition.modalities.output,
+        },
+        variants: Object.entries(definition.variants ?? {}).map(([variantID, settings]) => ({
+          id: variantID,
+          settings,
+        })),
+      },
+    ]),
+  )
 }
 
 /**
@@ -85,13 +112,13 @@ export function getOpencodeConfigPath(): string {
  *
  * This function:
  * 1. Reads existing opencode.json/opencode.jsonc (or creates default structure)
- * 2. Replaces `provider.google.models` with plugin models
+ * 2. Replaces `providers.antigravity.models` with plugin models
  * 3. Writes back to disk with proper formatting
  *
  * Preserves:
  * - $schema and other top-level config keys
- * - Non-google provider sections
- * - Other settings within google provider (except models)
+ * - Google and other provider sections
+ * - Other settings within the Antigravity provider (except models)
  */
 export async function updateOpencodeConfig(options: UpdateConfigOptions = {}): Promise<UpdateConfigResult> {
   const configPath = options.configPath ?? getOpencodeConfigPath()
@@ -107,8 +134,8 @@ export async function updateOpencodeConfig(options: UpdateConfigOptions = {}): P
       // Create default config structure
       config = {
         $schema: SCHEMA_URL,
-        plugin: [],
-        provider: {},
+        plugins: [],
+        providers: {},
       }
     }
 
@@ -118,26 +145,28 @@ export async function updateOpencodeConfig(options: UpdateConfigOptions = {}): P
     }
 
     // Ensure plugin array exists and contains our plugin
-    if (!Array.isArray(config.plugin)) {
-      config.plugin = []
+    if (!Array.isArray(config.plugins)) {
+      config.plugins = []
     }
 
     // Check if plugin is already in the list (any version)
-    const hasPlugin = config.plugin.some((p) => p.includes("opencode-v2-antigravity-auth"))
+    const hasPlugin = config.plugins.some((plugin) => {
+      const packageName = typeof plugin === "string" ? plugin : plugin.package
+      return packageName.includes("opencode-v2-antigravity-auth")
+    })
     if (!hasPlugin) {
-      config.plugin.push(PLUGIN_NAME)
+      config.plugins.push(PLUGIN_NAME)
     }
 
-    // Ensure provider.google structure exists
-    if (!config.provider) {
-      config.provider = {}
+    // Keep Google untouched; Antigravity has its own provider namespace.
+    if (!config.providers) {
+      config.providers = {}
     }
-    if (!config.provider.google) {
-      config.provider.google = {}
+    if (!config.providers.antigravity) {
+      config.providers.antigravity = {}
     }
 
-    // Replace google models with plugin models
-    config.provider.google.models = { ...OPENCODE_MODEL_DEFINITIONS }
+    config.providers.antigravity.models = toConfigModels()
 
     // Ensure config directory exists
     const configDir = dirname(configPath)

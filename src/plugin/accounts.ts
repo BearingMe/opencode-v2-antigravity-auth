@@ -11,9 +11,9 @@ import {
   type AccountStorageV4,
   type RateLimitStateV3,
   type ModelFamily,
-  type HeaderStyle,
   type CooldownReason,
   type RemovedAccountTombstone,
+  type QuotaSummaryGroup,
 } from "./storage"
 import type { OAuthAuthDetails, RefreshParts } from "./types"
 import type { AccountSelectionStrategy } from "./config/schema"
@@ -30,7 +30,7 @@ import { getModelFamily } from "./transform/model-resolver"
 import { debugLogToFile } from "./debug"
 import { formatAccountLabel } from "./logging-utils"
 
-export type { ModelFamily, HeaderStyle, CooldownReason } from "./storage"
+export type { ModelFamily, CooldownReason } from "./storage"
 export type { AccountSelectionStrategy } from "./config/schema"
 
 export type RateLimitReason =
@@ -145,7 +145,7 @@ export function calculateBackoffMs(
   }
 }
 
-export type BaseQuotaKey = "claude" | "gemini-antigravity" | "gemini-cli"
+export type BaseQuotaKey = "claude" | "gemini-antigravity"
 export type QuotaKey = BaseQuotaKey | `${BaseQuotaKey}:${string}`
 
 export interface ManagedAccount {
@@ -180,6 +180,8 @@ export interface ManagedAccount {
 
   cachedQuota?: Partial<Record<QuotaGroup, QuotaGroupSummary>>
   cachedQuotaUpdatedAt?: number
+  cachedQuotaSummary?: QuotaSummaryGroup[]
+  cachedQuotaSummaryUpdatedAt?: number
   verificationRequired?: boolean
   verificationRequiredAt?: number
   verificationRequiredReason?: string
@@ -199,11 +201,11 @@ function clampNonNegativeInt(value: unknown, fallback: number): number {
   return value < 0 ? 0 : Math.floor(value)
 }
 
-function getQuotaKey(family: ModelFamily, headerStyle: HeaderStyle, model?: string | null): QuotaKey {
+function getQuotaKey(family: ModelFamily, model?: string | null): QuotaKey {
   if (family === "claude") {
     return "claude"
   }
-  const base = headerStyle === "gemini-cli" ? "gemini-cli" : "gemini-antigravity"
+  const base = "gemini-antigravity"
   if (model) {
     return `${base}:${model}`
   }
@@ -215,40 +217,15 @@ function isRateLimitedForQuotaKey(account: ManagedAccount, key: QuotaKey): boole
   return resetTime !== undefined && nowMs() < resetTime
 }
 
-function isRateLimitedForFamily(account: ManagedAccount, family: ModelFamily, model?: string | null): boolean {
+function isAccountRateLimitedForFamily(account: ManagedAccount, family: ModelFamily, model?: string | null): boolean {
   if (family === "claude") {
     return isRateLimitedForQuotaKey(account, "claude")
   }
-
-  const antigravityIsLimited = isRateLimitedForHeaderStyle(account, family, "antigravity", model)
-  const cliIsLimited = isRateLimitedForHeaderStyle(account, family, "gemini-cli", model)
-
-  return antigravityIsLimited && cliIsLimited
-}
-
-function isRateLimitedForHeaderStyle(
-  account: ManagedAccount,
-  family: ModelFamily,
-  headerStyle: HeaderStyle,
-  model?: string | null,
-): boolean {
   clearExpiredRateLimits(account)
-
-  if (family === "claude") {
-    return isRateLimitedForQuotaKey(account, "claude")
-  }
-
-  // Check model-specific quota first if provided
-  if (model) {
-    const modelKey = getQuotaKey(family, headerStyle, model)
-    if (isRateLimitedForQuotaKey(account, modelKey)) {
-      return true
-    }
-  }
-
-  // Then check base family quota
-  const baseKey = getQuotaKey(family, headerStyle)
-  return isRateLimitedForQuotaKey(account, baseKey)
+  return (
+    isRateLimitedForQuotaKey(account, getQuotaKey(family, model)) ||
+    (Boolean(model) && isRateLimitedForQuotaKey(account, getQuotaKey(family)))
+  )
 }
 
 function clearExpiredRateLimits(account: ManagedAccount): void {
@@ -403,6 +380,8 @@ export class AccountManager {
             fingerprintHistory: acc.fingerprintHistory ?? [],
             cachedQuota: acc.cachedQuota as Partial<Record<QuotaGroup, QuotaGroupSummary>> | undefined,
             cachedQuotaUpdatedAt: acc.cachedQuotaUpdatedAt,
+            cachedQuotaSummary: acc.cachedQuotaSummary,
+            cachedQuotaSummaryUpdatedAt: acc.cachedQuotaSummaryUpdatedAt,
             verificationRequired: acc.verificationRequired,
             verificationRequiredAt: acc.verificationRequiredAt,
             verificationRequiredReason: acc.verificationRequiredReason,
@@ -557,15 +536,14 @@ export class AccountManager {
     family: ModelFamily,
     model?: string | null,
     strategy: AccountSelectionStrategy = "sticky",
-    headerStyle: HeaderStyle = "antigravity",
     pidOffsetEnabled: boolean = false,
     softQuotaThresholdPercent: number = 100,
     softQuotaCacheTtlMs: number = 10 * 60 * 1000,
   ): ManagedAccount | null {
-    const quotaKey = getQuotaKey(family, headerStyle, model)
+    const quotaKey = getQuotaKey(family, model)
 
     if (strategy === "round-robin") {
-      const next = this.getNextForFamily(family, model, headerStyle, softQuotaThresholdPercent, softQuotaCacheTtlMs)
+      const next = this.getNextForFamily(family, model, softQuotaThresholdPercent, softQuotaCacheTtlMs)
       if (next) {
         this.markTouchedForQuota(next, quotaKey)
         this.currentAccountIndexByFamily[family] = next.index
@@ -586,7 +564,7 @@ export class AccountManager {
             lastUsed: acc.lastUsed,
             healthScore: healthTracker.getScore(acc.index),
             isRateLimited:
-              isRateLimitedForFamily(acc, family, model) ||
+              isAccountRateLimitedForFamily(acc, family, model) ||
               isOverSoftQuotaThreshold(acc, family, softQuotaThresholdPercent, softQuotaCacheTtlMs, model),
             isCoolingDown: this.isAccountCoolingDown(acc),
           }
@@ -626,7 +604,7 @@ export class AccountManager {
     const current = this.getCurrentAccountForFamily(family)
     if (current) {
       clearExpiredRateLimits(current)
-      const isLimitedForRequestedStyle = isRateLimitedForHeaderStyle(current, family, headerStyle, model)
+      const isLimited = isAccountRateLimitedForFamily(current, family, model)
       const isOverThreshold = isOverSoftQuotaThreshold(
         current,
         family,
@@ -634,13 +612,13 @@ export class AccountManager {
         softQuotaCacheTtlMs,
         model,
       )
-      if (!isLimitedForRequestedStyle && !isOverThreshold && !this.isAccountCoolingDown(current)) {
+      if (!isLimited && !isOverThreshold && !this.isAccountCoolingDown(current)) {
         this.markTouchedForQuota(current, quotaKey)
         return current
       }
     }
 
-    const next = this.getNextForFamily(family, model, headerStyle, softQuotaThresholdPercent, softQuotaCacheTtlMs)
+    const next = this.getNextForFamily(family, model, softQuotaThresholdPercent, softQuotaCacheTtlMs)
     if (next) {
       this.markTouchedForQuota(next, quotaKey)
       this.currentAccountIndexByFamily[family] = next.index
@@ -651,7 +629,6 @@ export class AccountManager {
   getNextForFamily(
     family: ModelFamily,
     model?: string | null,
-    headerStyle: HeaderStyle = "antigravity",
     softQuotaThresholdPercent: number = 100,
     softQuotaCacheTtlMs: number = 10 * 60 * 1000,
   ): ManagedAccount | null {
@@ -659,7 +636,7 @@ export class AccountManager {
       clearExpiredRateLimits(a)
       return (
         a.enabled !== false &&
-        !isRateLimitedForHeaderStyle(a, family, headerStyle, model) &&
+        !isAccountRateLimitedForFamily(a, family, model) &&
         !isOverSoftQuotaThreshold(a, family, softQuotaThresholdPercent, softQuotaCacheTtlMs, model) &&
         !this.isAccountCoolingDown(a)
       )
@@ -679,14 +656,8 @@ export class AccountManager {
     return account
   }
 
-  markRateLimited(
-    account: ManagedAccount,
-    retryAfterMs: number,
-    family: ModelFamily,
-    headerStyle: HeaderStyle = "antigravity",
-    model?: string | null,
-  ): void {
-    const key = getQuotaKey(family, headerStyle, model)
+  markRateLimited(account: ManagedAccount, retryAfterMs: number, family: ModelFamily, model?: string | null): void {
+    const key = getQuotaKey(family, model)
     account.rateLimitResetTimes[key] = nowMs() + retryAfterMs
   }
 
@@ -705,7 +676,6 @@ export class AccountManager {
   markRateLimitedWithReason(
     account: ManagedAccount,
     family: ModelFamily,
-    headerStyle: HeaderStyle,
     model: string | null | undefined,
     reason: RateLimitReason,
     retryAfterMs?: number | null,
@@ -723,7 +693,7 @@ export class AccountManager {
     account.lastFailureTime = now
 
     const backoffMs = calculateBackoffMs(reason, failures - 1, retryAfterMs)
-    const key = getQuotaKey(family, headerStyle, model)
+    const key = getQuotaKey(family, model)
     account.rateLimitResetTimes[key] = now + backoffMs
 
     return backoffMs
@@ -740,10 +710,7 @@ export class AccountManager {
       if (family === "claude") {
         delete account.rateLimitResetTimes.claude
       } else {
-        const antigravityKey = getQuotaKey(family, "antigravity", model)
-        const cliKey = getQuotaKey(family, "gemini-cli", model)
-        delete account.rateLimitResetTimes[antigravityKey]
-        delete account.rateLimitResetTimes[cliKey]
+        delete account.rateLimitResetTimes[getQuotaKey(family, model)]
       }
       account.consecutiveFailures = 0
     }
@@ -799,53 +766,20 @@ export class AccountManager {
       return (
         acc.enabled !== false &&
         this.isFreshForQuota(acc, quotaKey) &&
-        !isRateLimitedForFamily(acc, family, model) &&
+        !isAccountRateLimitedForFamily(acc, family, model) &&
         !this.isAccountCoolingDown(acc)
       )
     })
   }
 
-  isRateLimitedForHeaderStyle(
-    account: ManagedAccount,
-    family: ModelFamily,
-    headerStyle: HeaderStyle,
-    model?: string | null,
-  ): boolean {
-    return isRateLimitedForHeaderStyle(account, family, headerStyle, model)
-  }
-
-  getAvailableHeaderStyle(account: ManagedAccount, family: ModelFamily, model?: string | null): HeaderStyle | null {
-    clearExpiredRateLimits(account)
-    if (family === "claude") {
-      return isRateLimitedForHeaderStyle(account, family, "antigravity") ? null : "antigravity"
-    }
-    if (!isRateLimitedForHeaderStyle(account, family, "antigravity", model)) {
-      return "antigravity"
-    }
-    if (!isRateLimitedForHeaderStyle(account, family, "gemini-cli", model)) {
-      return "gemini-cli"
-    }
-    return null
+  isRateLimitedForFamily(account: ManagedAccount, family: ModelFamily, model?: string | null): boolean {
+    return isAccountRateLimitedForFamily(account, family, model)
   }
 
   /**
-   * Check if any OTHER account has antigravity quota available for the given family/model.
-   *
-   * Used to determine whether to switch accounts vs fall back to gemini-cli:
-   * - If true: Switch to another account (preserve antigravity priority)
-   * - If false: All accounts exhausted antigravity, safe to fall back to gemini-cli
+   * Check if any other enabled account has quota available for this family/model.
    */
-  hasOtherAccountWithAntigravityAvailable(
-    currentAccountIndex: number,
-    family: ModelFamily,
-    model?: string | null,
-  ): boolean {
-    // Claude has no gemini-cli fallback - always return false
-    // (This method is only relevant for Gemini's dual quota pools)
-    if (family === "claude") {
-      return false
-    }
-
+  hasOtherAccountAvailable(currentAccountIndex: number, family: ModelFamily, model?: string | null): boolean {
     return this.accounts.some((acc) => {
       // Skip current account
       if (acc.index === currentAccountIndex) {
@@ -861,8 +795,7 @@ export class AccountManager {
       }
       // Clear expired rate limits before checking
       clearExpiredRateLimits(acc)
-      // Check if antigravity is available for this account
-      return !isRateLimitedForHeaderStyle(acc, family, "antigravity", model)
+      return !isAccountRateLimitedForFamily(acc, family, model)
     })
   }
 
@@ -1014,20 +947,10 @@ export class AccountManager {
     }
   }
 
-  getMinWaitTimeForFamily(
-    family: ModelFamily,
-    model?: string | null,
-    headerStyle?: HeaderStyle,
-    strict?: boolean,
-  ): number {
+  getMinWaitTimeForFamily(family: ModelFamily, model?: string | null): number {
     const available = this.accounts.filter((a) => {
       clearExpiredRateLimits(a)
-      return (
-        a.enabled !== false &&
-        (strict && headerStyle
-          ? !isRateLimitedForHeaderStyle(a, family, headerStyle, model)
-          : !isRateLimitedForFamily(a, family, model))
-      )
+      return a.enabled !== false && !isAccountRateLimitedForFamily(a, family, model)
     })
     if (available.length > 0) {
       return 0
@@ -1038,23 +961,13 @@ export class AccountManager {
       if (family === "claude") {
         const t = a.rateLimitResetTimes.claude
         if (t !== undefined) waitTimes.push(Math.max(0, t - nowMs()))
-      } else if (strict && headerStyle) {
-        const key = getQuotaKey(family, headerStyle, model)
-        const t = a.rateLimitResetTimes[key]
-        if (t !== undefined) waitTimes.push(Math.max(0, t - nowMs()))
       } else {
-        // For Gemini, account becomes available when EITHER pool expires for this model/family
-        const antigravityKey = getQuotaKey(family, "antigravity", model)
-        const cliKey = getQuotaKey(family, "gemini-cli", model)
-
-        const t1 = a.rateLimitResetTimes[antigravityKey]
-        const t2 = a.rateLimitResetTimes[cliKey]
-
-        const accountWait = Math.min(
-          t1 !== undefined ? Math.max(0, t1 - nowMs()) : Infinity,
-          t2 !== undefined ? Math.max(0, t2 - nowMs()) : Infinity,
-        )
-        if (accountWait !== Infinity) waitTimes.push(accountWait)
+        const keys = model ? [getQuotaKey(family, model), getQuotaKey(family)] : [getQuotaKey(family)]
+        const accountWaits = keys
+          .map((key) => a.rateLimitResetTimes[key])
+          .filter((resetTime): resetTime is number => resetTime !== undefined)
+          .map((resetTime) => Math.max(0, resetTime - nowMs()))
+        if (accountWaits.length > 0) waitTimes.push(Math.max(...accountWaits))
       }
     }
 
@@ -1093,6 +1006,8 @@ export class AccountManager {
       fingerprintHistory: account.fingerprintHistory,
       cachedQuota: account.cachedQuota,
       cachedQuotaUpdatedAt: account.cachedQuotaUpdatedAt,
+      cachedQuotaSummary: account.cachedQuotaSummary,
+      cachedQuotaSummaryUpdatedAt: account.cachedQuotaSummaryUpdatedAt,
       verificationRequired: account.verificationRequired,
       verificationRequiredAt: account.verificationRequiredAt,
       verificationRequiredReason: account.verificationRequiredReason,
@@ -1168,6 +1083,14 @@ export class AccountManager {
           next.cachedQuota = mem.cachedQuota
           next.cachedQuotaUpdatedAt = mem.cachedQuotaUpdatedAt
         }
+        if (
+          mem.cachedQuotaSummaryUpdatedAt !== undefined &&
+          (disk.cachedQuotaSummaryUpdatedAt === undefined ||
+            mem.cachedQuotaSummaryUpdatedAt >= disk.cachedQuotaSummaryUpdatedAt)
+        ) {
+          next.cachedQuotaSummary = mem.cachedQuotaSummary
+          next.cachedQuotaSummaryUpdatedAt = mem.cachedQuotaSummaryUpdatedAt
+        }
         merged.push(next)
       }
 
@@ -1200,6 +1123,8 @@ export class AccountManager {
           fingerprintHistory: mem.fingerprintHistory,
           cachedQuota: mem.cachedQuota,
           cachedQuotaUpdatedAt: mem.cachedQuotaUpdatedAt,
+          cachedQuotaSummary: mem.cachedQuotaSummary,
+          cachedQuotaSummaryUpdatedAt: mem.cachedQuotaSummaryUpdatedAt,
           verificationRequired: mem.verificationRequired,
           verificationRequiredAt: mem.verificationRequiredAt,
           verificationRequiredReason: mem.verificationRequiredReason,

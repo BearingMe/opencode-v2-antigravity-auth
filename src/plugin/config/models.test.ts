@@ -16,42 +16,56 @@ describe("OPENCODE_MODEL_DEFINITIONS", () => {
 
     expect(modelNames).toEqual([
       "antigravity-claude-opus-4-6-thinking",
-      "antigravity-claude-sonnet-4-6",
-      "antigravity-gemini-3-flash",
-      "antigravity-gemini-3-pro",
+      "antigravity-claude-sonnet-4-6-thinking",
       "antigravity-gemini-3.1-pro",
-      "gemini-2.5-flash",
-      "gemini-2.5-pro",
-      "gemini-3-flash-preview",
-      "gemini-3-pro-preview",
-      "gemini-3.1-pro-preview",
-      "gemini-3.1-pro-preview-customtools",
+      "antigravity-gemini-3.6-flash",
+      "antigravity-gemini-3.7-flash",
+      "antigravity-gemini-3.8-flash",
+      "antigravity-gpt-oss-120b-medium",
     ])
   })
 
-  it("defines Gemini 3 variants for Antigravity models", () => {
-    expect(getModel("antigravity-gemini-3-pro").variants).toEqual({
-      low: { thinkingLevel: "low" },
-      high: { thinkingLevel: "high" },
-    })
-
+  it("defines only the requested thinking variants", () => {
     expect(getModel("antigravity-gemini-3.1-pro").variants).toEqual({
       low: { thinkingLevel: "low" },
       high: { thinkingLevel: "high" },
     })
 
-    expect(getModel("antigravity-gemini-3-flash").variants).toEqual({
-      minimal: { thinkingLevel: "minimal" },
-      low: { thinkingLevel: "low" },
-      medium: { thinkingLevel: "medium" },
-      high: { thinkingLevel: "high" },
+    for (const modelID of [
+      "antigravity-gemini-3.6-flash",
+      "antigravity-gemini-3.7-flash",
+      "antigravity-gemini-3.8-flash",
+    ]) {
+      expect(getModel(modelID).variants).toEqual({
+        low: { thinkingLevel: "low" },
+        medium: { thinkingLevel: "medium" },
+        high: { thinkingLevel: "high" },
+      })
+    }
+  })
+
+  it("leaves Claude and GPT-OSS without selectable variants", () => {
+    expect(getModel("antigravity-claude-sonnet-4-6-thinking").variants).toBeUndefined()
+    expect(getModel("antigravity-claude-opus-4-6-thinking").variants).toBeUndefined()
+    expect(getModel("antigravity-gpt-oss-120b-medium").variants).toBeUndefined()
+
+    expect(getModel("antigravity-gpt-oss-120b-medium").modalities).toEqual({
+      input: ["text"],
+      output: ["text"],
     })
   })
 
-  it("defines thinking budget variants for Claude thinking models", () => {
-    expect(getModel("antigravity-claude-opus-4-6-thinking").variants).toEqual({
-      low: { thinkingConfig: { thinkingBudget: 8192 } },
-      max: { thinkingConfig: { thinkingBudget: 32768 } },
+  it("uses the picker labels from the requested model list", () => {
+    expect(
+      Object.fromEntries(Object.entries(OPENCODE_MODEL_DEFINITIONS).map(([id, model]) => [id, model.name])),
+    ).toEqual({
+      "antigravity-gemini-3.8-flash": "Gemini 3.8 Flash",
+      "antigravity-gemini-3.7-flash": "Gemini 3.7 Flash",
+      "antigravity-gemini-3.6-flash": "Gemini 3.6 Flash",
+      "antigravity-gemini-3.1-pro": "Gemini 3.1 Pro",
+      "antigravity-claude-sonnet-4-6-thinking": "Claude Sonnet 4.6 (Thinking)",
+      "antigravity-claude-opus-4-6-thinking": "Claude Opus 4.6 (Thinking)",
+      "antigravity-gpt-oss-120b-medium": "GPT-OSS 120B (Medium)",
     })
   })
 })

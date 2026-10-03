@@ -13,7 +13,6 @@ import { dirname, join } from "node:path"
 import { homedir } from "node:os"
 import { createHash, randomBytes } from "node:crypto"
 import lockfile from "proper-lockfile"
-import type { HeaderStyle } from "../constants"
 import { createLogger } from "./logger"
 
 const log = createLogger("storage")
@@ -112,7 +111,6 @@ export function ensureGitignoreSync(configDir: string): void {
 }
 
 export type ModelFamily = "claude" | "gemini"
-export type { HeaderStyle }
 
 export interface RateLimitState {
   claude?: number
@@ -122,6 +120,7 @@ export interface RateLimitState {
 export interface RateLimitStateV3 {
   claude?: number
   "gemini-antigravity"?: number
+  /** Legacy Gemini CLI cooldown retained when reading existing stores. */
   "gemini-cli"?: number
   [key: string]: number | undefined
 }
@@ -163,6 +162,22 @@ export interface AccountStorage {
 
 export type CooldownReason = "auth-failure" | "network-error" | "project-error" | "validation-required"
 
+/** Explicit quota windows returned by Antigravity's grouped summary endpoint. */
+export type QuotaSummaryWindow = "weekly" | "5h"
+
+/** One persisted Antigravity summary bucket; absent values remain unknown. */
+export interface QuotaSummaryBucket {
+  remainingFraction?: number
+  resetTime?: string
+}
+
+/** A vendor-labeled quota group with independent weekly and five-hour buckets. */
+export interface QuotaSummaryGroup {
+  displayName: string
+  description?: string
+  buckets: Partial<Record<QuotaSummaryWindow, QuotaSummaryBucket>>
+}
+
 export interface AccountMetadataV3 {
   /**
    * Durable opaque account id (e.g. a UUID) assigned by the account service.
@@ -195,6 +210,8 @@ export interface AccountMetadataV3 {
 
   cachedQuota?: Record<string, { remainingFraction?: number; resetTime?: string; modelCount: number }>
   cachedQuotaUpdatedAt?: number
+  cachedQuotaSummary?: QuotaSummaryGroup[]
+  cachedQuotaSummaryUpdatedAt?: number
 }
 
 export interface AccountStorageV3 {

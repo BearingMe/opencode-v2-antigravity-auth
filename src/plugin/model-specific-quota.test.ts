@@ -13,7 +13,7 @@ function markAntigravityRateLimited(
   account: Parameters<AccountManager["markRateLimited"]>[0],
   model?: string,
 ) {
-  manager.markRateLimited(account, 60000, "gemini", "antigravity", model)
+  manager.markRateLimited(account, 60000, "gemini", model)
 }
 
 describe("Model-specific Gemini quota", () => {
@@ -32,39 +32,37 @@ describe("Model-specific Gemini quota", () => {
   it("blocks only the specific Gemini model when markRateLimited is called with a model", () => {
     const account = manager.getCurrentAccountForFamily("gemini")!
 
-    // Mark gemini-1.5-pro as rate limited on antigravity
+    // Mark gemini-1.5-pro as rate limited in the active Gemini quota.
     markAntigravityRateLimited(manager, account, MODEL_PRO)
 
-    // gemini-1.5-pro should be rate limited for antigravity
-    expect(manager.isRateLimitedForHeaderStyle(account, "gemini", "antigravity", MODEL_PRO)).toBe(true)
+    // gemini-1.5-pro should be rate limited.
+    expect(manager.isRateLimitedForFamily(account, "gemini", MODEL_PRO)).toBe(true)
 
-    // gemini-1.5-flash should NOT be rate limited for antigravity
-    expect(manager.isRateLimitedForHeaderStyle(account, "gemini", "antigravity", MODEL_FLASH)).toBe(false)
+    // gemini-1.5-flash should remain available.
+    expect(manager.isRateLimitedForFamily(account, "gemini", MODEL_FLASH)).toBe(false)
 
     // General gemini (no model) should NOT be rate limited
-    expect(manager.isRateLimitedForHeaderStyle(account, "gemini", "antigravity")).toBe(false)
+    expect(manager.isRateLimitedForFamily(account, "gemini")).toBe(false)
   })
 
-  it("falls back to gemini-cli only for the specific model", () => {
+  it("ignores obsolete Gemini CLI cooldowns for the specific model", () => {
     const account = manager.getCurrentAccountForFamily("gemini")!
 
     // Mark gemini-1.5-pro as rate limited on antigravity
     markAntigravityRateLimited(manager, account, MODEL_PRO)
 
-    // Available header style for Pro should be gemini-cli
-    expect(manager.getAvailableHeaderStyle(account, "gemini", MODEL_PRO)).toBe("gemini-cli")
-
-    // Available header style for Flash should still be antigravity
-    expect(manager.getAvailableHeaderStyle(account, "gemini", MODEL_FLASH)).toBe("antigravity")
+    account.rateLimitResetTimes[`gemini-cli:${MODEL_PRO}`] = Date.now() + 60_000
+    expect(manager.isRateLimitedForFamily(account, "gemini", MODEL_PRO)).toBe(true)
+    expect(manager.isRateLimitedForFamily(account, "gemini", MODEL_FLASH)).toBe(false)
   })
 
-  it("returns null when all header styles are exhausted for the specific model on a single account", () => {
+  it("returns null when the specific model is rate-limited on a single account", () => {
     const account = manager.getCurrentAccountForFamily("gemini")!
 
     markAntigravityRateLimited(manager, account, MODEL_PRO)
-    manager.markRateLimited(account, 60000, "gemini", "gemini-cli", MODEL_PRO)
+    account.rateLimitResetTimes[`gemini-cli:${MODEL_PRO}`] = Date.now() + 60_000
 
-    // No other account available, so returns null for the rate-limited model
+    // No other account is available, so the rate-limited model returns null.
     expect(manager.getCurrentOrNextForFamily("gemini", MODEL_PRO)).toBeNull()
 
     // Flash should still return the same account since it's not rate-limited
@@ -75,11 +73,11 @@ describe("Model-specific Gemini quota", () => {
   it("base family rate limit blocks all models in that family", () => {
     const account = manager.getCurrentAccountForFamily("gemini")!
 
-    // Mark base gemini-antigravity as rate limited
+    // Mark the base Gemini quota as rate limited.
     markAntigravityRateLimited(manager, account)
 
-    // All Gemini models should now be blocked for antigravity on this account
-    expect(manager.isRateLimitedForHeaderStyle(account, "gemini", "antigravity", MODEL_PRO)).toBe(true)
-    expect(manager.isRateLimitedForHeaderStyle(account, "gemini", "antigravity", MODEL_FLASH)).toBe(true)
+    // All Gemini models should now be blocked on this account.
+    expect(manager.isRateLimitedForFamily(account, "gemini", MODEL_PRO)).toBe(true)
+    expect(manager.isRateLimitedForFamily(account, "gemini", MODEL_FLASH)).toBe(true)
   })
 })

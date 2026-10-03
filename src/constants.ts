@@ -50,13 +50,6 @@ export const ANTIGRAVITY_LOAD_ENDPOINTS = [ANTIGRAVITY_ENDPOINT_PROD, ANTIGRAVIT
 export const ANTIGRAVITY_ENDPOINT = ANTIGRAVITY_ENDPOINT_DAILY
 
 /**
- * Gemini CLI endpoint (production).
- * Used for models without :antigravity suffix.
- * Same as opencode-gemini-auth's GEMINI_CODE_ASSIST_ENDPOINT.
- */
-export const GEMINI_CLI_ENDPOINT = ANTIGRAVITY_ENDPOINT_PROD
-
-/**
  * Hardcoded project id used when Antigravity does not return one (e.g., business/workspace accounts).
  */
 export const ANTIGRAVITY_DEFAULT_PROJECT_ID = "rising-fact-p41fc"
@@ -105,11 +98,11 @@ export const ANTIGRAVITY_HEADERS = {
   "Client-Metadata": `{"ideType":"ANTIGRAVITY","platform":"${process.platform === "win32" ? "WINDOWS" : "MACOS"}","pluginType":"GEMINI"}`,
 } as const
 
-export const GEMINI_CLI_HEADERS = {
-  "User-Agent": "google-api-nodejs-client/9.15.1",
-  "X-Goog-Api-Client": "gl-node/22.17.0",
-  "Client-Metadata": "ideType=IDE_UNSPECIFIED,platform=PLATFORM_UNSPECIFIED,pluginType=GEMINI",
-} as const
+/**
+ * User agent used by the existing Google OAuth and Code Assist discovery flow.
+ * Keep its wire value stable; it is separate from Antigravity content requests.
+ */
+export const ANTIGRAVITY_AUTH_USER_AGENT = "google-api-nodejs-client/9.15.1"
 
 const ANTIGRAVITY_PLATFORMS = ["windows/amd64", "darwin/arm64", "darwin/amd64"] as const
 
@@ -129,14 +122,7 @@ export type HeaderSet = {
   "Client-Metadata"?: string
 }
 
-export function getRandomizedHeaders(style: HeaderStyle, model?: string): HeaderSet {
-  if (style === "gemini-cli") {
-    return {
-      "User-Agent": GEMINI_CLI_HEADERS["User-Agent"],
-      "X-Goog-Api-Client": GEMINI_CLI_HEADERS["X-Goog-Api-Client"],
-      "Client-Metadata": GEMINI_CLI_HEADERS["Client-Metadata"],
-    }
-  }
+export function getRandomizedHeaders(): HeaderSet {
   const platform = randomFrom(ANTIGRAVITY_PLATFORMS)
   const metadataPlatform = platform.startsWith("windows") ? "WINDOWS" : "MACOS"
   return {
@@ -146,12 +132,10 @@ export function getRandomizedHeaders(style: HeaderStyle, model?: string): Header
   }
 }
 
-export type HeaderStyle = "antigravity" | "gemini-cli"
-
 /**
  * Provider identifier shared between the plugin loader and credential store.
  */
-export const ANTIGRAVITY_PROVIDER_ID = "google"
+export const ANTIGRAVITY_PROVIDER_ID = "antigravity"
 
 // ============================================================================
 // TOOL HALLUCINATION PREVENTION (Ported from LLM-API-Key-Proxy)
@@ -193,9 +177,7 @@ export const EMPTY_SCHEMA_PLACEHOLDER_DESCRIPTION = "Placeholder. Always pass tr
  * session mismatch, plugin restart), this sentinel can be injected to skip
  * validation instead of failing with "Invalid signature in thinking block".
  *
- * This is an officially supported Google API feature, used by:
- * - gemini-cli: https://github.com/google-gemini/gemini-cli
- * - Google .NET SDK: PredictionServiceChatClient.cs
+ * This is an officially supported Google API feature used by Google's SDKs.
  *
  */
 export const SKIP_THOUGHT_SIGNATURE = "skip_thought_signature_validator"

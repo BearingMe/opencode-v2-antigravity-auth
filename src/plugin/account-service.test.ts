@@ -186,7 +186,7 @@ describe("checkQuota", () => {
   })
 
   it("strips updatedAccount credential material from results", async () => {
-    const outcome = await checkQuota({} as never, "google")
+    const outcome = await checkQuota({} as never, "antigravity")
 
     expect(outcome.results).toHaveLength(2)
     expect(outcome.results[1]).not.toHaveProperty("updatedAccount")
@@ -195,7 +195,7 @@ describe("checkQuota", () => {
   })
 
   it("persists rotated token metadata without touching other fields", async () => {
-    const outcome = await checkQuota({} as never, "google")
+    const outcome = await checkQuota({} as never, "antigravity")
 
     expect(outcome.persistedUpdates).toBe(1)
     expect(updateAccounts).toHaveBeenCalledOnce()
@@ -218,7 +218,7 @@ describe("checkQuota", () => {
       },
     ])
 
-    const outcome = await checkQuota({} as never, "google")
+    const outcome = await checkQuota({} as never, "antigravity")
 
     expect(outcome.persistedUpdates).toBe(0)
     // The rotation matched nothing inside the transaction, so no replacement
@@ -333,6 +333,117 @@ describe("getQuotaPresentation", () => {
     expect(checkAccountsQuota).not.toHaveBeenCalled()
   })
 
+  it("persists grouped quota independently when the per-model probe fails", async () => {
+    loadAccounts.mockResolvedValue(storage([account({ id: "stable" })]))
+    checkAccountsQuota.mockResolvedValue([
+      {
+        index: 0,
+        status: "ok",
+        quota: {
+          groups: {},
+          modelCount: 0,
+          error: "Failed to fetch Antigravity quota",
+          quotaSummaryStatus: "ok",
+          quotaSummaryGroups: [
+            {
+              displayName: "Gemini Models",
+              description: "Models within this group: Gemini Flash, Gemini Pro",
+              buckets: {
+                weekly: { remainingFraction: 0.6558833, resetTime: "2026-10-09T18:11:34Z" },
+                "5h": { remainingFraction: 1, resetTime: "2026-10-02T23:11:34Z" },
+              },
+            },
+          ],
+        },
+      },
+    ])
+
+    const fresh = await getQuotaPresentation({} as never)
+    const saved = written.at(-1)
+
+    expect(fresh.accounts[0]).toMatchObject({
+      status: "error",
+      quotaSummary: {
+        status: "ok",
+        freshness: "fresh",
+        groups: [
+          {
+            displayName: "Gemini Models",
+            buckets: {
+              weekly: { remainingFraction: 0.6558833, resetTime: Date.parse("2026-10-09T18:11:34Z") },
+              "5h": { remainingFraction: 1, resetTime: Date.parse("2026-10-02T23:11:34Z") },
+            },
+          },
+        ],
+      },
+    })
+    expect(saved).toMatchObject({
+      accounts: [
+        {
+          cachedQuotaSummary: [{ displayName: "Gemini Models", buckets: { weekly: { remainingFraction: 0.6558833 } } }],
+          cachedQuotaSummaryUpdatedAt: expect.any(Number),
+        },
+      ],
+    })
+
+    loadAccounts.mockResolvedValue(saved)
+    checkAccountsQuota.mockResolvedValue([{ index: 0, status: "error", error: "summary unavailable" }])
+    const stale = await getQuotaPresentation({} as never, { staleAfterMs: 0 })
+    expect(stale.accounts[0]?.quotaSummary).toMatchObject({
+      status: "error",
+      freshness: "stale",
+      groups: [{ displayName: "Gemini Models", buckets: { weekly: { remainingFraction: 0.6558833 } } }],
+    })
+  })
+
+  it("returns a concurrent newer grouped snapshot instead of an older probe result", async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+    const olderSummary = [{ displayName: "Older check", buckets: { weekly: { remainingFraction: 0.2 } } }]
+    const newerSummary = [{ displayName: "Newer check", buckets: { weekly: { remainingFraction: 0.8 } } }]
+    const source = account({
+      id: "stable",
+      cachedQuotaSummary: olderSummary,
+      cachedQuotaSummaryUpdatedAt: 500,
+    })
+    loadAccounts.mockResolvedValue(storage([source]))
+    checkAccountsQuota.mockImplementationOnce(async () => {
+      vi.setSystemTime(2_000)
+      loadAccounts.mockResolvedValue(
+        storage([
+          account({
+            ...source,
+            cachedQuotaSummary: newerSummary,
+            cachedQuotaSummaryUpdatedAt: 2_000,
+          }),
+        ]),
+      )
+      return [
+        {
+          index: 0,
+          status: "ok",
+          quota: {
+            groups: {},
+            modelCount: 0,
+            quotaSummaryStatus: "ok",
+            quotaSummaryGroups: olderSummary,
+          },
+        },
+      ]
+    })
+
+    try {
+      const result = await getQuotaPresentation({} as never)
+      expect(result.accounts[0]?.quotaSummary).toMatchObject({
+        checkedAt: 2_000,
+        freshness: "fresh",
+        groups: [{ displayName: "Newer check", buckets: { weekly: { remainingFraction: 0.8 } } }],
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it.each(["delete", "reconnect", "newer check", "disable"])("does not overwrite a concurrent %s", async (change) => {
     const source = account({
       id: "stable",
@@ -392,10 +503,9 @@ describe("getQuotaPresentation", () => {
               index: 0,
               status: "ok",
               quota: { groups: { claude: { remainingFraction: 0, resetTime: "2030-01-02T03:04:05Z" } }, modelCount: 1 },
-              geminiCliQuota: { models: [] },
             },
           ]
-        : [{ index: 0, status: "ok", quota: { groups: {}, modelCount: 0 }, geminiCliQuota: { models: [] } }]
+        : [{ index: 0, status: "ok", quota: { groups: {}, modelCount: 0 } }]
     })
 
     const dto = await getQuotaPresentation({} as never)
@@ -414,7 +524,7 @@ describe("getQuotaPresentation", () => {
     expect(dto.accounts[1]?.status).toBe("unknown")
     expect(dto.accounts[1]?.groups.claude?.remainingFraction).toBeNull()
     expect(dto.accounts[1]?.groups.claude?.consumedPercent).toBeNull()
-    // Empty Gemini CLI buckets do not imply exhausted Antigravity quota.
+    // Missing quota groups remain unknown rather than appearing exhausted.
     expect(dto.accounts[1]?.groups["gemini-pro"]?.consumedPercent).toBeNull()
   })
 
@@ -546,7 +656,6 @@ describe("getQuotaPresentation", () => {
                 },
             modelCount: 3,
           },
-          geminiCliQuota: { models: [] },
         },
       ]
     })
@@ -607,7 +716,6 @@ describe("getQuotaPresentation", () => {
           },
           modelCount: 3,
         },
-        geminiCliQuota: { models: [] },
       },
     ])
 
@@ -654,7 +762,7 @@ describe("verifyAccount", () => {
   })
 
   it("marks blocked accounts disabled and records the verification link", async () => {
-    const outcome = await verifyAccount({ index: 0 }, {} as never, "google")
+    const outcome = await verifyAccount({ index: 0 }, {} as never, "antigravity")
 
     expect(outcome).toMatchObject({
       index: 0,
@@ -685,7 +793,7 @@ describe("verifyAccount", () => {
     )
     verifyAccountAccess.mockResolvedValue({ status: "ok", message: "Account verification check passed." })
 
-    const outcome = await verifyAccount({ index: 0 }, {} as never, "google")
+    const outcome = await verifyAccount({ index: 0 }, {} as never, "antigravity")
 
     expect(outcome).toMatchObject({ status: "ok", checkedAt: expect.any(Number) })
     const writtenCleared = written[0] as { accounts: Array<Record<string, unknown>> }
@@ -696,7 +804,7 @@ describe("verifyAccount", () => {
   it("records errors without disabling and resolves by durable id", async () => {
     verifyAccountAccess.mockResolvedValue({ status: "error", message: "network unavailable" })
 
-    const outcome = await verifyAccount({ id: "acc-two" }, {} as never, "google")
+    const outcome = await verifyAccount({ id: "acc-two" }, {} as never, "antigravity")
 
     expect(outcome).toMatchObject({ index: 1, status: "error" })
     const writtenVerifyError = written[0] as { accounts: Array<Record<string, unknown>> }
@@ -704,7 +812,7 @@ describe("verifyAccount", () => {
   })
 
   it("does not write for unresolvable targets", async () => {
-    const outcome = await verifyAccount({ index: 8 }, {} as never, "google")
+    const outcome = await verifyAccount({ index: 8 }, {} as never, "antigravity")
 
     expect(outcome).toMatchObject({ ok: false })
     expect(updateAccounts).not.toHaveBeenCalled()
@@ -718,7 +826,7 @@ describe("verifyAccount", () => {
     )
     verifyAccountAccess.mockResolvedValue({ status: "ok", message: "Account verification check passed." })
 
-    const outcome = await verifyAccount({ id: "acc-one" }, {} as never, "google")
+    const outcome = await verifyAccount({ id: "acc-one" }, {} as never, "antigravity")
 
     expect(outcome).toMatchObject({ ok: false, kind: "not-found" })
     expect(written).toHaveLength(0)
@@ -1063,7 +1171,6 @@ describe("legacy tool adapter parity (check_quota, verify, delete_all)", () => {
       email: "one@example.com",
       status: "ok" as const,
       quota: { groups: {}, modelCount: 0 },
-      geminiCliQuota: { models: [] },
     }
     checkAccountsQuota.mockResolvedValue([
       quotaPayload,
@@ -1079,7 +1186,7 @@ describe("legacy tool adapter parity (check_quota, verify, delete_all)", () => {
     const result = await manageAccounts({ action: "check_quota" }, {} as never, vi.fn(), vi.fn())
     const parsed = JSON.parse(result.content) as Array<Record<string, unknown>>
 
-    // Pre-extraction shape preserved minus the redacted credential field.
+    // Quota shape is preserved minus the redacted credential field.
     expect(parsed).toHaveLength(2)
     expect(parsed[0]).toMatchObject(quotaPayload)
     expect(parsed[1]).not.toHaveProperty("updatedAccount")

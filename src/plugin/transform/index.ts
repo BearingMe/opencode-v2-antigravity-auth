@@ -15,7 +15,7 @@ export type {
 export {
   resolveModelWithTier,
   resolveModelWithVariant,
-  resolveModelForHeaderStyle,
+  resolveAntigravityModel,
   getModelFamily,
   MODEL_ALIASES,
   THINKING_TIER_BUDGETS,

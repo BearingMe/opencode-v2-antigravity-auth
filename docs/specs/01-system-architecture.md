@@ -4,7 +4,7 @@
 
 | Part            | Paths                                                          | Responsibility                                                                                                                                               |
 | --------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Shared identity | `src/constants.ts`, `src/shims.d.ts`, `src/google-sdk.ts`      | OAuth client id/secret/scopes/redirect, endpoint orders, header styles, version pinning, hardening prompts, search tuning                                    |
+| Shared identity | `src/constants.ts`, `src/shims.d.ts`, `src/google-sdk.ts`      | OAuth client id/secret/scopes/redirect, endpoint orders, Antigravity headers, version pinning, hardening prompts, search tuning                              |
 | Native engine   | `src/plugin/engine.ts`                                         | Request execution + rotation loop (sole router), unified OAuth refresh, thinking warmup                                                                      |
 | V2 bridge       | `src/v2-plugin.ts`                                             | V2 `integration/provider/model/aisdk/tool/session/event` transforms; routes via the native engine                                                            |
 | OAuth leaf      | `src/antigravity/oauth.ts`                                     | PKCE URL build + code exchange + `loadCodeAssist` project discovery                                                                                          |
@@ -32,7 +32,7 @@ transform/*, request-helpers ──should stay──> pure re: I/O
 native engine: `aisdk.hook("sdk") → antigravityFetch →
 executeAntigravityRequest` (`src/plugin/engine.ts`: rotation,
 soft-quota gate, Retry-After/RetryInfo, thinking
-warmup, toasts, `invalid_grant` eviction, gemini-only dual-pool fallback).
+warmup, toasts, and `invalid_grant` eviction).
 No parallel router, no legacy fallback.
 
 **Rationale:** Single routing implementation; prevents quota/signature drift.
@@ -47,19 +47,33 @@ No parallel router, no legacy fallback.
 
 **Status:** Explicit.
 
+### Rule: R-ARCH-ANTIGRAVITY-AUTH-ISOLATION
+
+**Requirement:** Antigravity MUST register its own `antigravity` provider,
+integration, and `antigravity-oauth` method. It MUST NOT update, remove, read,
+or depend on OpenCode's `google` integration, Google provider, or Google
+connection.
+
+**Rationale:** Antigravity account selection and OAuth credentials are isolated
+from ordinary Google API-key and OAuth connections.
+
+**Project evidence:** `src/v2-plugin.ts` integration/provider transforms and
+`src/v2-plugin.setup.test.ts` standalone registration coverage.
+
+**Status:** Explicit.
+
 ### Rule: R-ARCH-NO-BYPASS-SDK
 
-**Requirement:** Every `antigravity-*` model and every OAuth-routed `gemini-*`
-model MUST set `package = aisdk:<ANTIGRAVITY_SDK>` where `ANTIGRAVITY_SDK`
-is `new URL("./google-sdk.js", import.meta.url).href`. Plain `gemini-*`
-models with a non-OAuth (API-key) connection MUST keep their configured
-route and MUST NOT receive `options.fetch`.
+**Requirement:** Every model registered by the `antigravity` provider MUST set
+`package = aisdk:<ANTIGRAVITY_SDK>` where `ANTIGRAVITY_SDK` is
+`new URL("./google-sdk.js", import.meta.url).href`. The Google provider is
+outside this plugin's routing scope and MUST retain its configured route.
 
 **Project evidence:**
 
 - `src/v2-plugin.ts` provider/model transforms; `src/google-sdk.ts`
-- `src/v2-plugin.setup.test.ts` :: API-key gemini untouched; unauthenticated
-  antigravity throws
+- `src/v2-plugin.setup.test.ts` :: Google SDK route untouched; unauthenticated
+  Antigravity throws
 
 **Status:** Explicit.
 
@@ -73,9 +87,9 @@ in `request.ts`, `accounts.ts`, `storage.ts`, `quota.ts`, `project.ts`.
 
 ## Extension points
 
-- `HeaderStyle = "antigravity" | "gemini-cli"` + per-model `quotaPreference`
-  (`src/constants.ts :: getRandomizedHeaders`,
-  `src/plugin/transform/model-resolver.ts :: resolveModelWithTier`).
+- Dedicated `antigravity` provider and OAuth integration; the OpenCode `google`
+  provider and integration are not modified. Antigravity traffic uses the
+  native engine (`src/plugin/engine.ts`, `src/v2-plugin.ts`).
 - `account_selection_strategy = sticky | round-robin | hybrid` (default
   `hybrid`) + health/token-bucket trackers (`src/plugin/rotation.ts`).
 - `TransformContext/Result`, `StreamingCallbacks/SignatureStore`
@@ -89,7 +103,8 @@ in `request.ts`, `accounts.ts`, `storage.ts`, `quota.ts`, `project.ts`.
 deleteAll/ping`) — the interactive management surface sharing the
   `account-service.ts` backend with the legacy tool. `ping` returns
   `ANTIGRAVITY_RPC_ACCOUNTS_OK`.
-- V2 login surface: `google-oauth` integration with a required
+- V2 login surface: the standalone `antigravity` integration with its
+  `antigravity-oauth` method and required
   pre-authorization Add/reconnect selection (one account per command;
   native Ctrl+C cancellation) +
   `antigravity_accounts` tool + `/antigravity` dialog +

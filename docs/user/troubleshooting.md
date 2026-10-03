@@ -34,14 +34,14 @@ Signing in again refreshes an existing account in place. Only delete
 tombstone, quota cache, and selection. Prefer:
 
 ```bash
-opencode auth login   # reconnects the account you sign in with
+opencode auth login   # choose Antigravity, then reconnect the account
 ```
 
 ### `invalid_grant` / revoked token
 
 Password changes and security events revoke refresh tokens. The plugin
-evicts the affected account automatically. Re-authenticate it with
-`opencode auth login`.
+evicts the affected account automatically. Choose Antigravity in
+`opencode auth login` to re-authenticate it.
 
 ### "All accounts rate-limited" (but quota looks available)
 
@@ -61,16 +61,17 @@ account(s) in the accounts file (one entry per account).
 ### Blocked account (`verificationRequired`)
 
 Use `/antigravity` → **Verify**: blocked results show a `Verify:` URL plus
-`run opencode auth login and sign in again`. Complete verification, then
+`run opencode auth login, choose Antigravity, and sign in again`. Complete verification, then
 re-authenticate.
 
 ## Requests and models
 
 ### "Model not found"
 
-The plugin registers its models automatically. If a model is missing, check
-for another plugin or config that removes/renames `google` provider models,
-then restart OpenCode.
+The plugin registers its models automatically under `antigravity`. If an old
+`google/antigravity-*` reference no longer resolves, update it to
+`antigravity/antigravity-*`. Check for another plugin or config that removes or
+renames Antigravity models, then restart OpenCode.
 
 ### Gemini 3 `400 Unknown name "parameters"`
 
@@ -112,7 +113,9 @@ and paste it into the login prompt.
   to avoid conflicting Google auth. For parallel subagents, enable
   `"pid_offset_enabled": true` in `antigravity.json`.
 - **DCP (`@tarquinen/opencode-dcp`):** list this plugin **before** DCP.
-- **Other gemini-auth plugins:** not needed; this plugin handles Google OAuth.
+- **Other gemini-auth plugins:** not needed for Antigravity models; this plugin
+  registers its own Antigravity OAuth integration and leaves OpenCode's Google
+  integration alone.
 
 ## Still stuck?
 

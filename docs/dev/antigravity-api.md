@@ -65,15 +65,14 @@ risk — rotate both; scripts should one day import from a single source).
 
 - OAuth `Authorization: Bearer` on Antigravity calls; the SDK's placeholder
   `x-goog-api-key` is stripped before forwarding.
-- `x-goog-user-project` is stripped for **all** header styles.
+- `x-goog-user-project` is stripped from OAuth requests.
 - Content requests must **not** send `X-Goog-QuotaUser`, `X-Client-Device-Id`,
   `X-Goog-Api-Client`, or `Client-Metadata`. Fingerprints contribute
   `User-Agent` only (`buildFingerprintHeaders`, applied on the Antigravity
   path).
-- Two header styles exist for the dual quota pools: `antigravity`
-  (fingerprint UA) and `gemini-cli` (nodejs-client UA). Cross-style quota
-  fallback is allowed for the `gemini` family only; Claude always uses
-  `antigravity`.
+- Gemini and Claude OAuth content requests use the Antigravity route. The
+  fingerprint contributes `User-Agent` only; ordinary Google API-key
+  connections are left untouched by the plugin.
 - Linux never appears in Antigravity UAs (Linux masquerades as macOS);
   `ideType` is `ANTIGRAVITY`, platform is `WINDOWS|MACOS`, plugin type
   `GEMINI`. Runtime Antigravity version resolves dynamically with a

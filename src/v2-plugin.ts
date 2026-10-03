@@ -39,8 +39,9 @@ import { initAntigravityVersion } from "./plugin/version.js"
 import { createAutoUpdateCheckerHook } from "./hooks/auto-update-checker/index.js"
 
 const PLUGIN_ID = "opencode-v2-antigravity-auth"
-const INTEGRATION_ID = "google"
-const GOOGLE_PROVIDER_ID = ProviderID.google
+const INTEGRATION_ID = "antigravity"
+const ANTIGRAVITY_PROVIDER = Schema.decodeUnknownSync(ProviderID)(ANTIGRAVITY_PROVIDER_ID)
+const ANTIGRAVITY_OAUTH_METHOD_ID = "antigravity-oauth"
 const ANTIGRAVITY_SDK = new URL("./google-sdk.js", import.meta.url).href
 const bridgeLog = createLogger("v2-bridge")
 
@@ -307,8 +308,8 @@ export default Plugin.define({
             expires: credential.expires,
           }
         }
-        // An explicit non-OAuth Google connection (for example an API key) must
-        // take precedence over saved Antigravity accounts for ordinary Gemini.
+        // Don't silently switch to a saved OAuth account when this integration
+        // has an explicit non-OAuth connection.
         return { type: "none" }
       }
       if (currentAuth) return currentAuth
@@ -329,7 +330,7 @@ export default Plugin.define({
     const requireOAuthAuth = async () => {
       const auth = await getAuth()
       if (!isOAuthAuth(auth)) {
-        throw new Error("Antigravity OAuth is no longer available. Reconnect Google Antigravity before retrying.")
+        throw new Error("Antigravity OAuth is no longer available. Reconnect Antigravity before retrying.")
       }
       return auth
     }
@@ -394,22 +395,17 @@ export default Plugin.define({
     }
 
     await ctx.integration.transform((editor) => {
-      editor.update(INTEGRATION_ID, (integration) => {
-        integration.name = "Google Antigravity"
-      })
-      const inheritedKey = editor.method.list(INTEGRATION_ID).find((method) => method.type === "key")
-      if (inheritedKey) editor.method.remove(INTEGRATION_ID, inheritedKey)
       editor.method.update({
         integrationID: INTEGRATION_ID,
         method: {
-          id: "google-oauth",
+          id: ANTIGRAVITY_OAUTH_METHOD_ID,
           type: "oauth",
-          label: "OAuth with Google (Antigravity)",
+          label: "Sign in with Google for Antigravity",
           form: [
             {
               key: "accountAction",
               type: "string",
-              title: "Google Antigravity",
+              title: "Antigravity",
               description: formatAuthSummary(accountSummary, MAX_SAVED_ACCOUNTS),
               required: true,
               options: [
@@ -428,7 +424,7 @@ export default Plugin.define({
           // The host answers method.form BEFORE starting OAuth/opening a URL.
           // Refuse missing/legacy answers rather than bypassing consent.
           if (answer.accountAction !== "add")
-            throw new Error("Choose Add or reconnect an account before starting Google sign-in.")
+            throw new Error("Choose Add or reconnect an account before starting Antigravity sign-in.")
           accountSummary = (await loadAccounts())?.accounts ?? []
           const authorization = await authorizeAntigravity("")
           return {
@@ -454,7 +450,7 @@ export default Plugin.define({
                 refresh: `${result.refresh}|${result.projectId}`,
                 expires: result.expires,
                 metadata: { email: result.email },
-                methodID: Schema.decodeUnknownSync(IntegrationMethodID)("google-oauth"),
+                methodID: Schema.decodeUnknownSync(IntegrationMethodID)(ANTIGRAVITY_OAUTH_METHOD_ID),
               }
             },
           }
@@ -469,15 +465,17 @@ export default Plugin.define({
               )?.email
         },
       })
+      editor.update(INTEGRATION_ID, (integration) => {
+        integration.name = "Antigravity"
+      })
     })
 
     await ctx.provider.transform((editor) => {
-      const existing = editor.get(GOOGLE_PROVIDER_ID)
-      const models = new Map(existing?.models ?? [])
-      for (const [id, definition] of Object.entries(OPENCODE_MODEL_DEFINITIONS)) {
+      const existing = editor.get(ANTIGRAVITY_PROVIDER)
+      const models = Object.entries(OPENCODE_MODEL_DEFINITIONS).map(([id, definition]) => {
         const modelID = Schema.decodeUnknownSync(ModelID)(id)
-        const model = ModelInfo.default(GOOGLE_PROVIDER_ID, modelID)
-        models.set(id, {
+        const model = ModelInfo.default(ANTIGRAVITY_PROVIDER, modelID)
+        return {
           ...model,
           name: definition.name,
           package: `aisdk:${ANTIGRAVITY_SDK}`,
@@ -488,32 +486,32 @@ export default Plugin.define({
             id: Schema.decodeUnknownSync(ModelVariantID)(variantID),
             settings: settings as Record<string, unknown>,
           })),
-        })
-      }
+        }
+      })
 
       if (existing) {
-        editor.update(GOOGLE_PROVIDER_ID, (provider) => {
+        editor.update(ANTIGRAVITY_PROVIDER, (provider) => {
           provider.activation = "enabled"
           provider.package = `aisdk:${ANTIGRAVITY_SDK}`
         })
-        editor.models.set(GOOGLE_PROVIDER_ID, [...models.values()])
+        editor.models.set(ANTIGRAVITY_PROVIDER, models)
       } else {
         editor.add({
           info: {
-            ...ProviderInfo.empty(GOOGLE_PROVIDER_ID),
-            name: "Google Antigravity",
+            ...ProviderInfo.empty(ANTIGRAVITY_PROVIDER),
+            name: "Antigravity",
             activation: "enabled",
             package: `aisdk:${ANTIGRAVITY_SDK}`,
           },
-          models: [...models.values()],
+          models,
         })
       }
     })
 
     await ctx.model.transform((editor) => {
-      for (const model of editor.list(GOOGLE_PROVIDER_ID)) {
+      for (const model of editor.list(ANTIGRAVITY_PROVIDER)) {
         if (!model.id.startsWith("antigravity-") && !model.id.startsWith("gemini-")) continue
-        editor.update(GOOGLE_PROVIDER_ID, model.id.toString(), (draft) => {
+        editor.update(ANTIGRAVITY_PROVIDER, model.id.toString(), (draft) => {
           draft.package = `aisdk:${ANTIGRAVITY_SDK}`
         })
       }
@@ -522,18 +520,13 @@ export default Plugin.define({
     await ctx.aisdk.hook(
       "sdk",
       async (event) => {
-        if (event.package !== ANTIGRAVITY_SDK && event.package !== "@ai-sdk/google") return
+        if (event.package !== ANTIGRAVITY_SDK) return
         const antigravityModel = event.model.id.startsWith("antigravity-")
         const geminiModel = event.model.id.startsWith("gemini-")
         if (!antigravityModel && !geminiModel) return
         const auth = await getAuth()
         if (!isOAuthAuth(auth)) {
-          if (antigravityModel) {
-            throw new Error("Antigravity OAuth is not connected. Connect Google Antigravity before using this model.")
-          }
-          bridgeLog.debug("Keeping Google SDK model on its configured API-key route", { model: event.model.id })
-          if (event.package === ANTIGRAVITY_SDK) event.sdk = createGoogle(event.options)
-          return
+          throw new Error("Antigravity OAuth is not connected. Connect Antigravity before using this model.")
         }
         event.options.fetch = antigravityFetch
         // The Google SDK requires an API key even though this fetch bridge uses OAuth.
@@ -545,7 +538,7 @@ export default Plugin.define({
         })
         event.sdk = createGoogle(event.options)
       },
-      { providerID: GOOGLE_PROVIDER_ID },
+      { providerID: ANTIGRAVITY_PROVIDER },
     )
 
     await ctx.tool.transform((editor) => {
@@ -753,7 +746,7 @@ export function formatAuthInstructions(
   maxAccounts: number,
 ): string {
   return [
-    "Complete Google sign-in, then paste the authorization code or full localhost redirect URL.",
+    "Complete Google consent for Antigravity, then paste the authorization code or full localhost redirect URL.",
     ...(accounts.length >= maxAccounts
       ? [`Maximum of ${maxAccounts} Antigravity accounts reached; reconnect a saved account.`]
       : []),
@@ -769,7 +762,7 @@ export function formatAuthSummary(
     return `- ${email}${account.enabled === false ? " (disabled)" : ""}`
   })
   return [
-    `Google Antigravity — saved accounts (${accounts.length}/${maxAccounts})`,
+    `Antigravity — saved Google accounts (${accounts.length}/${maxAccounts})`,
     "",
     ...(lines.length > 0 ? lines : ["- (none yet)"]),
     "",
@@ -791,7 +784,8 @@ export function parseOAuthCallbackInput(value: string, expectedState: string): {
   try {
     parsed = new URL(trimmed)
   } catch {
-    if (!expectedState) throw new Error("Missing OAuth state; restart Google sign-in and paste the full redirect URL")
+    if (!expectedState)
+      throw new Error("Missing OAuth state; restart Antigravity sign-in and paste the full redirect URL")
     return { code: trimmed, state: expectedState }
   }
 
@@ -799,7 +793,7 @@ export function parseOAuthCallbackInput(value: string, expectedState: string): {
   const state = parsed.searchParams.get("state")
   if (!code) throw new Error("Missing code in OAuth redirect URL")
   if (!state) throw new Error("Missing state in OAuth redirect URL")
-  if (expectedState && state !== expectedState) throw new Error("OAuth state mismatch; restart Google sign-in")
+  if (expectedState && state !== expectedState) throw new Error("OAuth state mismatch; restart Antigravity sign-in")
   return { code, state }
 }
 

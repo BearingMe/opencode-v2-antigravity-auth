@@ -33,8 +33,10 @@ export function formatResetCountdown(resetTime: number | null | undefined, now: 
   if (typeof resetTime !== "number" || !Number.isFinite(resetTime)) return "reset unknown"
   const diff = resetTime - now
   if (diff <= 0) return "resetting now"
-  const hours = Math.floor(diff / 3_600_000)
+  const days = Math.floor(diff / 86_400_000)
+  const hours = Math.floor((diff % 86_400_000) / 3_600_000)
   const minutes = Math.floor((diff % 3_600_000) / 60_000)
+  if (days > 0) return `resets in ${days}d ${hours}h`
   if (hours > 0) return `resets in ${hours}h ${minutes}m`
   if (minutes > 0) return `resets in ${minutes}m`
   return "resets in <1m"
@@ -66,6 +68,49 @@ export interface QuotaInfoRow {
   description: string
 }
 
+/** Explicit quota windows shown in Antigravity's grouped quota view. */
+export type QuotaSummaryWindow = "weekly" | "5h"
+
+/** A normalized quota window ready for rendering. */
+export interface QuotaSummaryWindowRow {
+  remainingFraction: number | null
+  resetTime: number | null
+}
+
+/** A grouped Antigravity pool and its two quota windows. */
+export interface QuotaSummaryGroupRow {
+  displayName: string
+  description: string | null
+  buckets: Record<QuotaSummaryWindow, QuotaSummaryWindowRow>
+}
+
+/** Grouped quota data and its independent cache freshness state. */
+export interface QuotaSummarySnapshot {
+  groups: Array<QuotaSummaryGroupRow>
+  checkedAt: number | null
+  freshness: "fresh" | "stale" | "unchecked"
+  status: "ok" | "error" | "unknown"
+}
+
+/** Formats a quota fraction with the two decimal places used by Antigravity's quota panel. */
+export function formatQuotaPercentage(fraction: number | null | undefined): string {
+  if (!isUsableFraction(fraction)) return "unknown"
+  return `${(fraction * 100).toFixed(2)}%`
+}
+
+/** Describes whether a quota window is usable now or when its next reset arrives. */
+export function formatQuotaWindowStatus(
+  fraction: number | null | undefined,
+  resetTime: number | null | undefined,
+  now: number = Date.now(),
+): string {
+  if (isUsableFraction(fraction) && fraction >= 1) return "Quota available"
+  const countdown = formatResetCountdown(resetTime, now)
+  if (countdown === "reset unknown") return isUsableFraction(fraction) ? "Refresh time unknown" : "Quota unknown"
+  if (countdown === "resetting now") return "Refreshes now"
+  return `Refreshes ${countdown.replace(/^resets /, "")}`
+}
+
 const QUOTA_GROUP_KEYS = ["claude", "gemini-pro", "gemini-flash"] as const
 
 const QUOTA_GROUP_LABELS: Record<string, string> = {
@@ -85,13 +130,10 @@ export function quotaInfoRows(groups: Record<string, QuotaRowGroup>): Array<Quot
   })
 }
 
-export function quotaViewPlaceholder(): string {
-  return "Updates when opened. Not live-updated; ctrl+r to refresh."
-}
-
 export interface QuotaDetailSnapshot {
   enabled?: boolean
   groups: Record<string, QuotaRowGroup>
+  quotaSummary?: QuotaSummarySnapshot
   checkedAt: number | null
   freshness: string
   status: string

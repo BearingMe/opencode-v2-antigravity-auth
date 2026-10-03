@@ -1,68 +1,65 @@
 # Models and variants
 
-Models are registered automatically by the plugin on the `google` provider.
-Explicit model definitions are optional; the inventory below matches
+The plugin registers a fixed model catalog on the `antigravity` provider. It
+does not discover models from the API. The inventory below matches
 `src/plugin/config/models.ts`.
 
-## Antigravity pool (default routing for Claude and Gemini)
+## Migrate existing model references
 
-| Model                                  | Variants                           | Notes                                            |
-| -------------------------------------- | ---------------------------------- | ------------------------------------------------ |
-| `antigravity-gemini-3-pro`             | `low`, `high`                      | Gemini 3 Pro with thinking                       |
-| `antigravity-gemini-3.1-pro`           | `low`, `high`                      | Gemini 3.1 Pro with thinking (rollout-dependent) |
-| `antigravity-gemini-3-flash`           | `minimal`, `low`, `medium`, `high` | Gemini 3 Flash with thinking                     |
-| `antigravity-claude-sonnet-4-6`        | —                                  | Claude Sonnet 4.6                                |
-| `antigravity-claude-opus-4-6-thinking` | `low`, `max`                       | Claude Opus 4.6 with extended thinking           |
+Antigravity models now use a dedicated provider ID. Change only the provider
+prefix on old Antigravity selections, for example:
 
-## Gemini CLI pool (separate quota; fallback target)
+```text
+google/antigravity-claude-opus-4-6-thinking → antigravity/antigravity-claude-opus-4-6-thinking
+```
 
-| Model                                | Notes                                                            |
-| ------------------------------------ | ---------------------------------------------------------------- |
-| `gemini-2.5-flash`                   | Gemini 2.5 Flash                                                 |
-| `gemini-2.5-pro`                     | Gemini 2.5 Pro                                                   |
-| `gemini-3-flash-preview`             | Gemini 3 Flash (preview)                                         |
-| `gemini-3-pro-preview`               | Gemini 3 Pro (preview)                                           |
-| `gemini-3.1-pro-preview`             | Gemini 3.1 Pro (preview, rollout-dependent)                      |
-| `gemini-3.1-pro-preview-customtools` | Gemini 3.1 Pro Preview Custom Tools (preview, rollout-dependent) |
+Ordinary Google models such as `google/gemini-2.5-flash` keep their existing
+provider and connection. The plugin does not migrate, read, or remove Google
+credentials. Existing Antigravity accounts in the plugin's v4 account store
+remain available.
 
-## Routing
+## Antigravity models
 
-- **Antigravity-first (default):** Gemini models use Antigravity quota across
-  accounts.
-- **CLI-first (`cli_first: true`):** Gemini models try the Gemini CLI pool
-  first.
-- When one Gemini pool is exhausted, the plugin falls back to the other pool
-  automatically. Claude always stays on Antigravity.
-- Model names are transformed for the target API as needed (for example,
-  an Antigravity Flash model maps to its `-preview` CLI counterpart).
+| Model                                    | Variants                | Notes                            |
+| ---------------------------------------- | ----------------------- | -------------------------------- |
+| `antigravity-gemini-3.8-flash`           | `low`, `medium`, `high` | Gemini 3.8 Flash                 |
+| `antigravity-gemini-3.7-flash`           | `low`, `medium`, `high` | Gemini 3.7 Flash                 |
+| `antigravity-gemini-3.6-flash`           | `low`, `medium`, `high` | Gemini 3.6 Flash                 |
+| `antigravity-gemini-3.1-pro`             | `low`, `high`           | Gemini 3.1 Pro                   |
+| `antigravity-claude-sonnet-4-6-thinking` | —                       | Claude Sonnet 4.6 with thinking  |
+| `antigravity-claude-opus-4-6-thinking`   | —                       | Claude Opus 4.6 with thinking    |
+| `antigravity-gpt-oss-120b-medium`        | —                       | GPT-OSS 120B at medium reasoning |
 
-Use a variant like this:
+The Gemini 3.8 Flash model is sent to Antigravity's `gemini-3.8-flash-tiered`
+backend ID. Legacy Gemini preview IDs are still normalized by request routing,
+but are not published as selectable catalog entries.
+
+Gemini 2.5 IDs such as `gemini-2.5-flash`, `gemini-2.5-pro`, and
+`gemini-2.5-flash-image` are not supported through Antigravity OAuth. Use a
+registered `antigravity-gemini-*` model instead, or use those IDs with an
+ordinary Google API-key connection on OpenCode's separate `google` provider.
+This plugin does not alter that provider; `gemini-2.5-flash-image` is only
+available through the Google API.
+
+Select a Gemini Flash variant like this:
 
 ```bash
-opencode run "Hello" --model=google/antigravity-claude-opus-4-6-thinking --variant=max
+opencode run "Hello" --model=antigravity/antigravity-gemini-3.8-flash --variant=high
 ```
 
 ## Variant formats
 
-| Family     | Format                                            | Example                                            |
-| ---------- | ------------------------------------------------- | -------------------------------------------------- |
-| Claude     | `thinkingConfig.thinkingBudget` (tokens)          | `{ "thinkingConfig": { "thinkingBudget": 8192 } }` |
-| Gemini 3   | `thinkingLevel` (`minimal`/`low`/`medium`/`high`) | `{ "thinkingLevel": "high" }`                      |
-| Gemini 2.5 | `thinkingConfig.thinkingBudget`                   | `{ "thinkingConfig": { "thinkingBudget": 8192 } }` |
+| Family   | Format                                  | Example                       |
+| -------- | --------------------------------------- | ----------------------------- |
+| Gemini 3 | `thinkingLevel` (`low`/`medium`/`high`) | `{ "thinkingLevel": "high" }` |
 
-Gemini 3 levels differ by model: Flash supports
-`minimal`/`low`/`medium`/`high`; Pro supports `low`/`high`. The API rejects
-invalid levels (for example `minimal` on Pro), so configure variants
-accordingly. The legacy numeric `thinkingBudget` form for Gemini 3 still maps
-to a level (≤8192 → low, ≤16384 → medium, above → high) but `thinkingLevel`
-is preferred.
+Flash supports `low`, `medium`, and `high`; Pro supports `low` and `high`.
+Claude Thinking models use the resolver's default thinking budget and expose no
+picker variants. GPT-OSS is fixed to medium reasoning and also exposes no
+variants.
 
-Claude budgets: `low` = 8192 tokens, `max` = 32768 tokens. Custom budgets
-(for example 4096/16384/24576) are accepted.
-
-Tier-suffixed names (for example `antigravity-gemini-3-pro-low`) remain
-accepted for backward compatibility, but simplified names with variants are
-recommended: cleaner picker, customizable budgets, automatic quota routing.
+The request resolver still understands tier-suffixed IDs for compatibility,
+but only the base model IDs in the catalog above are published in the picker.
 
 ## Removed: dedicated search tool
 

@@ -3,26 +3,26 @@ import { spawn } from "child_process"
 
 interface ModelTest {
   model: string
-  category: "gemini-cli" | "antigravity-gemini" | "antigravity-claude"
+  category: "google-api-key" | "antigravity-gemini" | "antigravity-claude" | "antigravity-gpt-oss"
 }
 
 const MODELS: ModelTest[] = [
-  // Gemini CLI (direct Google API)
-  { model: "google/gemini-3-flash-preview", category: "gemini-cli" },
-  { model: "google/gemini-3-pro-preview", category: "gemini-cli" },
-  { model: "google/gemini-2.5-pro", category: "gemini-cli" },
-  { model: "google/gemini-2.5-flash", category: "gemini-cli" },
+  // Unsupported through Antigravity OAuth; these need ordinary Google API-key auth.
+  { model: "google/gemini-2.5-pro", category: "google-api-key" },
+  { model: "google/gemini-2.5-flash", category: "google-api-key" },
 
-  // Antigravity Gemini
-  { model: "google/antigravity-gemini-3-pro-low", category: "antigravity-gemini" },
-  { model: "google/antigravity-gemini-3-pro-high", category: "antigravity-gemini" },
-  { model: "google/antigravity-gemini-3-flash", category: "antigravity-gemini" },
+  // Antigravity Gemini catalog entries.
+  { model: "antigravity/antigravity-gemini-3.8-flash", category: "antigravity-gemini" },
+  { model: "antigravity/antigravity-gemini-3.7-flash", category: "antigravity-gemini" },
+  { model: "antigravity/antigravity-gemini-3.6-flash", category: "antigravity-gemini" },
+  { model: "antigravity/antigravity-gemini-3.1-pro", category: "antigravity-gemini" },
 
   // Antigravity Claude
-  { model: "google/antigravity-claude-sonnet-4-6", category: "antigravity-claude" },
-  { model: "google/antigravity-claude-opus-4-6-thinking-low", category: "antigravity-claude" },
-  { model: "google/antigravity-claude-opus-4-6-thinking-medium", category: "antigravity-claude" },
-  { model: "google/antigravity-claude-opus-4-6-thinking-high", category: "antigravity-claude" },
+  { model: "antigravity/antigravity-claude-sonnet-4-6-thinking", category: "antigravity-claude" },
+  { model: "antigravity/antigravity-claude-opus-4-6-thinking", category: "antigravity-claude" },
+
+  // GPT-OSS is a fixed medium-reasoning model with no picker variants.
+  { model: "antigravity/antigravity-gpt-oss-120b-medium", category: "antigravity-gpt-oss" },
 ]
 
 const TEST_PROMPT = "Reply with exactly one word: WORKING"
@@ -105,14 +105,14 @@ Usage:
 
 Options:
   --model <model>      Test specific model
-  --category <cat>     Test by category (gemini-cli, antigravity-gemini, antigravity-claude)
+  --category <cat>     Test by category (google-api-key, antigravity-gemini, antigravity-claude, antigravity-gpt-oss)
   --timeout <ms>       Timeout per model (default: 120000)
   --dry-run            List models without testing
   --help, -h           Show this help
 
 Examples:
   bun run script/test-models.ts --dry-run
-  bun run script/test-models.ts --model google/gemini-3-flash-preview
+  bun run script/test-models.ts --model antigravity/antigravity-gemini-3.8-flash
   bun run script/test-models.ts --category antigravity-claude
 `)
 }

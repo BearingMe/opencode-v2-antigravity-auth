@@ -1,7 +1,7 @@
 import { Plugin } from "@opencode/plugin/tui"
 import { AntigravityAccounts } from "./rpc.js"
 import { formatAccountOneLiner } from "./plugin/account-ui-format.js"
-import type { QuotaRefreshOutcome } from "./plugin/account-ui-format.js"
+import type { QuotaRefreshOutcome, QuotaSummarySnapshot } from "./plugin/account-ui-format.js"
 import { MissingAccountDialogView, QuotaDialogView } from "./tui-quota-dialog.js"
 import { createQuotaDialogController } from "./tui-quota-controller.js"
 import { AccountListDialogView } from "./tui-account-list-dialog.js"
@@ -28,6 +28,7 @@ interface QuotaAccount {
   enabled: boolean
   status: "ok" | "error" | "unknown"
   groups: Record<string, QuotaGroup>
+  quotaSummary?: QuotaSummarySnapshot
   checkedAt: number | null
   freshness: "fresh" | "stale" | "unchecked"
   verificationRequired: boolean
@@ -317,7 +318,7 @@ export default Plugin.define({
           if (quotaError) {
             context.ui.toast.show({
               title: "Antigravity quota",
-              message: "Quota refresh failed. Showing last saved values.",
+              message: "Some quota readings could not be refreshed. Showing available values.",
               variant: "error",
             })
           } else toastFailure(invalidResponse)
@@ -346,6 +347,7 @@ export default Plugin.define({
             colors: {
               base: context.theme.text.base,
               muted: context.theme.text.muted,
+              accent: context.theme.hue.accent[200],
               success: context.theme.text.feedback.success.base,
               warning: context.theme.text.feedback.warning.base,
               error: context.theme.text.feedback.error.base,
@@ -362,7 +364,7 @@ export default Plugin.define({
         },
       )
       closeQuota = quotaCloser
-      context.ui.dialog.set({ size: DIALOG_SIZE })
+      context.ui.dialog.set({ size: "medium" })
     }
 
     const openActions = async (account: ListAccount): Promise<void> => {

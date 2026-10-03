@@ -64,7 +64,7 @@ describe("isClaudeModel", () => {
 
   it("returns true for prefixed claude models", () => {
     expect(isClaudeModel("antigravity-claude-sonnet-4-5")).toBe(true)
-    expect(isClaudeModel("google/claude-opus-4-5")).toBe(true)
+    expect(isClaudeModel("antigravity/claude-opus-4-5")).toBe(true)
   })
 
   it("returns false for non-claude models", () => {
@@ -95,7 +95,7 @@ describe("isClaudeThinkingModel", () => {
 
   it("returns true for prefixed thinking models", () => {
     expect(isClaudeThinkingModel("antigravity-claude-sonnet-4-5-thinking")).toBe(true)
-    expect(isClaudeThinkingModel("google/claude-opus-4-5-thinking-high")).toBe(true)
+    expect(isClaudeThinkingModel("antigravity/claude-opus-4-5-thinking-high")).toBe(true)
   })
 
   it("returns false for non-thinking claude models", () => {

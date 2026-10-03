@@ -1,11 +1,11 @@
-# Antigravity + Gemini CLI OAuth Plugin for OpenCode V2
+# Antigravity OAuth Plugin for OpenCode V2
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Authenticate OpenCode V2 against **Antigravity** (Google's IDE backend) via
 OAuth and use Antigravity quota for `gemini-3` / `claude-4.6` models with
-your Google credentials. Multi-account rotation, dual Gemini quota pools,
-thinking support, and session recovery included.
+your Google credentials. Multi-account rotation, thinking support, and
+session recovery included.
 
 > **Maintained V2 port.** This is a fork of
 > [`NoeFabris/opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth)
@@ -25,11 +25,11 @@ thinking support, and session recovery included.
 
 ## What you get
 
-- **Claude Opus 4.6 / Sonnet 4.6** and **Gemini 3 / 3.1 Pro/Flash** via
-  Google OAuth
+- **Gemini 3.6/3.7/3.8 Flash, Gemini 3.1 Pro, Claude Opus/Sonnet 4.6
+  Thinking, and GPT-OSS 120B Medium** via Antigravity's Google OAuth
 - **Multi-account rotation** across up to 10 Google accounts
-- **Dual Gemini quota pools** (Antigravity + Gemini CLI, automatic fallback)
-- **Thinking models** with configurable variants
+- **One Antigravity quota pool** for supported models
+- **Gemini thinking variants** for low/medium/high levels where supported
 - **Auto-recovery** from interrupted tool calls
 - **Model-declared web search** sanitized by the pipeline (no dedicated
   search tool is registered)
@@ -60,11 +60,11 @@ optional `@version` pins are all accepted. The V2 key is `plugins`
 opencode auth login   # one account per run; repeat to add more (max 10)
 ```
 
-Then manage saved accounts inside OpenCode with `/antigravity`. Models are
-registered automatically — verify with:
+Then manage saved accounts inside OpenCode with `/antigravity`. The plugin
+registers a fixed model catalog — verify with:
 
 ```bash
-opencode run "Hello" --model=google/antigravity-gemini-3-flash
+opencode run "Hello" --model=antigravity/antigravity-gemini-3.8-flash
 ```
 
 ## Multi-account in 30 seconds
@@ -81,15 +81,24 @@ opencode run "Hello" --model=google/antigravity-gemini-3-flash
 Create `~/.config/opencode/antigravity.json` (project override:
 `.opencode/antigravity.json`). Defaults work for most users.
 
-| Area              | Key options                                                                                                    |
-| ----------------- | -------------------------------------------------------------------------------------------------------------- |
-| Thinking/recovery | `keep_thinking` (default `false`), `session_recovery` (`true`), `auto_resume` (`false`), `cli_first` (`false`) |
-| Rotation          | `account_selection_strategy` (`hybrid`), `scheduling_mode` (`cache_first`), `pid_offset_enabled` (`false`)     |
-| Quota protection  | `soft_quota_threshold_percent` (`90`), `quota_refresh_interval_minutes` (`15`)                                 |
-| Behavior          | `quiet_mode` (`false`), `toast_scope` (`root_only`), `debug` / `debug_tui` (`false`), `auto_update` (`true`)   |
+| Area              | Key options                                                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------------------------------ |
+| Thinking/recovery | `keep_thinking` (default `false`), `session_recovery` (`true`), `auto_resume` (`false`)                      |
+| Rotation          | `account_selection_strategy` (`hybrid`), `scheduling_mode` (`cache_first`), `pid_offset_enabled` (`false`)   |
+| Quota protection  | `soft_quota_threshold_percent` (`90`), `quota_refresh_interval_minutes` (`15`)                               |
+| Behavior          | `quiet_mode` (`false`), `toast_scope` (`root_only`), `debug` / `debug_tui` (`false`), `auto_update` (`true`) |
 
 Full reference: [docs/user/configuration.md](docs/user/configuration.md).
 Schema: `assets/antigravity.schema.json`.
+
+Gemini CLI-only model IDs such as `gemini-2.5-pro` and `gemini-2.5-flash`
+are not served through Antigravity OAuth. Use a registered
+`antigravity-gemini-*` model instead, or keep using those IDs with an ordinary
+Google API-key connection under OpenCode's separate `google` provider.
+Antigravity has its own provider and sign-in; this plugin does not change
+OpenCode's Google integration. Existing `google/antigravity-*` model
+references need the new `antigravity/` provider prefix; saved plugin accounts
+remain in place. Verified Gemini preview aliases remain supported.
 
 ## Docs
 

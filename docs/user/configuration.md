@@ -31,7 +31,10 @@ and is ignored on its own.
 | `session_recovery` | `true`       | Auto-recover from interrupted tool calls                                                                                                                        |
 | `auto_resume`      | `false`      | Auto-send the resume prompt after recovery                                                                                                                      |
 | `resume_text`      | `"continue"` | Text sent when `auto_resume` is on                                                                                                                              |
-| `cli_first`        | `false`      | Route Gemini models to the Gemini CLI pool first (Claude always stays on Antigravity). Fallback across pools is automatic for Gemini either way.                |
+
+Legacy `cli_first` and `quota_fallback` settings no longer affect routing and
+can be removed from existing config files. Supported Gemini OAuth requests use
+Antigravity across the account pool.
 
 ## Account rotation
 
@@ -85,7 +88,6 @@ and is ignored on its own.
 | `proactive_refresh_check_interval_seconds`                                                       | `300`                                                                    |
 | `signature_cache.enabled` / `memory_ttl_seconds` / `disk_ttl_seconds` / `write_interval_seconds` | `true` / `3600` / `172800` / `60` (only used with `keep_thinking: true`) |
 | `health_score.*`, `token_bucket.*`                                                               | Tuning for the `hybrid` strategy                                         |
-| `quota_fallback`                                                                                 | Deprecated, ignored (Gemini cross-pool fallback is always on)            |
 
 The JSON schema (`assets/antigravity.schema.json`) is the authoritative
 reference for every key. When this guide and the schema disagree, the schema

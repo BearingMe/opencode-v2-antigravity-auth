@@ -77,7 +77,7 @@ event` transforms. V2 API explicitly "may change before stable".
   account-service presentation, account-ui-format, cache, debug/logger —
   see `02-subsystems` and code refs (`request.test.ts`,
   `model-resolver.test.ts`, `rotation.test.ts`, `quota-fallback.test.ts`,
-  `antigravity-first-fallback.test.ts`, `cross-model-integration.test.ts`).
+  `antigravity-account-rotation.test.ts`, `cross-model-integration.test.ts`).
 - `src/plugin/engine.test.ts`: native-engine tests (routing decision, quota
   fallback, warmup URL, wait formatting, native-enable flag,
   unified-refresh delegation
@@ -135,17 +135,16 @@ event` transforms. V2 API explicitly "may change before stable".
    `formatRefreshParts({refreshToken: result.refresh, ...})` for
    `currentAuth` — double-encoding hazard contained only by tolerant
    parsing. Handle both 2- and 3-segment forms on any auth-format change.
-3. D-AUTH-SHADOW: an explicit non-OAuth Google connection returns
-   `{type:"none"}` and shadows the saved Antigravity pool for ordinary
-   Gemini (intentional precedence, but surprising — MUST be preserved or
-   changed deliberately with UX sign-off).
+3. D-AUTH-ISOLATION: Antigravity reads credentials only from its own
+   integration and saved account pool. Changes to OpenCode's Google
+   integration or connection MUST NOT affect Antigravity routing.
 4. D-SEARCH-MUTEX: `googleSearch + functionDeclarations` are mutually
    exclusive on Gemini — `web_search` is dropped with `console.warn` when
    functions exist. Reviewers MUST NOT "fix" this by sending both.
 5. D-QUOTA-FAIL-OPEN: soft-quota gates fail OPEN on stale/missing cache
    (fail-closed only when all-over with valid resetTime). Deliberate
    availability bias; changing to fail-closed needs product decision.
-6. Deprecated `ANTIGRAVITY_HEADERS / ANTIGRAVITY_VERSION / quota_fallback /
+6. Deprecated `ANTIGRAVITY_HEADERS / ANTIGRAVITY_VERSION /
 invalidateCache` remain exported. New code MUST use
    `getAntigravityHeaders() / getAntigravityVersion() / invalidatePackage()`.
 7. D-RETRY-GLOBAL (observed limitation): `ctx.session.hook("retry")` in
@@ -160,11 +159,10 @@ invalidateCache` remain exported. New code MUST use
    in `scripts/check-quota.mjs`. Rotation means changing both; scripts
    SHOULD import from a single source rather than re-hardcoding.
 9. Header contract (Explicit): `x-goog-user-project` MUST be
-   stripped for ALL header styles; content requests MUST NOT send
+   stripped from OAuth content requests; content requests MUST NOT send
    `X-Goog-QuotaUser`, `X-Client-Device-Id`, `X-Goog-Api-Client`, or
-   `Client-Metadata` (fingerprint contributes `User-Agent` only);
-   `quota_fallback` config is deprecated/ignored (Gemini cross-pool fallback
-   is always on).
+   `Client-Metadata` (fingerprint contributes `User-Agent` only). Gemini
+   OAuth content requests use only the Antigravity route.
 10. Debug-sink split (Explicit): `debug` = file logging only,
     `debug_tui` = TUI panel only. New code MUST NOT gate file logging on
     `debug_tui` or TUI logging on `debug`.
@@ -176,8 +174,8 @@ invalidateCache` remain exported. New code MUST use
 
 ## Unresolved questions (do not invent answers)
 
-- U1: Exact server-side quota numbers/reset semantics for the two pools
-  (analysis records aggregation logic only).
+- U1: Exact server-side quota numbers/reset semantics (analysis records
+  aggregation logic only).
 - U2: Whether `loadCodeAssist` prod-first vs request daily-first ordering
   is still optimal (mirrors CLIProxy; no live probe evidence in context).
 - U3: Seed-hash session-key collision probability/impact for identical

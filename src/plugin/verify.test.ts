@@ -39,7 +39,7 @@ describe("verifyAccountAccess", () => {
   it("reports missing refresh tokens without network calls", async () => {
     const fetchSpy = vi.fn()
     vi.stubGlobal("fetch", fetchSpy)
-    const result = await verifyAccountAccess({ refreshToken: "" }, makeClient(), "google")
+    const result = await verifyAccountAccess({ refreshToken: "" }, makeClient(), "antigravity")
     expect(result).toMatchObject({ status: "error", message: "Missing refresh token for selected account." })
     expect(fetchSpy).not.toHaveBeenCalled()
   })
@@ -53,7 +53,7 @@ describe("verifyAccountAccess", () => {
         statusText: "Bad Request",
       }),
     )
-    const result = await verifyAccountAccess({ refreshToken: "rt" }, makeClient(), "google")
+    const result = await verifyAccountAccess({ refreshToken: "rt" }, makeClient(), "antigravity")
     expect(result.status).toBe("error")
     expect(result.message).toContain("invalid_grant")
   })
@@ -75,7 +75,7 @@ describe("verifyAccountAccess", () => {
           }),
       ),
     )
-    const result = await verifyAccountAccess({ refreshToken: "rt" }, makeClient(), "google")
+    const result = await verifyAccountAccess({ refreshToken: "rt" }, makeClient(), "antigravity")
     expect(result).toMatchObject({ status: "ok" })
   })
 
@@ -101,7 +101,7 @@ describe("verifyAccountAccess", () => {
           ),
       ),
     )
-    const result = await verifyAccountAccess({ refreshToken: "rt" }, makeClient(), "google")
+    const result = await verifyAccountAccess({ refreshToken: "rt" }, makeClient(), "antigravity")
     expect(result.status).toBe("blocked")
     expect(result.verifyUrl).toContain("accounts.google.com")
   })

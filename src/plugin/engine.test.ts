@@ -35,12 +35,9 @@ import {
   executeAntigravityRequest,
   extractModelFromUrl,
   formatWaitTime,
-  getHeaderStyleFromUrl,
   getModelFamilyFromUrl,
   isNativeEngineEnabled,
   refreshOAuthCredentialUnified,
-  resolveHeaderRoutingDecision,
-  resolveQuotaFallbackHeaderStyle,
   resetEngineStateForTests,
   __testEngineExports,
 } from "./engine.ts"
@@ -73,34 +70,7 @@ function makeManager(entries: Array<{ refreshToken: string; access?: string; exp
 
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro:generateContent"
 
-describe("engine routing helpers (V1 parity)", () => {
-  it("forces antigravity headers for claude and honors cli_first for gemini", () => {
-    expect(
-      getHeaderStyleFromUrl(
-        "https://generativelanguage.googleapis.com/v1beta/models/antigravity-claude-opus-4-6:generateContent",
-        "claude",
-        true,
-      ),
-    ).toBe("antigravity")
-    expect(getHeaderStyleFromUrl(GEMINI_URL, "gemini", false)).toBe("antigravity")
-    expect(getHeaderStyleFromUrl(GEMINI_URL, "gemini", true)).toBe("gemini-cli")
-  })
-
-  it("allows quota fallback for gemini only", () => {
-    const config = { ...DEFAULT_CONFIG, cli_first: false }
-    expect(resolveHeaderRoutingDecision(GEMINI_URL, "gemini", config).allowQuotaFallback).toBe(true)
-    expect(resolveHeaderRoutingDecision(GEMINI_URL, "claude", config).allowQuotaFallback).toBe(false)
-    expect(
-      resolveQuotaFallbackHeaderStyle({ family: "claude", headerStyle: "antigravity", alternateStyle: "gemini-cli" }),
-    ).toBeNull()
-    expect(
-      resolveQuotaFallbackHeaderStyle({ family: "gemini", headerStyle: "antigravity", alternateStyle: "antigravity" }),
-    ).toBeNull()
-    expect(
-      resolveQuotaFallbackHeaderStyle({ family: "gemini", headerStyle: "antigravity", alternateStyle: "gemini-cli" }),
-    ).toBe("gemini-cli")
-  })
-
+describe("engine request helpers", () => {
   it("extracts model family from URL", () => {
     expect(getModelFamilyFromUrl(GEMINI_URL)).toBe("gemini")
     expect(
@@ -172,15 +142,15 @@ describe("refreshOAuthCredentialUnified (D-REFRESH-DUAL)", () => {
       access: "old-access",
       refresh: "old|proj",
       expires: 1,
-      methodID: "google-oauth",
+      methodID: "antigravity-oauth",
     }
-    const refreshed = await refreshOAuthCredentialUnified(credential, client, "google")
+    const refreshed = await refreshOAuthCredentialUnified(credential, client, "antigravity")
     expect(mockRefreshAccessToken).toHaveBeenCalledOnce()
     expect(refreshed).toMatchObject({
       access: "new-access",
       refresh: "rotated|proj",
       expires: 4242,
-      methodID: "google-oauth",
+      methodID: "antigravity-oauth",
     })
   })
 })
@@ -200,16 +170,15 @@ describe("executeAntigravityRequest", () => {
         accessToken: string,
         projectId: string,
         endpointOverride?: string,
-        headerStyle = "antigravity",
+        forceThinkingRecovery = false,
       ) => ({
-        request: `https://mock-endpoint/${headerStyle}`,
+        request: `https://mock-endpoint/${forceThinkingRecovery ? "recovery" : "request"}`,
         init: { method: "POST", headers: {}, body: init?.body },
         streaming: false,
         requestedModel: "gemini-3-pro",
         effectiveModel: "gemini-3-pro",
         projectId,
         endpoint: endpointOverride,
-        headerStyle,
         accessToken,
         input,
       }),
@@ -225,13 +194,43 @@ describe("executeAntigravityRequest", () => {
         { method: "POST" },
         {
           client: makeClient(),
-          providerId: "google",
+          providerId: "antigravity",
           config: { ...DEFAULT_CONFIG },
           accountManager: manager,
         },
       ),
     ).rejects.toThrow("No Antigravity accounts available")
   })
+
+  it.each(["gemini-2.5-pro", "antigravity-gemini-2.5-flash-low"])(
+    "rejects unsupported model %s before account or project work",
+    async (model) => {
+      const manager = makeManager([
+        { refreshToken: "rt-1", access: "at-1", expires: Date.now() + 3600_000 },
+        { refreshToken: "rt-2", access: "at-2", expires: Date.now() + 3600_000 },
+      ])
+      const fetchImpl = vi.fn(async () => new Response("unexpected"))
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+
+      await expect(
+        executeAntigravityRequest(
+          url,
+          { method: "POST", body: JSON.stringify({ contents: [] }) },
+          {
+            client: makeClient(),
+            providerId: "antigravity",
+            config: { ...DEFAULT_CONFIG },
+            accountManager: manager,
+            fetchImpl,
+          },
+        ),
+      ).rejects.toThrow(/not available through Antigravity OAuth/)
+
+      expect(mockEnsureProjectContext).not.toHaveBeenCalled()
+      expect(mockPrepare).not.toHaveBeenCalled()
+      expect(fetchImpl).not.toHaveBeenCalled()
+    },
+  )
 
   it("routes SDK JSON through the engine and marks the account used", async () => {
     const manager = makeManager([{ refreshToken: "rt-1", access: "at-1", expires: Date.now() + 3600_000 }])
@@ -247,7 +246,7 @@ describe("executeAntigravityRequest", () => {
       { method: "POST", body: "{}" },
       {
         client: makeClient(),
-        providerId: "google",
+        providerId: "antigravity",
         config: { ...DEFAULT_CONFIG },
         accountManager: manager,
         fetchImpl: fetchImpl as unknown as typeof fetch,
@@ -256,7 +255,7 @@ describe("executeAntigravityRequest", () => {
     expect(response.status).toBe(200)
     expect(fetchImpl).toHaveBeenCalledOnce()
     expect(mockPrepare).toHaveBeenCalledOnce()
-    expect(mockPrepare.mock.calls[0]?.[5]).toBe("antigravity")
+    expect(mockPrepare.mock.calls[0]?.[5]).toBe(false)
     expect(mockTransform).toHaveBeenCalledOnce()
   })
 
@@ -288,7 +287,7 @@ describe("executeAntigravityRequest", () => {
       { method: "POST" },
       {
         client: makeClient(),
-        providerId: "google",
+        providerId: "antigravity",
         config: { ...DEFAULT_CONFIG },
         accountManager: manager,
         fetchImpl: fetchImpl as unknown as typeof fetch,
@@ -299,7 +298,7 @@ describe("executeAntigravityRequest", () => {
     expect(manager.getTotalAccountCount()).toBe(1)
   })
 
-  it("falls back from antigravity to gemini-cli quota for gemini on QUOTA_EXHAUSTED", async () => {
+  it("records Gemini quota exhaustion for its Antigravity model", async () => {
     const manager = makeManager([{ refreshToken: "rt-1", access: "at-1", expires: Date.now() + 3600_000 }])
     const quotaBody = JSON.stringify({
       error: {
@@ -307,28 +306,26 @@ describe("executeAntigravityRequest", () => {
         details: [{ "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason: "QUOTA_EXHAUSTED" }],
       },
     })
-    const fetchImpl = vi.fn(async (input: unknown) => {
-      const url = String(input)
-      if (url.includes("antigravity")) {
-        return new Response(quotaBody, { status: 429, headers: { "content-type": "application/json" } })
-      }
-      return new Response("{}", { status: 200, headers: { "content-type": "application/json" } })
-    })
+    const fetchImpl = vi.fn(
+      async () => new Response(quotaBody, { status: 429, headers: { "content-type": "application/json" } }),
+    )
     const response = await executeAntigravityRequest(
       GEMINI_URL,
       { method: "POST" },
       {
         client: makeClient(),
-        providerId: "google",
+        providerId: "antigravity",
         config: { ...DEFAULT_CONFIG },
         accountManager: manager,
         fetchImpl: fetchImpl as unknown as typeof fetch,
       },
     )
-    expect(response.status).toBe(200)
-    expect(fetchImpl).toHaveBeenCalledTimes(2)
-    expect(mockPrepare.mock.calls[0]?.[5]).toBe("antigravity")
-    expect(mockPrepare.mock.calls[1]?.[5]).toBe("gemini-cli")
+    expect(response.status).toBe(429)
+    expect(fetchImpl).toHaveBeenCalledOnce()
+    expect(mockPrepare).toHaveBeenCalledOnce()
+    expect(manager.getAccountsSnapshot()[0]?.rateLimitResetTimes["gemini-antigravity:gemini-3-pro"]).toBeGreaterThan(
+      Date.now(),
+    )
   })
 
   it("returns a synthetic prompt-too-long response on 400 instead of locking the session", async () => {
@@ -346,7 +343,7 @@ describe("executeAntigravityRequest", () => {
       { method: "POST" },
       {
         client: makeClient(),
-        providerId: "google",
+        providerId: "antigravity",
         config: { ...DEFAULT_CONFIG },
         accountManager: manager,
         fetchImpl: fetchImpl as unknown as typeof fetch,
@@ -385,7 +382,7 @@ describe("executeAntigravityRequest", () => {
       { method: "POST" },
       {
         client,
-        providerId: "google",
+        providerId: "antigravity",
         config: { ...DEFAULT_CONFIG, quiet_mode: false },
         accountManager: manager,
         fetchImpl: fetchImpl as unknown as typeof fetch,
@@ -419,7 +416,7 @@ describe("executeAntigravityRequest", () => {
       { method: "POST" },
       {
         client,
-        providerId: "google",
+        providerId: "antigravity",
         config: { ...DEFAULT_CONFIG, quiet_mode: true },
         accountManager: manager,
         fetchImpl: fetchImpl as unknown as typeof fetch,

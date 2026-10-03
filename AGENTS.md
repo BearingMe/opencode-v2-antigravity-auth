@@ -141,7 +141,7 @@ src/
     ├── transform/             # Pure per-family transforms (claude/gemini/sanitizer/resolver)
     ├── core/streaming/        # SSE transformer
     ├── thinking-recovery.ts / recovery/  # Turn repair + session-error hook
-    ├── quota.ts               # fetchAvailableModels + Gemini CLI quota probing
+    ├── quota.ts               # Antigravity per-model + grouped quota probing
     ├── accounts.ts / storage.ts  # Pool manager + v4 persistent store (tombstones)
     ├── fingerprint.ts / project.ts  # Device fingerprints + managed project context
     ├── refresh-queue.ts / rotation.ts  # Proactive refresh + health/token-bucket scoring
@@ -159,8 +159,9 @@ src/
 ### 1. Request Routing
 
 AI SDK hook + fetch bridge for `generativelanguage.googleapis.com` model
-paths only; single native engine (`executeAntigravityRequest`). Two header
-styles: `antigravity` and `gemini-cli` (dual Gemini quota pools).
+paths only; single native engine (`executeAntigravityRequest`) routes OAuth
+Gemini and Claude models through Antigravity. Ordinary Google API-key
+connections keep their configured route.
 
 ### 2. Claude Thinking Blocks
 
@@ -240,3 +241,16 @@ surfaces. Do not attempt to patch or touch OpenCode core codebase.
 - [docs/dev/README.md](docs/dev/README.md) — Developer map + host target
 - [docs/specs/07-rule-index.md](docs/specs/07-rule-index.md) — Normative rule lookup
 - [CHANGELOG.md](CHANGELOG.md) — Version history
+
+### External quota implementation references
+
+- [Antigravity-Manager](https://github.com/lbjlaq/Antigravity-Manager) —
+  [PR 3185](https://github.com/lbjlaq/Antigravity-Manager/pull/3185) documents
+  `retrieveUserQuotaSummary` and its grouped weekly/five-hour buckets.
+- [OmniRoute](https://github.com/diegosouzapw/OmniRoute) —
+  [`antigravityWeeklyQuota.ts`](https://github.com/diegosouzapw/OmniRoute/blob/main/open-sse/services/usage/antigravityWeeklyQuota.ts)
+  contains an independent fetcher/parser for the summary response.
+
+Both references reverse-engineer an undocumented Google endpoint. Treat them
+as corroboration, not an API contract; verify fields against live Antigravity
+responses before changing quota semantics.

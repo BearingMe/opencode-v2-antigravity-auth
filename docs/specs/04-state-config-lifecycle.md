@@ -52,16 +52,16 @@ Key knobs and defaults (`config/schema.ts :: DEFAULT_CONFIG`): `quiet_mode`,
 memory/disk/write}`, empty-response retries, `tool_id_recovery`,
 `claude_tool_hardening/prompt_auto_caching`, proactive refresh
 `{enabled, buffer 1800 s, interval 300 s}`, `max_rate_limit_wait 300 s`,
-`cli_first`, `account_selection sticky|round-robin|hybrid` (default hybrid),
+`account_selection sticky|round-robin|hybrid` (default hybrid),
 `pid_offset`, `switch_on_first`, scheduling `cache_first|balance|
 performance_first`, `max_cache_first 60`, `failure_ttl 3600`,
 soft quota `soft_quota 90` / `quota_refresh 15` / ttl-auto,
 health/token-bucket params, `auto_update`, `claude_prompt_auto_caching`
 (default off).
-`quota_fallback` is deprecated and ignored (Gemini fallback across pools is
-always on; see `quota-fallback.test.ts`).
-Header-normalization note: `x-goog-user-project` is stripped for all
-styles. Debug-sink split: `debug` = file only, `debug_tui` = TUI only.
+`gemini-cli` cooldown entries already present in v4 account stores are
+ignored by routing and retained as inert legacy data. Header-normalization
+note: `x-goog-user-project` is stripped from OAuth requests. Debug-sink split:
+`debug` = file only, `debug_tui` = TUI only.
 
 Validation: Zod partial schemas; malformed JSONC in the update checker is
 tolerated (`continue` / null, no-throw — `checker.test.ts`).
