@@ -1,6 +1,6 @@
 # Platform
 
-`platform/` contains low-level, application-wide technical facilities that are not tied to one domain or one external integration. A possible future example is `platform/logging/`.
+`platform/` contains low-level, application-wide technical facilities that are not tied to one domain or one external integration. `platform/logging/` owns structured log events, destination-neutral logger contracts, log-safe formatting, and independent debug-flag policy.
 
 ## Hard rules
 

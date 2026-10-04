@@ -132,7 +132,7 @@ the tracker may identify that commit by subject to avoid self-referential hashes
 | 1    | Baseline and ownership map            | done    | `test: isolate suite state and map architecture baseline`         |
 | 2    | Public APIs and ports                 | done    | `refactor: define module contracts and legacy bridges`            |
 | 3    | Mechanical boundary checks            | done    | `build: enforce architecture boundaries and required test suites` |
-| 4    | Logging separation                    | pending | —                                                                 |
+| 4    | Logging separation                    | done    | `refactor: separate logging facilities from destinations`         |
 | 5    | Account persistence                   | pending | —                                                                 |
 | 6    | Account pool and selection            | pending | —                                                                 |
 | 7    | Antigravity account communication     | pending | —                                                                 |
@@ -190,8 +190,8 @@ the receiving boundary exists; their current path remains legacy-by-location.
 | External-request portions of `src/plugin/request.ts`                                                                                                                                                           | `adapters/antigravity/inference-client.ts`; do not move account selection, retries, or inference policy there.                                                                                                                                                                                                                             |
 | `src/plugin/errors.ts`                                                                                                                                                                                         | `modules/inference/` for inference/request errors; split only if a distinct account or adapter error contract is demonstrated.                                                                                                                                                                                                             |
 | `src/plugin/image-saver.ts`                                                                                                                                                                                    | `adapters/filesystem/`; image-output path and writes are infrastructure, not inference policy. Add/fold a cohesive leaf within this adapter during migration; do not add a new top-level capability.                                                                                                                                       |
-| `src/lib/logger/index.ts`                                                                                                                                                                                      | `platform/logging/`; keep logger contracts/dispatch-neutral facilities domain- and vendor-agnostic.                                                                                                                                                                                                                                        |
-| `src/lib/logger/file.ts`                                                                                                                                                                                       | `adapters/filesystem/debug-log.ts`; it writes to disk and is a destination, not a platform facility.                                                                                                                                                                                                                                       |
+| `src/platform/logging/{index,policy,format}.ts` (moved from `src/lib/logger/index.ts` plus neutral debug helpers)                                                                                              | Keep logger contracts, debug-flag policy, and safe formatting domain- and vendor-agnostic.                                                                                                                                                                                                                                                 |
+| `src/adapters/filesystem/debug-log.ts` (moved from `src/lib/logger/file.ts` plus legacy file setup)                                                                                                            | It owns paths, retention, timestamps, and disk writes; it is a destination, not a platform facility.                                                                                                                                                                                                                                       |
 | `src/plugin/logger.ts`, `src/plugin/logging-utils.ts`, `src/plugin/debug.ts`                                                                                                                                   | Split neutral log event/policy/formatting into `platform/logging/`; host TUI/console delivery into `adapters/opencode/`; file paths/writers into `adapters/filesystem/debug-log.ts`. Account labels and domain context remain with their owning module.                                                                                    |
 | `src/constants.ts`                                                                                                                                                                                             | Split by responsibility: Antigravity endpoints, OAuth identity, headers, and protocol metadata to `adapters/antigravity/`; provider/host identifiers to `adapters/opencode/`; model transform instructions and schema/signature values to `modules/inference/`. Do not retain a global constants dumping ground.                           |
 | `src/plugin/types.ts` (remaining types)                                                                                                                                                                        | Split by ownership: host client surfaces to `adapters/opencode/`, account/auth contracts to `modules/accounts/`, inference/request/streaming contracts to `modules/inference/`, and recovery message contracts to `modules/session-recovery/`.                                                                                             |
@@ -380,9 +380,9 @@ Make required automated suites gate normal CI.
   explicit allowance. Accounts and inference remain independent; inference may
   depend on session recovery's public API.
 - Four exact legacy-bridge import allowances name their removal steps in
-  `script/boundary-exceptions.json`. The pre-existing debug/logger/storage
-  cycle is recorded as three exact edges with Step 4 as its removal checkpoint;
-  adding an edge invalidates that exception.
+  `script/boundary-exceptions.json`. At Step 3, the pre-existing
+  debug/logger/storage cycle was recorded as three exact edges with Step 4 as
+  its removal checkpoint; Step 4 removed the cycle and its exception manifest.
 - The invalid-fixture CLI smoke returned nonzero and identified the offending
   source line and private target. Checker fixtures passed (7 tests / 22
   expectations), including side-effect imports/re-exports, type-only versus
@@ -409,11 +409,45 @@ into `adapters/filesystem/debug-log.ts`, and host behavior into its adapter.
 
 **Acceptance criteria:**
 
-- [ ] Platform logging has no account/inference/vendor/host policy.
-- [ ] File paths and writes remain outside modules and platform logging.
-- [ ] Redaction, graceful failure, and debug flags retain their behavior.
-- [ ] `debug` and `debug_tui` remain independently effective.
-- [ ] Logging behavior tests and a built-package logging smoke pass.
+- [x] Platform logging has no account/inference/vendor/host policy.
+- [x] File paths and writes remain outside modules and platform logging.
+- [x] Redaction, graceful failure, and debug flags retain their behavior.
+- [x] `debug` and `debug_tui` remain independently effective.
+- [x] Logging behavior tests and a built-package logging smoke pass.
+
+### Step 4 progress notes
+
+- Moved structured log events, sink dispatch, debug-flag policy, and neutral
+  safe formatting into `src/platform/logging/`. Console and OpenCode TUI
+  delivery now live in `src/adapters/opencode/logging.ts`; file path selection,
+  retention, timestamped writes, and config ignore updates live in
+  `src/adapters/filesystem/`.
+- `plugin/logger.ts` remains the compatibility facade; `plugin/debug.ts` keeps
+  Antigravity request/account trace context and header redaction. The storage
+  module retains its existing `.gitignore` exports and reporting via wrappers;
+  account storage behavior was not moved.
+- Removed the Step 3 runtime-cycle exception after breaking the debug → storage
+  edge. The boundary checker passes with no cycle allowance. Debug `close()`
+  waits for the file stream to close; reinitialization and explicit disposal
+  release the active destination.
+- Existing behavior remains covered: file/TUI/console flags are independent;
+  request Authorization values remain redacted; text previews remain bounded;
+  file timestamps, 25-log retention, and best-effort failures are tested.
+  Built-artifact smoke passed for file-only and TUI-only output, redaction, and
+  an unavailable file destination.
+- Anchored the local `/opencode/` ignore rule to the repository root after
+  review found it also ignored the required nested
+  `src/adapters/opencode/logging.ts` implementation.
+- Validation: `bun run check:boundaries`, boundary checker fixtures (7 tests /
+  22 expectations), `bun run test` (52 files / 1,152 tests), `bun run test:tui`
+  (clean build / 13 tests), and `bun run test:logging:smoke` passed. Typecheck,
+  lint, changed-file Prettier, and `git diff --check` passed.
+- Oracle found no remaining blocker. Review findings about stream disposal and
+  smoke cleanup were resolved. The debug-policy finding was checked against
+  baseline runtime behavior and normative rules: runtime already enabled
+  `debug_tui` independently, and the new platform policy preserves that
+  required behavior. Runtime functions and new test helpers were JSDoc-audited.
+- Completion commit: `refactor: separate logging facilities from destinations`.
 
 ## 5. Extract account persistence
 

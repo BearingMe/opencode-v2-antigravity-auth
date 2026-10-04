@@ -37,3 +37,6 @@ jobs:
 
       - name: Run native TUI tests and build
         run: bun run test:tui
+
+      - name: Smoke test built logging destinations
+        run: bun run test:logging:smoke

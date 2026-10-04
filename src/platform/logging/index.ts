@@ -1,7 +1,7 @@
-/** The log levels supported by the plugin's logger adapters. */
+/** Log levels supported by destination adapters. */
 export type LogLevel = "debug" | "info" | "warn" | "error"
 
-/** A single log event before an adapter sends it to a sink. */
+/** A log event before a destination adapter receives it. */
 export interface LogEntry {
   service: string
   level: LogLevel
@@ -26,7 +26,7 @@ export type LogSink = (entry: LogEntry) => void
  * @example `createLogger("antigravity.request", [writeToConsole])`
  */
 export function createLogger(service: string, sinks: readonly LogSink[]): Logger {
-  /** Builds one event and forwards it to every configured sink. */
+  /** Creates one structured event and forwards it to each configured destination. */
   const log = (level: LogLevel, message: string, extra?: Record<string, unknown>): void => {
     const entry: LogEntry = { service, level, message, extra }
     for (const sink of sinks) {
@@ -39,27 +39,5 @@ export function createLogger(service: string, sinks: readonly LogSink[]): Logger
     info: (message, extra) => log("info", message, extra),
     warn: (message, extra) => log("warn", message, extra),
     error: (message, extra) => log("error", message, extra),
-  }
-}
-
-/**
- * Writes arguments through the console method matching the log level.
- *
- * @example `writeConsoleLog("warn", "[service]", "slow response")`
- */
-export function writeConsoleLog(level: LogLevel, ...args: unknown[]): void {
-  switch (level) {
-    case "debug":
-      console.debug(...args)
-      break
-    case "info":
-      console.info(...args)
-      break
-    case "warn":
-      console.warn(...args)
-      break
-    case "error":
-      console.error(...args)
-      break
   }
 }

@@ -63,6 +63,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:tui": "bun run build && bun --conditions=browser test test/tui-quota-render.test.ts",
+    "test:logging:smoke": "bun run script/test-logging-smoke.mjs",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",

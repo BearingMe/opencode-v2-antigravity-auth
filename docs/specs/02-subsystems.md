@@ -237,12 +237,14 @@ non-streaming variant.
   `../dev/manual-testing.md`.
 - `version.ts :: initAntigravityVersion` (changelog scrape 5 k chars →
   fallback; regex `\d+\.\d+\.\d+`; 5 s; `setAntigravityVersion` write-once).
-- `debug.ts` (file logs, 25-file rotation, Authorization masking, 12 k
-  preview) + `logger.ts` (TUI `antigravity.{module}`, debug-gated) +
-  `logging-utils.ts` (policy/format helpers). Debug-sink split:
-  `debug` controls file logging only; `debug_tui` independently controls
-  the TUI panel (`OPENCODE_ANTIGRAVITY_DEBUG` vs
-  `OPENCODE_ANTIGRAVITY_DEBUG_TUI`).
+- `platform/logging/` owns structured log events, neutral formatting, and
+  independent file/TUI flag policy. `adapters/opencode/logging.ts` delivers
+  host-panel and optional console events; `adapters/filesystem/debug-log.ts`
+  owns file paths, timestamps, and 25-file retention. The legacy
+  `plugin/debug.ts` keeps Antigravity request/account trace formatting and
+  Authorization masking (12 k preview). `debug` controls file logging only;
+  `debug_tui` independently controls the TUI panel
+  (`OPENCODE_ANTIGRAVITY_DEBUG` vs `OPENCODE_ANTIGRAVITY_DEBUG_TUI`).
 - `config/`: Zod `AntigravityConfigSchema` + `DEFAULT_CONFIG`
   (`config/schema.ts`), user-then-project load with signature_cache
   deep-merge (`loader.ts`), `OPENCODE_MODEL_DEFINITIONS`

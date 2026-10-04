@@ -1,19 +1,11 @@
-import { mkdirSync, readdirSync, statSync, unlinkSync } from "node:fs"
-import { join } from "node:path"
 import { env } from "node:process"
-import { homedir } from "node:os"
-import { createTimestampedFileWriter } from "../lib/logger/file.js"
+import { createDebugFileDestination } from "../adapters/filesystem/debug-log.js"
+import { writeOpenCodeLog } from "../adapters/opencode/logging.js"
+import type { GitignoreUpdate } from "../adapters/filesystem/config-directory.js"
+import { formatBodyPreviewForLog, formatErrorForLog, truncateTextForLog } from "../platform/logging/format.js"
+import { deriveDebugPolicy } from "../platform/logging/policy.js"
 import type { AntigravityConfig } from "./config"
-import {
-  deriveDebugPolicy,
-  formatAccountContextLabel,
-  formatAccountLabel,
-  formatBodyPreviewForLog,
-  formatErrorForLog,
-  isTruthyFlag,
-  truncateTextForLog,
-} from "./logging-utils"
-import { ensureGitignoreSync } from "./storage"
+import { formatAccountContextLabel, formatAccountLabel } from "./logging-utils"
 
 const MAX_BODY_PREVIEW_CHARS = 12000
 const MAX_BODY_LOG_CHARS = 50000
@@ -29,78 +21,10 @@ interface DebugState {
   debugTuiEnabled: boolean
   logFilePath: string | undefined
   logWriter: (line: string) => void
+  closeLogWriter: () => Promise<void>
 }
 
 let debugState: DebugState | null = null
-
-/**
- * Get the OS-specific config directory.
- */
-function getConfigDir(): string {
-  const platform = process.platform
-  if (platform === "win32") {
-    return join(env.APPDATA || join(homedir(), "AppData", "Roaming"), "opencode")
-  }
-  const xdgConfig = env.XDG_CONFIG_HOME || join(homedir(), ".config")
-  return join(xdgConfig, "opencode")
-}
-
-/**
- * Returns the logs directory, creating it if needed.
- */
-function getLogsDir(customLogDir?: string): string {
-  const logsDir = customLogDir || join(getConfigDir(), "antigravity-logs")
-
-  try {
-    mkdirSync(logsDir, { recursive: true })
-  } catch {
-    // Directory may already exist or we don't have permission
-  }
-
-  return logsDir
-}
-
-/**
- * Builds a timestamped log file path.
- */
-function createLogFilePath(customLogDir?: string): string {
-  const logsDir = getLogsDir(customLogDir)
-  cleanupOldLogs(logsDir, 25)
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
-  return join(logsDir, `antigravity-debug-${timestamp}.log`)
-}
-
-/**
- * Cleans up old log files, keeping only the most recent maxFiles.
- */
-function cleanupOldLogs(logsDir: string, maxFiles: number): void {
-  try {
-    const files = readdirSync(logsDir)
-      .filter((file) => file.startsWith("antigravity-debug-") && file.endsWith(".log"))
-      .map((file) => join(logsDir, file))
-
-    if (files.length <= maxFiles) {
-      return
-    }
-
-    const sortedFiles = files
-      .map((file) => ({
-        file,
-        mtime: statSync(file).mtimeMs,
-      }))
-      .sort((a, b) => b.mtime - a.mtime)
-
-    for (let i = maxFiles; i < sortedFiles.length; i++) {
-      try {
-        unlinkSync(sortedFiles[i]!.file)
-      } catch {
-        // Ignore deletion errors
-      }
-    }
-  } catch {
-    // Ignore directory read errors
-  }
-}
 
 /**
  * Initialize or reinitialize debug state with the given config.
@@ -109,25 +33,46 @@ function cleanupOldLogs(logsDir: string, maxFiles: number): void {
 export function initializeDebug(config: AntigravityConfig): void {
   // Config takes precedence, but env var can force enable for debugging
   const envDebugFlag = env.OPENCODE_ANTIGRAVITY_DEBUG ?? ""
-  const { debugEnabled } = deriveDebugPolicy({
+  const { debugEnabled, debugTuiEnabled } = deriveDebugPolicy({
     configDebug: config.debug,
     configDebugTui: config.debug_tui,
     envDebugFlag,
     envDebugTuiFlag: env.OPENCODE_ANTIGRAVITY_DEBUG_TUI,
   })
-  const debugTuiEnabled = config.debug_tui || isTruthyFlag(env.OPENCODE_ANTIGRAVITY_DEBUG_TUI)
-  const logFilePath = debugEnabled ? createLogFilePath(config.log_dir) : undefined
-  const logWriter = createTimestampedFileWriter(logFilePath)
-
-  if (debugEnabled) {
-    ensureGitignoreSync(getConfigDir())
-  }
+  if (debugState) void debugState.closeLogWriter()
+  const fileDestination = createDebugFileDestination(debugEnabled, config.log_dir, reportGitignoreUpdate)
 
   debugState = {
     debugEnabled,
     debugTuiEnabled,
-    logFilePath,
-    logWriter,
+    logFilePath: fileDestination.filePath,
+    logWriter: fileDestination.writeLine,
+    closeLogWriter: fileDestination.close,
+  }
+}
+
+/** Closes the active file destination and resets debug state for host shutdown. */
+export async function disposeDebugLog(): Promise<void> {
+  const currentState = debugState
+  debugState = null
+  await currentState?.closeLogWriter()
+}
+
+/** Preserves the legacy storage-service log when debug setup updates config ignores. */
+function reportGitignoreUpdate(outcome: GitignoreUpdate): void {
+  if (outcome.status === "created") {
+    writeOpenCodeLog({
+      service: "antigravity.storage",
+      level: "info",
+      message: "Created .gitignore in config directory",
+    })
+  } else if (outcome.status === "updated") {
+    writeOpenCodeLog({
+      service: "antigravity.storage",
+      level: "info",
+      message: "Updated .gitignore with missing entries",
+      extra: { added: outcome.added },
+    })
   }
 }
 
@@ -138,21 +83,20 @@ export function initializeDebug(config: AntigravityConfig): void {
 function getDebugState(): DebugState {
   if (!debugState) {
     // Fallback to env-based initialization for backward compatibility
-    const { debugEnabled } = deriveDebugPolicy({
+    const { debugEnabled, debugTuiEnabled } = deriveDebugPolicy({
       configDebug: false,
       configDebugTui: false,
       envDebugFlag: env.OPENCODE_ANTIGRAVITY_DEBUG,
       envDebugTuiFlag: env.OPENCODE_ANTIGRAVITY_DEBUG_TUI,
     })
-    const debugTuiEnabled = isTruthyFlag(env.OPENCODE_ANTIGRAVITY_DEBUG_TUI)
-    const logFilePath = debugEnabled ? createLogFilePath() : undefined
-    const logWriter = createTimestampedFileWriter(logFilePath)
+    const fileDestination = createDebugFileDestination(debugEnabled, undefined, reportGitignoreUpdate)
 
     debugState = {
       debugEnabled,
       debugTuiEnabled,
-      logFilePath,
-      logWriter,
+      logFilePath: fileDestination.filePath,
+      logWriter: fileDestination.writeLine,
+      closeLogWriter: fileDestination.close,
     }
   }
   return debugState
@@ -162,18 +106,22 @@ function getDebugState(): DebugState {
 // Public API
 // =============================================================================
 
+/** Reports whether detailed request and account logs are enabled for files. */
 export function isDebugEnabled(): boolean {
   return getDebugState().debugEnabled
 }
 
+/** Reports whether plugin log events are enabled for the OpenCode TUI. */
 export function isDebugTuiEnabled(): boolean {
   return getDebugState().debugTuiEnabled
 }
 
+/** Returns the active debug log path, when file logging is enabled. */
 export function getLogFilePath(): string | undefined {
   return getDebugState().logFilePath
 }
 
+/** Request-scoped metadata used to pair debug request and response records. */
 export interface AntigravityDebugContext {
   id: string
   streaming: boolean
@@ -290,11 +238,13 @@ function logDebug(line: string): void {
   getDebugState().logWriter(line)
 }
 
+/** Runs a debug-only operation when file logging is enabled. */
 function runWithDebugEnabled(action: () => void): void {
   if (!getDebugState().debugEnabled) return
   action()
 }
 
+/** Account details used by account and quota debug records. */
 export interface AccountDebugInfo {
   index: number
   email?: string
@@ -303,6 +253,7 @@ export interface AccountDebugInfo {
   rateLimitState?: { claude?: number; gemini?: number }
 }
 
+/** Logs account selection context and active rate-limit state when file debug is enabled. */
 export function logAccountContext(label: string, info: AccountDebugInfo): void {
   runWithDebugEnabled(() => {
     const accountLabel = formatAccountContextLabel(info.email, info.index)
@@ -328,6 +279,7 @@ export function logAccountContext(label: string, info: AccountDebugInfo): void {
   })
 }
 
+/** Logs an account rate-limit response and any available provider details. */
 export function logRateLimitEvent(
   accountIndex: number,
   email: string | undefined,
@@ -354,6 +306,7 @@ export function logRateLimitEvent(
   })
 }
 
+/** Logs a concise snapshot of account cooldowns for one model family. */
 export function logRateLimitSnapshot(
   family: string,
   accounts: Array<{ index: number; email?: string; rateLimitResetTimes?: { claude?: number; gemini?: number } }>,
@@ -374,6 +327,7 @@ export function logRateLimitSnapshot(
   })
 }
 
+/** Logs a bounded response preview and returns the complete cloned response text. */
 export async function logResponseBody(
   context: AntigravityDebugContext | null | undefined,
   response: Response,
@@ -393,12 +347,14 @@ export async function logResponseBody(
   }
 }
 
+/** Logs the model family selected for an outgoing request. */
 export function logModelFamily(url: string, extractedModel: string | null, family: string): void {
   runWithDebugEnabled(() => {
     logDebug(`[ModelFamily] url=${url} model=${extractedModel ?? "unknown"} family=${family}`)
   })
 }
 
+/** Writes a caller-provided line to the configured debug file when enabled. */
 export function debugLogToFile(message: string): void {
   runWithDebugEnabled(() => {
     logDebug(message)

@@ -49,6 +49,10 @@ src/
 ├── constants.ts               # Endpoints, headers, OAuth identity, model routing
 ├── antigravity/oauth.ts       # PKCE authorize URL + code exchange + project discovery
 ├── hooks/auto-update-checker/ # Version check (root sessions only; never installs)
+├── adapters/
+│   ├── filesystem/            # Config ignore maintenance and debug-file destination
+│   └── opencode/              # Host logging destinations
+├── platform/logging/          # Neutral events, policy, and safe log formatting
 └── plugin/
     ├── engine.ts              # Native request/rotation engine (sole router)
     ├── account-service.ts     # Shared account store service (tool + RPC backend)
@@ -67,6 +71,12 @@ src/
     ├── cache/ / stores/       # Signature caches (memory + disk)
     └── debug.ts / logger.ts / logging-utils.ts / version.ts / errors.ts / types.ts
 ```
+
+Logging is split by responsibility: `platform/logging/` owns neutral policy,
+events, and formatting; OpenCode host/console delivery is in
+`adapters/opencode/logging.ts`; file paths, retention, and writes are in
+`adapters/filesystem/debug-log.ts`. The remaining plugin logging files keep
+Antigravity trace context and compatibility-facing logger calls.
 
 Historical (removed, do not reintroduce): V1 `src/plugin.ts`, `cli.ts`,
 `server.ts` (localhost OAuth listener), `ui/`, and `plugin/search.ts`

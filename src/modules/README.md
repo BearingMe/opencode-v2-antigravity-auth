@@ -31,6 +31,6 @@ Modules and platform code may use the approved pure `zod` package; other
 external package imports need an explicit adapter/port or a reviewed checker
 allowance.
 
-Exact legacy bridge and runtime-cycle allowances, with their removal steps, live
-in `script/boundary-exceptions.json` and `script/boundary-cycle-exceptions.json`.
-Do not broaden an allowance to a directory or reuse it from another source file.
+Exact legacy bridge allowances, with their removal steps, live in
+`script/boundary-exceptions.json`. Do not broaden an allowance to a directory or
+reuse it from another source file. Runtime cycles have no current allowances.

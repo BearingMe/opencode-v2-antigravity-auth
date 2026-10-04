@@ -1,33 +1,19 @@
 import { promises as fs } from "node:fs"
-import {
-  existsSync,
-  readFileSync,
-  writeFileSync,
-  appendFileSync,
-  mkdirSync,
-  renameSync,
-  copyFileSync,
-  unlinkSync,
-} from "node:fs"
+import { existsSync, mkdirSync, renameSync, copyFileSync, unlinkSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { homedir } from "node:os"
 import { createHash, randomBytes } from "node:crypto"
 import lockfile from "proper-lockfile"
+import {
+  ensureGitignore as ensureConfigGitignore,
+  ensureGitignoreSync as ensureConfigGitignoreSync,
+  type GitignoreUpdate,
+} from "../adapters/filesystem/config-directory.js"
 import { createLogger } from "./logger"
 
 const log = createLogger("storage")
 
-/**
- * Files/directories that should be gitignored in the config directory.
- * These contain sensitive data or machine-specific state.
- */
-export const GITIGNORE_ENTRIES = [
-  ".gitignore",
-  "antigravity-accounts.json",
-  "antigravity-accounts.json.*.tmp",
-  "antigravity-signature-cache.json",
-  "antigravity-logs/",
-]
+export { GITIGNORE_ENTRIES } from "../adapters/filesystem/config-directory.js"
 
 /**
  * Ensures a .gitignore file exists in the config directory with entries
@@ -35,78 +21,22 @@ export const GITIGNORE_ENTRIES = [
  * entries if it already exists.
  */
 export async function ensureGitignore(configDir: string): Promise<void> {
-  const gitignorePath = join(configDir, ".gitignore")
-
-  try {
-    let content: string
-    let existingLines: string[] = []
-
-    try {
-      content = await fs.readFile(gitignorePath, "utf-8")
-      existingLines = content.split("\n").map((line) => line.trim())
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        return
-      }
-      content = ""
-    }
-
-    const missingEntries = GITIGNORE_ENTRIES.filter((entry) => !existingLines.includes(entry))
-
-    if (missingEntries.length === 0) {
-      return
-    }
-
-    if (content === "") {
-      await fs.writeFile(gitignorePath, missingEntries.join("\n") + "\n", "utf-8")
-      log.info("Created .gitignore in config directory")
-    } else {
-      const suffix = content.endsWith("\n") ? "" : "\n"
-      await fs.appendFile(gitignorePath, suffix + missingEntries.join("\n") + "\n", "utf-8")
-      log.info("Updated .gitignore with missing entries", {
-        added: missingEntries,
-      })
-    }
-  } catch {
-    // Non-critical feature
-  }
+  reportGitignoreUpdate(await ensureConfigGitignore(configDir))
 }
 
 /**
  * Synchronous version of ensureGitignore for use in sync code paths.
  */
 export function ensureGitignoreSync(configDir: string): void {
-  const gitignorePath = join(configDir, ".gitignore")
+  reportGitignoreUpdate(ensureConfigGitignoreSync(configDir))
+}
 
-  try {
-    let content: string
-    let existingLines: string[] = []
-
-    if (existsSync(gitignorePath)) {
-      content = readFileSync(gitignorePath, "utf-8")
-      existingLines = content.split("\n").map((line) => line.trim())
-    } else {
-      content = ""
-    }
-
-    const missingEntries = GITIGNORE_ENTRIES.filter((entry) => !existingLines.includes(entry))
-
-    if (missingEntries.length === 0) {
-      return
-    }
-
-    if (content === "") {
-      writeFileSync(gitignorePath, missingEntries.join("\n") + "\n", "utf-8")
-      log.info("Created .gitignore in config directory")
-    } else {
-      const suffix = content.endsWith("\n") ? "" : "\n"
-      appendFileSync(gitignorePath, suffix + missingEntries.join("\n") + "\n", "utf-8")
-      log.info("Updated .gitignore with missing entries", {
-        added: missingEntries,
-      })
-    }
-  } catch {
-    // Non-critical feature
+/** Keeps the legacy storage logger messages for config-directory changes. */
+function reportGitignoreUpdate(outcome: GitignoreUpdate): void {
+  if (outcome.status === "created") {
+    log.info("Created .gitignore in config directory")
+  } else if (outcome.status === "updated") {
+    log.info("Updated .gitignore with missing entries", { added: outcome.added })
   }
 }
 

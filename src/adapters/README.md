@@ -7,6 +7,8 @@ adapters/
   antigravity/
   opencode/
   filesystem/
+    config-directory.ts
+    debug-log.ts
 ```
 
 ## Hard rules

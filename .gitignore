@@ -44,7 +44,7 @@ test-file.ts
 .worktrees/
 CLIProxyAPI/
 LLM-API-Key-Proxy/
-opencode/
+/opencode/
 opencode-better-antigravity-auth/
 
 # AI
