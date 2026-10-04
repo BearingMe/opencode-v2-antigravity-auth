@@ -40,3 +40,6 @@ jobs:
 
       - name: Smoke test built logging destinations
         run: bun run test:logging:smoke
+
+      - name: Smoke test built account persistence
+        run: bun run test:account-store:smoke

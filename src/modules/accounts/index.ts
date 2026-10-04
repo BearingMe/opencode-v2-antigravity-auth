@@ -192,3 +192,7 @@ export type {
   AccountQuotaProbePort,
   AccountStateUpdate,
 } from "./ports.js"
+
+export * from "./persistence/policy.js"
+export * from "./persistence/service.js"
+export { AccountStoreUnreadableError } from "./persistence/errors.js"

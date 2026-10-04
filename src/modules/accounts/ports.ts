@@ -8,6 +8,8 @@ export interface AccountStateUpdate<State, Result> {
 export interface AccountPersistencePort<State> {
   load(): Promise<State | null>
   transact<Result>(update: (state: State) => Promise<AccountStateUpdate<State, Result>>): Promise<Result>
+  /** Replaces storage under its transaction boundary without loading its current value. */
+  replace(state: State): Promise<void>
 }
 
 /** Credential refresh operation required by account lifecycle policy. */

@@ -50,8 +50,10 @@ src/
 ├── antigravity/oauth.ts       # PKCE authorize URL + code exchange + project discovery
 ├── hooks/auto-update-checker/ # Version check (root sessions only; never installs)
 ├── adapters/
-│   ├── filesystem/            # Config ignore maintenance and debug-file destination
+│   ├── filesystem/            # Account store, config ignores, and debug-file destination
 │   └── opencode/              # Host logging destinations
+├── modules/accounts/
+│   └── persistence/           # Stored schema, migrations, dedupe, and tombstone policy
 ├── platform/logging/          # Neutral events, policy, and safe log formatting
 └── plugin/
     ├── engine.ts              # Native request/rotation engine (sole router)
@@ -77,6 +79,11 @@ events, and formatting; OpenCode host/console delivery is in
 `adapters/opencode/logging.ts`; file paths, retention, and writes are in
 `adapters/filesystem/debug-log.ts`. The remaining plugin logging files keep
 Antigravity trace context and compatibility-facing logger calls.
+
+Account persistence policy now lives in `modules/accounts/persistence/` and
+the locked filesystem implementation is in
+`adapters/filesystem/account-store.ts`. `plugin/storage.ts` remains a
+compatibility facade while existing callers migrate in later steps.
 
 Historical (removed, do not reintroduce): V1 `src/plugin.ts`, `cli.ts`,
 `server.ts` (localhost OAuth listener), `ui/`, and `plugin/search.ts`

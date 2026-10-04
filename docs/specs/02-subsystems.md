@@ -141,22 +141,25 @@ timestamps. `checkAccountsQuota` refreshes expired tokens, ensures project
 context, fetches both quota endpoints, and does not let summary failure block
 the per-model reading.
 
-## 2.7 Storage — `src/plugin/storage.ts`
+## 2.7 Account persistence — `modules/accounts/persistence/`
 
-File `OPENCODE_CONFIG_DIR || ~/.config/opencode/antigravity-accounts.json`
+Account-owned store versions, V1→V4 migrations, email deduplication, merge and
+replace policy, and tombstone matching live in
+`src/modules/accounts/persistence/`. `adapters/filesystem/account-store.ts`
+owns `OPENCODE_CONFIG_DIR || ~/.config/opencode/antigravity-accounts.json`
 (win32 legacy `%APPDATA%` migration rename→copy; chmod 0600; gitignore
-entries). Versions V1→V4 with migrations (bool→per-family; gemini→
-gemini-antigravity; fingerprint slots). `loadAccounts` migrates+saves,
-validates refreshToken, dedupes by email (newest lastUsed/addedAt), clamps
-`activeIndex` (service writes go through single-lock `updateAccounts`
-replace-transactions). `saveAccounts`
-merges by refreshToken (preserving project ids/rate limits/max lastUsed)
-under `proper-lockfile` (10 s stale, 5 retries), atomic tmp→rename, and is
-reserved for token-rotation paths — never deletes. `saveAccountsReplace`
-is the replace-semantics helper in `storage.ts`; service code MUST use
-`updateAccounts` so the read, tombstone filter, and write stay in one
-locked transaction. Merge-on-save can
-resurrect deletes if the wrong saver is used.
+entries), `proper-lockfile` (10 s stale, 5 retries), atomic tmp→rename, and
+secure file access. `src/plugin/storage.ts` remains a compatibility facade for
+callers awaiting later account migrations.
+
+`loadAccounts` migrates+saves, validates refreshToken, dedupes by email (newest
+lastUsed/addedAt), and clamps `activeIndex`. Service writes MUST use the
+single-lock `updateAccounts` transaction. `saveAccounts` merges by refreshToken
+(preserving project ids/rate limits/max lastUsed) and is reserved for
+token-rotation snapshots — never use it for deletion. `saveAccountsReplace`
+retains on-disk tombstones unless `{ clearTombstones: true }` explicitly
+requests a full reset; that reset can replace an unreadable file. Tombstones
+prevent stale saves from restoring deleted account generations.
 
 ## 2.8 Fingerprints — `src/plugin/fingerprint.ts`
 

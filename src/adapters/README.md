@@ -7,6 +7,7 @@ adapters/
   antigravity/
   opencode/
   filesystem/
+    account-store.ts
     config-directory.ts
     debug-log.ts
 ```

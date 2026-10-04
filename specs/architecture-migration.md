@@ -127,22 +127,22 @@ concise: commands/results, Oracle and review outcomes, smoke scenario/results,
 documentation audit, and any blockers. Update evidence in the same scoped commit;
 the tracker may identify that commit by subject to avoid self-referential hashes.
 
-| Step | Title                                 | Status  | Evidence / commit                                                 |
-| ---- | ------------------------------------- | ------- | ----------------------------------------------------------------- |
-| 1    | Baseline and ownership map            | done    | `test: isolate suite state and map architecture baseline`         |
-| 2    | Public APIs and ports                 | done    | `refactor: define module contracts and legacy bridges`            |
-| 3    | Mechanical boundary checks            | done    | `build: enforce architecture boundaries and required test suites` |
-| 4    | Logging separation                    | done    | `refactor: separate logging facilities from destinations`         |
-| 5    | Account persistence                   | pending | —                                                                 |
-| 6    | Account pool and selection            | pending | —                                                                 |
-| 7    | Antigravity account communication     | pending | —                                                                 |
-| 8    | Account administration and lifecycle  | pending | —                                                                 |
-| 9    | Session recovery                      | pending | —                                                                 |
-| 10   | Inference transforms and signatures   | pending | —                                                                 |
-| 11   | Inference pipelines and client        | pending | —                                                                 |
-| 12   | Application execution and composition | pending | —                                                                 |
-| 13   | OpenCode integration and packaging    | pending | —                                                                 |
-| 14   | Final architecture verification       | pending | —                                                                 |
+| Step | Title                                 | Status  | Evidence / commit                                                       |
+| ---- | ------------------------------------- | ------- | ----------------------------------------------------------------------- |
+| 1    | Baseline and ownership map            | done    | `test: isolate suite state and map architecture baseline`               |
+| 2    | Public APIs and ports                 | done    | `refactor: define module contracts and legacy bridges`                  |
+| 3    | Mechanical boundary checks            | done    | `build: enforce architecture boundaries and required test suites`       |
+| 4    | Logging separation                    | done    | `refactor: separate logging facilities from destinations`               |
+| 5    | Account persistence                   | done    | `refactor: separate account persistence policy from filesystem storage` |
+| 6    | Account pool and selection            | pending | —                                                                       |
+| 7    | Antigravity account communication     | pending | —                                                                       |
+| 8    | Account administration and lifecycle  | pending | —                                                                       |
+| 9    | Session recovery                      | pending | —                                                                       |
+| 10   | Inference transforms and signatures   | pending | —                                                                       |
+| 11   | Inference pipelines and client        | pending | —                                                                       |
+| 12   | Application execution and composition | pending | —                                                                       |
+| 13   | OpenCode integration and packaging    | pending | —                                                                       |
+| 14   | Final architecture verification       | pending | —                                                                       |
 
 ## 1. Establish the migration baseline and ownership map
 
@@ -456,11 +456,43 @@ into `adapters/filesystem/debug-log.ts`, and host behavior into its adapter.
 
 **Acceptance criteria:**
 
-- [ ] Accounts needs no filesystem or locking implementation knowledge.
-- [ ] Store versions, paths, deduplication, and migrations remain compatible.
-- [ ] Replace transactions, atomic tombstones, and stale-save protection remain.
-- [ ] Unknown/stale mutation targets fail closed without writes.
-- [ ] Persistence smoke uses an isolated store, never real accounts.
+- [x] Accounts needs no filesystem or locking implementation knowledge.
+- [x] Store versions, paths, deduplication, and migrations remain compatible.
+- [x] Replace transactions, atomic tombstones, and stale-save protection remain.
+- [x] Unknown/stale mutation targets fail closed without writes.
+- [x] Persistence smoke uses an isolated store, never real accounts.
+
+### Step 5 progress notes
+
+- Moved persisted account types, V1→V4 migrations, deduplication, merge and
+  replacement policy, and generation-aware tombstones to
+  `src/modules/accounts/persistence/`. The account module has no filesystem,
+  locking, path, or Node crypto dependency; token fingerprinting is supplied as
+  a ported function.
+- `src/adapters/filesystem/account-store.ts` implements the account persistence
+  port and owns config paths, Windows legacy-path migration, permissions,
+  locking, parsing/writes, and atomic replacement. The existing
+  `src/plugin/storage.ts` remains a compatibility facade for later migration
+  steps; account pool/selection and administration were not relocated.
+- Preserved the explicit `clearTombstones` full-replacement path, including its
+  intentional no-read behavior for corrupt stores. Ordinary merge, replace,
+  and update transactions still fail closed on unreadable data. Regression
+  coverage also protects no-op writes, failed mutations, stale-save deletion,
+  re-add generations, and stale/unknown mutation targets.
+- Added `bun run test:account-store:smoke`, exercised against built modules and
+  a temporary `OPENCODE_CONFIG_DIR` with synthetic credentials only. It passed
+  v2 migration/persistence, tombstone protection against a stale save, and
+  corrupt-store preservation. The existing built logging smoke also passed.
+- Validation: `bun run check:boundaries`, boundary fixtures (7 tests / 22
+  expectations), `bun run test` (53 files / 1,157 tests), `bun run test:tui`
+  (clean build / 13 tests), `bun run test:account-store:smoke`, and
+  `bun run test:logging:smoke` passed. Typecheck, lint, changed-file Prettier,
+  and `git diff --check` passed.
+- Oracle found no remaining blocker. Review findings were resolved: the
+  migration save merges against freshly read, locked disk tombstones; explicit
+  `clearTombstones` no-read replacement matches baseline behavior and is tested.
+  Runtime functions and test helpers were JSDoc-audited.
+- Completion commit: `refactor: separate account persistence policy from filesystem storage`.
 
 ## 6. Migrate account pool and selection
 

@@ -231,6 +231,19 @@ describe("account tombstones", () => {
     expect(reloaded?.removedAccounts ?? []).toHaveLength(0)
   })
 
+  it("explicit full replacement can recover from an unreadable store", async () => {
+    const storePath = getStoragePath()
+    await writeFile(storePath, "{corrupt-json")
+
+    await saveAccountsReplace(storedPool([seedAccount({ email: "restored@example.com", refreshToken: "new-token" })]), {
+      clearTombstones: true,
+    })
+
+    const reloaded = await loadAccounts()
+    expect(reloaded?.accounts.map((account) => account.email)).toEqual(["restored@example.com"])
+    expect(reloaded?.removedAccounts ?? []).toHaveLength(0)
+  })
+
   it("a corrupt store is never overwritten by an update", async () => {
     const storePath = getStoragePath()
     const before = await readFile(storePath, "utf-8")
