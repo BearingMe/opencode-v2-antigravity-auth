@@ -626,6 +626,7 @@ verification, and refresh policies into their accounts subdirectories.
   the host/provider boundaries and, after the durable-ID verification race fix,
   the stale-target and queue-ordering concerns are resolved. Independent review
   found no actionable findings. No live vendor quota/auth check was performed.
+- Completion commit: `98da1fb` (`refactor: migrate account administration policies`).
 
 ## 9. Migrate session recovery
 
