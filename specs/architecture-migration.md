@@ -584,7 +584,7 @@ account policies through ports.
   adapters, with target-path relocation deferred to Step 8. Review's timeout,
   smoke-contract, and onboarding-sequencing findings were resolved; no
   actionable findings remain. Mocked smoke is not a live vendor check.
-- Completion commit: pending.
+- Completion commit: `2cd7ef3` (`refactor: extract Antigravity account communication`).
 
 ## 8. Migrate account administration and lifecycle policies
 
