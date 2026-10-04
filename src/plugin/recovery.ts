@@ -2,14 +2,7 @@ import type { AntigravityConfig } from "./config"
 import { createLogger } from "./logger"
 import { logToast } from "./debug"
 import type { PluginClient } from "./types"
-import {
-  readParts,
-  findMessagesWithThinkingBlocks,
-  findMessagesWithOrphanThinking,
-  findMessageByIndexNeedingThinking,
-  prependThinkingPart,
-  stripThinkingParts,
-} from "./recovery/storage"
+import { fileRecoveryStorage } from "./recovery/storage"
 import type { MessageInfo, MessageData, MessagePart, RecoveryErrorType, ResumeConfig } from "./recovery/types"
 
 // =============================================================================
@@ -128,7 +121,7 @@ async function recoverToolResultMissing(
   // Try API parts first, fallback to filesystem if empty
   let parts = failedMsg.parts || []
   if (parts.length === 0 && failedMsg.info?.id) {
-    const storedParts = readParts(failedMsg.info.id)
+    const storedParts = fileRecoveryStorage.readParts(failedMsg.info.id)
     parts = storedParts.map((p) => ({
       type: p.type === "tool" ? "tool_use" : p.type,
       id: "callID" in p ? (p as { callID?: string }).callID : p.id,
@@ -168,14 +161,14 @@ async function recoverThinkingBlockOrder(sessionID: string, _failedMsg: MessageD
   // Try to find the target message index from error
   const targetIndex = extractMessageIndex(error)
   if (targetIndex !== null) {
-    const targetMessageID = findMessageByIndexNeedingThinking(sessionID, targetIndex)
+    const targetMessageID = fileRecoveryStorage.findMessageByIndexNeedingThinking(sessionID, targetIndex)
     if (targetMessageID) {
-      return prependThinkingPart(sessionID, targetMessageID)
+      return fileRecoveryStorage.prependThinkingPart(sessionID, targetMessageID)
     }
   }
 
   // Fallback: find all orphan thinking messages
-  const orphanMessages = findMessagesWithOrphanThinking(sessionID)
+  const orphanMessages = fileRecoveryStorage.findMessagesWithOrphanThinking(sessionID)
 
   if (orphanMessages.length === 0) {
     return false
@@ -183,7 +176,7 @@ async function recoverThinkingBlockOrder(sessionID: string, _failedMsg: MessageD
 
   let anySuccess = false
   for (const messageID of orphanMessages) {
-    if (prependThinkingPart(sessionID, messageID)) {
+    if (fileRecoveryStorage.prependThinkingPart(sessionID, messageID)) {
       anySuccess = true
     }
   }
@@ -195,7 +188,7 @@ async function recoverThinkingBlockOrder(sessionID: string, _failedMsg: MessageD
  * Recover from thinking_disabled_violation by stripping thinking parts.
  */
 async function recoverThinkingDisabledViolation(sessionID: string, _failedMsg: MessageData): Promise<boolean> {
-  const messagesWithThinking = findMessagesWithThinkingBlocks(sessionID)
+  const messagesWithThinking = fileRecoveryStorage.findMessagesWithThinkingBlocks(sessionID)
 
   if (messagesWithThinking.length === 0) {
     return false
@@ -203,7 +196,7 @@ async function recoverThinkingDisabledViolation(sessionID: string, _failedMsg: M
 
   let anySuccess = false
   for (const messageID of messagesWithThinking) {
-    if (stripThinkingParts(messageID)) {
+    if (fileRecoveryStorage.stripThinkingParts(messageID)) {
       anySuccess = true
     }
   }

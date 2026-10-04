@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFile
 import { join } from "node:path"
 import { MESSAGE_STORAGE, PART_STORAGE, THINKING_TYPES, META_TYPES } from "./constants"
 import type { StoredMessageMeta, StoredPart, StoredTextPart } from "./types"
+import type { RecoveryStoragePort } from "../../modules/session-recovery/index.js"
 
 // =============================================================================
 // Directory Helpers
@@ -242,3 +243,19 @@ export function findMessageByIndexNeedingThinking(sessionID: string, targetIndex
 
   return null
 }
+
+/**
+ * Implements the recovery storage contract with the current host data layout.
+ *
+ * @example `fileRecoveryStorage.readParts(messageID)`
+ */
+export const fileRecoveryStorage = {
+  readMessages,
+  readParts,
+  messageHasContent,
+  findMessagesWithThinkingBlocks,
+  findMessagesWithOrphanThinking,
+  findMessageByIndexNeedingThinking,
+  prependThinkingPart,
+  stripThinkingParts,
+} satisfies RecoveryStoragePort

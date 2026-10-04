@@ -5,6 +5,8 @@ import { ID as ModelID, Info as ModelInfo, VariantID as ModelVariantID } from "@
 import { ID as ProviderID, Info as ProviderInfo } from "@opencode/schema/provider"
 import { IntegrationMethodID } from "@opencode/schema/integration-id"
 import { authorizeAntigravity, exchangeAntigravity } from "./antigravity/oauth.js"
+import { createLegacyAccountAdministration } from "./app/legacy-bridges/accounts.js"
+import { createLegacySessionRecovery } from "./app/legacy-bridges/session-recovery.js"
 import { ANTIGRAVITY_PROVIDER_ID } from "./constants.js"
 import { AntigravityAccounts } from "./rpc.js"
 import { formatRefreshParts, isOAuthAuth, parseRefreshParts } from "./plugin/auth.js"
@@ -12,13 +14,7 @@ import { loadAccounts } from "./plugin/storage.js"
 import {
   MAX_SAVED_ACCOUNTS,
   checkQuota as checkAccountsQuota,
-  deleteAllAccounts,
-  getQuotaPresentation,
-  listAccounts,
-  mutateAccount,
-  persistOAuthAccount,
   persistRefreshRotation,
-  verifyAccount,
   type MutationOp,
 } from "./plugin/account-service.js"
 import { OPENCODE_MODEL_DEFINITIONS } from "./plugin/config/models.js"
@@ -31,7 +27,7 @@ import {
   executeAntigravityRequest,
   refreshOAuthCredentialUnified,
 } from "./plugin/engine.js"
-import { createSessionRecoveryHook, getRecoverySuccessToast } from "./plugin/recovery.js"
+import { getRecoverySuccessToast } from "./plugin/recovery.js"
 import { initDiskSignatureCache } from "./plugin/cache.js"
 import { createProactiveRefreshQueue, type ProactiveRefreshQueue } from "./plugin/refresh-queue.js"
 import { initHealthTracker, initTokenTracker } from "./plugin/rotation.js"
@@ -123,6 +119,7 @@ export default Plugin.define({
     initRuntimeConfig(nativeConfig)
     initLogger(bridgeClient)
     await initAntigravityVersion()
+    const accountAdministration = createLegacyAccountAdministration(bridgeClient, ANTIGRAVITY_PROVIDER_ID)
 
     // Accounts RPC lives on the production server plugin: a separate entry has
     // no host auto-load contract (only "." and "./tui" load automatically),
@@ -130,17 +127,10 @@ export default Plugin.define({
     let accountsRegistration: { dispose: () => Promise<void> | void } | null = null
     try {
       accountsRegistration = await ctx.rpc.register(AntigravityAccounts, {
-        list: async () => listAccounts(),
-        quota: async (input) =>
-          getQuotaPresentation(
-            bridgeClient,
-            {
-              refresh: input.refresh ?? true,
-            },
-            ANTIGRAVITY_PROVIDER_ID,
-          ),
+        list: async () => accountAdministration.list(),
+        quota: async (input) => accountAdministration.quota({ refresh: input.refresh ?? true }),
         verify: async (input) => {
-          const outcome = await verifyAccount({ id: input.id }, bridgeClient, ANTIGRAVITY_PROVIDER_ID)
+          const outcome = await accountAdministration.verify({ id: input.id })
           if ("ok" in outcome) return outcome
           resetNativeManager()
           await refreshAccountSummary()
@@ -162,7 +152,11 @@ export default Plugin.define({
           return projected
         },
         mutate: async (input) => {
-          const outcome = await mutateAccount({ id: input.id }, input.op, input.family ? { family: input.family } : {})
+          const outcome = await accountAdministration.mutate(
+            { id: input.id },
+            input.op,
+            input.family ? { family: input.family } : {},
+          )
           if ("ok" in outcome) return outcome
           const selected = outcome.selected
           if (selected) {
@@ -193,7 +187,7 @@ export default Plugin.define({
           }
         },
         deleteAll: async () => {
-          await deleteAllAccounts()
+          await accountAdministration.deleteAll()
           currentAuth = { type: "oauth", refresh: "", access: "", expires: 0 }
           resetNativeManager()
           await refreshAccountSummary()
@@ -230,10 +224,7 @@ export default Plugin.define({
       initDiskSignatureCache(nativeConfig.signature_cache)
     }
 
-    const sessionRecovery = createSessionRecoveryHook(
-      { client: bridgeClient, directory: ctx.location.directory },
-      nativeConfig,
-    )
+    const sessionRecovery = createLegacySessionRecovery(bridgeClient, ctx.location.directory, nativeConfig)
 
     const updateChecker = createAutoUpdateCheckerHook(bridgeClient, ctx.location.directory, {
       showStartupToast: true,
@@ -435,7 +426,7 @@ export default Plugin.define({
               const params = parseOAuthCallbackInput(code, new URL(authorization.url).searchParams.get("state") ?? "")
               const result = await exchangeAntigravity(params.code, params.state)
               if (result.type !== "success") throw new Error(result.error)
-              await persistOAuthAccount(result, "add")
+              await accountAdministration.persistOAuth(result, "add")
               await refreshAccountSummary()
               currentAuth = {
                 type: "oauth",
@@ -815,11 +806,13 @@ export async function manageAccounts(
   invalidateFetch: () => void,
   setAuth: (auth: OAuthAuthDetails) => void,
 ): Promise<{ content: string }> {
+  const accountAdministration = createLegacyAccountAdministration(client, ANTIGRAVITY_PROVIDER_ID)
+
   // Legacy tool adapter: input/output contract is unchanged. All storage
   // reads/writes live in src/plugin/account-service.ts; this wrapper only
   // formats tool strings and applies in-memory effects (auth/invalidation).
   if (input.action === "list") {
-    const dto = await listAccounts()
+    const dto = await accountAdministration.list()
     return {
       content: JSON.stringify(
         {
@@ -848,7 +841,7 @@ export async function manageAccounts(
   }
 
   if (input.action === "verify") {
-    const outcome = await verifyAccount({ index: input.index ?? NaN }, client, ANTIGRAVITY_PROVIDER_ID)
+    const outcome = await accountAdministration.verify({ index: input.index ?? NaN })
     if ("ok" in outcome) {
       if (outcome.kind === "invalid-index") {
         return { content: `Invalid account index. There are ${outcome.accountCount} saved accounts.` }
@@ -871,7 +864,7 @@ export async function manageAccounts(
   }
 
   if (input.action === "delete_all") {
-    await deleteAllAccounts()
+    await accountAdministration.deleteAll()
     setAuth({ type: "oauth", refresh: "", access: "", expires: 0 })
     invalidateFetch()
     return { content: "All Antigravity accounts deleted." }
@@ -884,7 +877,7 @@ export async function manageAccounts(
     input.action === "select"
   ) {
     const op = input.action as MutationOp
-    const outcome = await mutateAccount({ index: input.index ?? NaN }, op)
+    const outcome = await accountAdministration.mutate({ index: input.index ?? NaN }, op)
     if ("ok" in outcome) {
       if (outcome.kind === "invalid-index") {
         return { content: `Invalid account index. There are ${outcome.accountCount} saved accounts.` }
@@ -916,7 +909,7 @@ export async function manageAccounts(
   // Unknown actions never reach the service, so they cannot write. The legacy
   // ordering is preserved: an out-of-range index reports the index error even
   // for an unknown action.
-  const count = (await listAccounts()).accounts.length
+  const count = (await accountAdministration.list()).accounts.length
   if (!Number.isInteger(input.index) || (input.index as number) < 0 || (input.index as number) >= count) {
     return { content: `Invalid account index. There are ${count} saved accounts.` }
   }

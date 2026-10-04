@@ -10,12 +10,7 @@ import {
 } from "./accounts.js"
 import { createSyntheticErrorResponse, isEmptyResponseBody } from "./request-helpers.js"
 import { EmptyResponseError } from "./errors.js"
-import {
-  assertAntigravityModelSupported,
-  buildThinkingWarmupBody,
-  prepareAntigravityRequest,
-  transformAntigravityResponse,
-} from "./request.js"
+import { assertAntigravityModelSupported, buildThinkingWarmupBody } from "./request.js"
 import { AntigravityTokenRefreshError, refreshAccessToken } from "./token.js"
 import { ensureProjectContext } from "./project.js"
 import { getHealthTracker, getTokenTracker } from "./rotation.js"
@@ -34,6 +29,8 @@ import { disposeDiskSignatureCache } from "./cache.js"
 import { extractVerificationErrorDetails } from "./verification.js"
 import type { AntigravityConfig } from "./config/index.js"
 import type { OAuthAuthDetails, PluginClient, ProjectContextResult } from "./types.js"
+import { createLegacyAccountPool } from "../app/legacy-bridges/accounts.js"
+import { legacyInference } from "../app/legacy-bridges/inference.js"
 
 const log = createLogger("engine")
 
@@ -483,6 +480,8 @@ export async function executeAntigravityRequest(
     assertAntigravityModelSupported(model)
   }
   const family = getModelFamilyFromUrl(urlString)
+  const classification = model ? legacyInference.classifyModel(model) : undefined
+  const accountPool = createLegacyAccountPool(accountManager)
   const debugLines: string[] = []
   const pushDebug = (line: string) => {
     if (!isDebugEnabled()) return
@@ -548,14 +547,17 @@ export async function executeAntigravityRequest(
       config.quota_refresh_interval_minutes,
     )
 
-    let account = accountManager.getCurrentOrNextForFamily(
-      family,
-      model,
-      config.account_selection_strategy,
-      config.pid_offset_enabled,
-      config.soft_quota_threshold_percent,
+    let account = accountPool.selectForRequest({
+      classification: {
+        family,
+        ...(model === null ? {} : { model }),
+        ...(classification ? { quotaGroup: classification.quotaGroup } : {}),
+      },
+      strategy: config.account_selection_strategy,
+      pidOffsetEnabled: config.pid_offset_enabled,
+      softQuotaThresholdPercent: config.soft_quota_threshold_percent,
       softQuotaCacheTtlMs,
-    )
+    })
 
     if (!account) {
       if (
@@ -564,10 +566,17 @@ export async function executeAntigravityRequest(
           config.soft_quota_threshold_percent,
           softQuotaCacheTtlMs,
           model,
+          classification?.quotaGroup,
         )
       ) {
         const threshold = config.soft_quota_threshold_percent
-        const softQuotaWaitMs = accountManager.getMinWaitTimeForSoftQuota(family, threshold, softQuotaCacheTtlMs, model)
+        const softQuotaWaitMs = accountManager.getMinWaitTimeForSoftQuota(
+          family,
+          threshold,
+          softQuotaCacheTtlMs,
+          model,
+          classification?.quotaGroup,
+        )
         const maxWaitMs = (config.max_rate_limit_wait_seconds ?? 300) * 1000
 
         if (softQuotaWaitMs === null || (maxWaitMs > 0 && softQuotaWaitMs > maxWaitMs)) {
@@ -758,8 +767,9 @@ export async function executeAntigravityRequest(
       }
     }
 
+    /** Sends the preparatory request needed to cache Claude thinking signatures. */
     const runThinkingWarmup = async (
-      prepared: ReturnType<typeof prepareAntigravityRequest>,
+      prepared: ReturnType<typeof legacyInference.prepareRequest>,
       projectId: string,
     ): Promise<void> => {
       if (!prepared.needsSignedThinkingWarmup || !prepared.sessionId) {
@@ -805,16 +815,16 @@ export async function executeAntigravityRequest(
       try {
         pushDebug("thinking-warmup: start")
         const warmupResponse = await fetchImpl(warmupUrl, warmupInit)
-        const transformed = await transformAntigravityResponse(
-          warmupResponse,
-          true,
-          warmupDebugContext,
-          prepared.requestedModel,
+        const transformed = await legacyInference.transformResponse({
+          response: warmupResponse,
+          streaming: true,
+          debugContext: warmupDebugContext,
+          requestedModel: prepared.requestedModel,
           projectId,
-          warmupUrl,
-          prepared.effectiveModel,
-          prepared.sessionId,
-        )
+          endpoint: warmupUrl,
+          effectiveModel: prepared.effectiveModel,
+          sessionId: prepared.sessionId,
+        })
         await transformed.text()
         markWarmupSuccess(prepared.sessionId)
         pushDebug("thinking-warmup: done")
@@ -853,19 +863,19 @@ export async function executeAntigravityRequest(
         if (!currentEndpoint) continue
 
         try {
-          const prepared = prepareAntigravityRequest(
+          const prepared = legacyInference.prepareRequest({
             input,
             init,
             accessToken,
-            projectContext.effectiveProjectId,
-            currentEndpoint,
+            projectId: projectContext.effectiveProjectId,
+            endpointOverride: currentEndpoint,
             forceThinkingRecovery,
-            {
+            options: {
               claudeToolHardening: config.claude_tool_hardening,
               claudePromptAutoCaching: config.claude_prompt_auto_caching,
               fingerprint: account.fingerprint,
             },
-          )
+          })
 
           const originalUrl = toUrlString(input)
           const resolvedUrl = toUrlString(prepared.request)
@@ -1151,20 +1161,20 @@ export async function executeAntigravityRequest(
             emptyResponseAttempts.delete(emptyAttemptKeyClean)
           }
 
-          const transformedResponse = await transformAntigravityResponse(
+          const transformedResponse = await legacyInference.transformResponse({
             response,
-            prepared.streaming,
+            streaming: prepared.streaming,
             debugContext,
-            prepared.requestedModel,
-            prepared.projectId,
-            prepared.endpoint,
-            prepared.effectiveModel,
-            prepared.sessionId,
-            prepared.toolDebugMissing,
-            prepared.toolDebugSummary,
-            prepared.toolDebugPayload,
+            requestedModel: prepared.requestedModel,
+            projectId: prepared.projectId,
+            endpoint: prepared.endpoint,
+            effectiveModel: prepared.effectiveModel,
+            sessionId: prepared.sessionId,
+            toolDebugMissing: prepared.toolDebugMissing,
+            toolDebugSummary: prepared.toolDebugSummary,
+            toolDebugPayload: prepared.toolDebugPayload,
             debugLines,
-          )
+          })
 
           const contextError = transformedResponse.headers.get("x-antigravity-context-error")
           if (contextError) {
@@ -1231,20 +1241,20 @@ export async function executeAntigravityRequest(
     if (shouldSwitchAccount) {
       if (accountCount <= 1) {
         if (lastFailure) {
-          return transformAntigravityResponse(
-            lastFailure.response,
-            lastFailure.streaming,
-            lastFailure.debugContext,
-            lastFailure.requestedModel,
-            lastFailure.projectId,
-            lastFailure.endpoint,
-            lastFailure.effectiveModel,
-            lastFailure.sessionId,
-            lastFailure.toolDebugMissing,
-            lastFailure.toolDebugSummary,
-            lastFailure.toolDebugPayload,
+          return legacyInference.transformResponse({
+            response: lastFailure.response,
+            streaming: lastFailure.streaming,
+            debugContext: lastFailure.debugContext,
+            requestedModel: lastFailure.requestedModel,
+            projectId: lastFailure.projectId,
+            endpoint: lastFailure.endpoint,
+            effectiveModel: lastFailure.effectiveModel,
+            sessionId: lastFailure.sessionId,
+            toolDebugMissing: lastFailure.toolDebugMissing,
+            toolDebugSummary: lastFailure.toolDebugSummary,
+            toolDebugPayload: lastFailure.toolDebugPayload,
             debugLines,
-          )
+          })
         }
 
         throw lastError || new Error("All Antigravity endpoints failed")
@@ -1254,20 +1264,20 @@ export async function executeAntigravityRequest(
     }
 
     if (lastFailure) {
-      return transformAntigravityResponse(
-        lastFailure.response,
-        lastFailure.streaming,
-        lastFailure.debugContext,
-        lastFailure.requestedModel,
-        lastFailure.projectId,
-        lastFailure.endpoint,
-        lastFailure.effectiveModel,
-        lastFailure.sessionId,
-        lastFailure.toolDebugMissing,
-        lastFailure.toolDebugSummary,
-        lastFailure.toolDebugPayload,
+      return legacyInference.transformResponse({
+        response: lastFailure.response,
+        streaming: lastFailure.streaming,
+        debugContext: lastFailure.debugContext,
+        requestedModel: lastFailure.requestedModel,
+        projectId: lastFailure.projectId,
+        endpoint: lastFailure.endpoint,
+        effectiveModel: lastFailure.effectiveModel,
+        sessionId: lastFailure.sessionId,
+        toolDebugMissing: lastFailure.toolDebugMissing,
+        toolDebugSummary: lastFailure.toolDebugSummary,
+        toolDebugPayload: lastFailure.toolDebugPayload,
         debugLines,
-      )
+      })
     }
 
     throw lastError || new Error("All Antigravity accounts failed")

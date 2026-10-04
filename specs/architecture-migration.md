@@ -6,8 +6,8 @@ The target tree below is the final destination, not a file-move order.
 Establish boundaries first, migrate behind them, then remove legacy locations.
 Preserve behavior; perform redesigns separately.
 
-Planning consultation with Oracle has occurred. No migration step is complete
-yet. This document records the approved sequence, not proof of implementation.
+Planning consultation with Oracle has occurred. Step 1 is complete; this
+document tracks the remaining migration work and its verified evidence.
 Existing behavioral requirements remain in
 [docs/specs/07-rule-index.md](../docs/specs/07-rule-index.md).
 Apply [testing-rules.md](testing-rules.md) throughout.
@@ -130,7 +130,7 @@ the tracker may identify that commit by subject to avoid self-referential hashes
 | Step | Title                                 | Status  | Evidence / commit                                         |
 | ---- | ------------------------------------- | ------- | --------------------------------------------------------- |
 | 1    | Baseline and ownership map            | done    | `test: isolate suite state and map architecture baseline` |
-| 2    | Public APIs and ports                 | pending | —                                                         |
+| 2    | Public APIs and ports                 | done    | `refactor: define module contracts and legacy bridges`    |
 | 3    | Mechanical boundary checks            | pending | —                                                         |
 | 4    | Logging separation                    | pending | —                                                         |
 | 5    | Account persistence                   | pending | —                                                         |
@@ -321,13 +321,38 @@ Legacy implementation may initially satisfy these contracts.
 
 **Acceptance criteria:**
 
-- [ ] Accounts exposes deliberate pool/admin operations through `index.ts`.
-- [ ] Accounts and inference define external dependencies through `ports.ts`.
-- [ ] Recovery exposes detection, repair, and storage contracts publicly.
-- [ ] Contracts do not expose host-client types, filesystem paths, or adapters.
-- [ ] Classification ownership is explicit; accounts receives needed model
+- [x] Accounts exposes deliberate pool/admin operations through `index.ts`.
+- [x] Accounts and inference define external dependencies through `ports.ts`.
+- [x] Recovery exposes detection, repair, and storage contracts publicly.
+- [x] Contracts do not expose host-client types, filesystem paths, or adapters.
+- [x] Classification ownership is explicit; accounts receives needed model
       classification instead of importing inference internals.
-- [ ] Boundaries preserve behavior without introducing a second execution path.
+- [x] Boundaries preserve behavior without introducing a second execution path.
+
+### Step 2 progress notes
+
+- Public account, inference, and session-recovery contracts are under
+  `src/modules/{accounts,inference,session-recovery}/`; their port types omit
+  OpenCode client and filesystem implementation types.
+- Current behavior is reached through temporary adapters in
+  `src/app/legacy-bridges/`. The account selection bridge passes inference's
+  family/model/quota-group result as data; legacy direct account callers retain
+  a compatibility fallback until their later migration.
+- Recovery ports include the storage reads/repairs and the semantic operation
+  for injecting synthetic tool results. The current filesystem and host-backed
+  recovery code remains the implementation for now.
+- Remove each legacy bridge when its destination module and host adapter own the
+  corresponding behavior; Step 14 must leave no `legacy-bridges/` facade.
+- Validation: `bun run test` passed (49 files / 1,147 tests);
+  `bun run test:tui` passed after a clean build (13 tests); typecheck, lint,
+  changed-file Prettier, and `git diff --check` passed. Focused smoke passed
+  (5 files / 114 tests), covering plugin setup/routing, account administration
+  and classification, request execution, and session recovery.
+- Oracle follow-up confirmed the recovery port can represent synthetic tool
+  results and found no remaining contract blocker. Independent review found no
+  actionable findings. Public contracts and JSDoc were audited; no host-facing
+  package exports changed.
+- Completion commit: `refactor: define module contracts and legacy bridges`.
 
 ## 3. Introduce mechanical boundary checks
 

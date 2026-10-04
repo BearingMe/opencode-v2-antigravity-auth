@@ -10,13 +10,11 @@ import {
   type AccountMetadataV3,
   type AccountStorageV4,
   type RateLimitStateV3,
-  type ModelFamily,
-  type CooldownReason,
   type RemovedAccountTombstone,
   type QuotaSummaryGroup,
 } from "./storage"
 import type { OAuthAuthDetails, RefreshParts } from "./types"
-import type { AccountSelectionStrategy } from "./config/schema"
+import type { AccountSelectionStrategy, CooldownReason, ModelFamily, QuotaGroup } from "../modules/accounts/index.js"
 import { getHealthTracker, getTokenTracker, selectHybridAccount, type AccountWithMetrics } from "./rotation"
 import {
   generateFingerprint,
@@ -25,13 +23,11 @@ import {
   type FingerprintVersion,
   MAX_FINGERPRINT_HISTORY,
 } from "./fingerprint"
-import type { QuotaGroup, QuotaGroupSummary } from "./quota"
-import { getModelFamily } from "./transform/model-resolver"
+import type { QuotaGroupSummary } from "./quota"
 import { debugLogToFile } from "./debug"
 import { formatAccountLabel } from "./logging-utils"
 
-export type { ModelFamily, CooldownReason } from "./storage"
-export type { AccountSelectionStrategy } from "./config/schema"
+export type { ModelFamily, CooldownReason, AccountSelectionStrategy } from "../modules/accounts/index.js"
 
 export type RateLimitReason =
   "QUOTA_EXHAUSTED" | "RATE_LIMIT_EXCEEDED" | "MODEL_CAPACITY_EXHAUSTED" | "SERVER_ERROR" | "UNKNOWN"
@@ -242,24 +238,35 @@ function clearExpiredRateLimits(account: ManagedAccount): void {
 /**
  * Resolve the quota group for soft quota checks.
  *
- * When a model string is available, we can precisely determine the quota group.
- * When model is null/undefined, we fall back based on family:
+ * Request routing supplies an inference classification when available. The
+ * string check remains only for legacy direct callers during the migration.
+ * When neither is available, selection falls back by family:
  * - Claude → "claude" quota group
  * - Gemini → "gemini-pro" (conservative fallback; may misclassify flash models)
  */
-export function resolveQuotaGroup(family: ModelFamily, model?: string | null): QuotaGroup {
+export function resolveQuotaGroup(family: ModelFamily, model?: string | null, quotaGroup?: QuotaGroup): QuotaGroup {
+  if (quotaGroup) return quotaGroup
   if (model) {
-    return getModelFamily(model)
+    const normalizedModel = model.toLowerCase()
+    if (normalizedModel.includes("claude")) return "claude"
+    return normalizedModel.includes("flash") ? "gemini-flash" : "gemini-pro"
   }
   return family === "claude" ? "claude" : "gemini-pro"
 }
 
+/**
+ * Applies cached quota policy using an inference-supplied group when present.
+ *
+ * Direct legacy callers retain model-string classification until their bridge
+ * is migrated; the request engine always supplies the explicit group.
+ */
 function isOverSoftQuotaThreshold(
   account: ManagedAccount,
   family: ModelFamily,
   thresholdPercent: number,
   cacheTtlMs: number,
   model?: string | null,
+  quotaGroup?: QuotaGroup,
 ): boolean {
   if (thresholdPercent >= 100) return false
   if (!account.cachedQuota) return false
@@ -268,9 +275,9 @@ function isOverSoftQuotaThreshold(
   const age = nowMs() - account.cachedQuotaUpdatedAt
   if (age > cacheTtlMs) return false
 
-  const quotaGroup = resolveQuotaGroup(family, model)
+  const resolvedQuotaGroup = resolveQuotaGroup(family, model, quotaGroup)
 
-  const groupData = account.cachedQuota[quotaGroup]
+  const groupData = account.cachedQuota[resolvedQuotaGroup]
   if (groupData?.remainingFraction == null) return false
 
   const remainingFraction = Math.max(0, Math.min(1, groupData.remainingFraction))
@@ -280,7 +287,7 @@ function isOverSoftQuotaThreshold(
   if (isOverThreshold) {
     const accountLabel = formatAccountLabel(account.email, account.index)
     const resetSuffix = groupData.resetTime ? ` (resets: ${groupData.resetTime})` : ""
-    const message = `[SoftQuota] Skipping ${accountLabel}: ${quotaGroup} usage ${usedPercent.toFixed(1)}% >= threshold ${thresholdPercent}%${resetSuffix}`
+    const message = `[SoftQuota] Skipping ${accountLabel}: ${resolvedQuotaGroup} usage ${usedPercent.toFixed(1)}% >= threshold ${thresholdPercent}%${resetSuffix}`
     debugLogToFile(message)
   }
 
@@ -532,6 +539,11 @@ export class AccountManager {
     this.lastToastTime = nowMs()
   }
 
+  /**
+   * Selects an account while preserving the supplied inference quota group.
+   *
+   * @example `manager.getCurrentOrNextForFamily("gemini", model, "hybrid", false, 90, ttl, group)`
+   */
   getCurrentOrNextForFamily(
     family: ModelFamily,
     model?: string | null,
@@ -539,11 +551,12 @@ export class AccountManager {
     pidOffsetEnabled: boolean = false,
     softQuotaThresholdPercent: number = 100,
     softQuotaCacheTtlMs: number = 10 * 60 * 1000,
+    quotaGroup?: QuotaGroup,
   ): ManagedAccount | null {
     const quotaKey = getQuotaKey(family, model)
 
     if (strategy === "round-robin") {
-      const next = this.getNextForFamily(family, model, softQuotaThresholdPercent, softQuotaCacheTtlMs)
+      const next = this.getNextForFamily(family, model, softQuotaThresholdPercent, softQuotaCacheTtlMs, quotaGroup)
       if (next) {
         this.markTouchedForQuota(next, quotaKey)
         this.currentAccountIndexByFamily[family] = next.index
@@ -565,7 +578,7 @@ export class AccountManager {
             healthScore: healthTracker.getScore(acc.index),
             isRateLimited:
               isAccountRateLimitedForFamily(acc, family, model) ||
-              isOverSoftQuotaThreshold(acc, family, softQuotaThresholdPercent, softQuotaCacheTtlMs, model),
+              isOverSoftQuotaThreshold(acc, family, softQuotaThresholdPercent, softQuotaCacheTtlMs, model, quotaGroup),
             isCoolingDown: this.isAccountCoolingDown(acc),
           }
         })
@@ -611,6 +624,7 @@ export class AccountManager {
         softQuotaThresholdPercent,
         softQuotaCacheTtlMs,
         model,
+        quotaGroup,
       )
       if (!isLimited && !isOverThreshold && !this.isAccountCoolingDown(current)) {
         this.markTouchedForQuota(current, quotaKey)
@@ -618,7 +632,7 @@ export class AccountManager {
       }
     }
 
-    const next = this.getNextForFamily(family, model, softQuotaThresholdPercent, softQuotaCacheTtlMs)
+    const next = this.getNextForFamily(family, model, softQuotaThresholdPercent, softQuotaCacheTtlMs, quotaGroup)
     if (next) {
       this.markTouchedForQuota(next, quotaKey)
       this.currentAccountIndexByFamily[family] = next.index
@@ -626,18 +640,24 @@ export class AccountManager {
     return next
   }
 
+  /**
+   * Finds the next eligible account using the provided model classification.
+   *
+   * @example `manager.getNextForFamily("gemini", model, 90, ttl, "gemini-flash")`
+   */
   getNextForFamily(
     family: ModelFamily,
     model?: string | null,
     softQuotaThresholdPercent: number = 100,
     softQuotaCacheTtlMs: number = 10 * 60 * 1000,
+    quotaGroup?: QuotaGroup,
   ): ManagedAccount | null {
     const available = this.accounts.filter((a) => {
       clearExpiredRateLimits(a)
       return (
         a.enabled !== false &&
         !isAccountRateLimitedForFamily(a, family, model) &&
-        !isOverSoftQuotaThreshold(a, family, softQuotaThresholdPercent, softQuotaCacheTtlMs, model) &&
+        !isOverSoftQuotaThreshold(a, family, softQuotaThresholdPercent, softQuotaCacheTtlMs, model, quotaGroup) &&
         !this.isAccountCoolingDown(a)
       )
     })
@@ -1328,16 +1348,22 @@ export class AccountManager {
     return oldest
   }
 
+  /**
+   * Reports whether every enabled account exceeds the selected quota group.
+   *
+   * @example `manager.areAllAccountsOverSoftQuota("gemini", 90, ttl, model, group)`
+   */
   areAllAccountsOverSoftQuota(
     family: ModelFamily,
     thresholdPercent: number,
     cacheTtlMs: number,
     model?: string | null,
+    quotaGroup?: QuotaGroup,
   ): boolean {
     if (thresholdPercent >= 100) return false
     const enabled = this.accounts.filter((a) => a.enabled !== false)
     if (enabled.length === 0) return false
-    return enabled.every((a) => isOverSoftQuotaThreshold(a, family, thresholdPercent, cacheTtlMs, model))
+    return enabled.every((a) => isOverSoftQuotaThreshold(a, family, thresholdPercent, cacheTtlMs, model, quotaGroup))
   }
 
   /**
@@ -1345,12 +1371,14 @@ export class AccountManager {
    * Returns 0 if any account is available (not over threshold).
    * Returns the minimum resetTime across all over-threshold accounts.
    * Returns null if no resetTime data is available.
+   * The request engine passes the quota group already resolved by inference.
    */
   getMinWaitTimeForSoftQuota(
     family: ModelFamily,
     thresholdPercent: number,
     cacheTtlMs: number,
     model?: string | null,
+    quotaGroup?: QuotaGroup,
   ): number | null {
     if (thresholdPercent >= 100) return 0
 
@@ -1358,19 +1386,21 @@ export class AccountManager {
     if (enabled.length === 0) return null
 
     // If any account is available (not over threshold), no wait needed
-    const available = enabled.filter((a) => !isOverSoftQuotaThreshold(a, family, thresholdPercent, cacheTtlMs, model))
+    const available = enabled.filter(
+      (a) => !isOverSoftQuotaThreshold(a, family, thresholdPercent, cacheTtlMs, model, quotaGroup),
+    )
     if (available.length > 0) return 0
 
     // All accounts are over threshold - find earliest reset time
     // For gemini family, we MUST have the model to distinguish pro vs flash quotas.
     // Fail-open (return null = no wait info) if model is missing to avoid blocking on wrong quota.
     if (!model && family !== "claude") return null
-    const quotaGroup = resolveQuotaGroup(family, model)
+    const resolvedQuotaGroup = resolveQuotaGroup(family, model, quotaGroup)
     const now = nowMs()
     const waitTimes: number[] = []
 
     for (const acc of enabled) {
-      const groupData = acc.cachedQuota?.[quotaGroup]
+      const groupData = acc.cachedQuota?.[resolvedQuotaGroup]
       if (groupData?.resetTime) {
         const resetTimestamp = Date.parse(groupData.resetTime)
         if (Number.isFinite(resetTimestamp)) {
