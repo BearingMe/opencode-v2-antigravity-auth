@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import {
   AccountManager,
@@ -50,6 +50,11 @@ describe("AccountManager", () => {
     vi.useRealTimers()
     vi.stubGlobal("process", { ...process, pid: 0 })
     writtenStores.length = 0
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
   })
 
   it("preserves verification result metadata across account-manager persistence", async () => {

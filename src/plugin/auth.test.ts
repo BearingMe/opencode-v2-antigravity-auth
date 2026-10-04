@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { isOAuthAuth, parseRefreshParts, formatRefreshParts, accessTokenExpired } from "./auth"
 import type { OAuthAuthDetails, ApiKeyAuthDetails } from "./types"
@@ -127,6 +127,11 @@ describe("formatRefreshParts", () => {
 
 describe("accessTokenExpired", () => {
   beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(0))
+  })
+
+  afterEach(() => {
     vi.useRealTimers()
   })
 
@@ -180,10 +185,7 @@ describe("accessTokenExpired", () => {
     expect(accessTokenExpired(auth)).toBe(false)
   })
 
-  it("returns false when token expires exactly at buffer boundary", () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date(0))
-
+  it("returns false just outside the buffer boundary", () => {
     const auth: OAuthAuthDetails = {
       type: "oauth",
       refresh: "token",

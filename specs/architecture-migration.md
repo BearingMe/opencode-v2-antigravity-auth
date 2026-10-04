@@ -127,22 +127,22 @@ concise: commands/results, Oracle and review outcomes, smoke scenario/results,
 documentation audit, and any blockers. Update evidence in the same scoped commit;
 the tracker may identify that commit by subject to avoid self-referential hashes.
 
-| Step | Title                                 | Status  | Evidence / commit |
-| ---- | ------------------------------------- | ------- | ----------------- |
-| 1    | Baseline and ownership map            | pending | —                 |
-| 2    | Public APIs and ports                 | pending | —                 |
-| 3    | Mechanical boundary checks            | pending | —                 |
-| 4    | Logging separation                    | pending | —                 |
-| 5    | Account persistence                   | pending | —                 |
-| 6    | Account pool and selection            | pending | —                 |
-| 7    | Antigravity account communication     | pending | —                 |
-| 8    | Account administration and lifecycle  | pending | —                 |
-| 9    | Session recovery                      | pending | —                 |
-| 10   | Inference transforms and signatures   | pending | —                 |
-| 11   | Inference pipelines and client        | pending | —                 |
-| 12   | Application execution and composition | pending | —                 |
-| 13   | OpenCode integration and packaging    | pending | —                 |
-| 14   | Final architecture verification       | pending | —                 |
+| Step | Title                                 | Status  | Evidence / commit                                         |
+| ---- | ------------------------------------- | ------- | --------------------------------------------------------- |
+| 1    | Baseline and ownership map            | done    | `test: isolate suite state and map architecture baseline` |
+| 2    | Public APIs and ports                 | pending | —                                                         |
+| 3    | Mechanical boundary checks            | pending | —                                                         |
+| 4    | Logging separation                    | pending | —                                                         |
+| 5    | Account persistence                   | pending | —                                                         |
+| 6    | Account pool and selection            | pending | —                                                         |
+| 7    | Antigravity account communication     | pending | —                                                         |
+| 8    | Account administration and lifecycle  | pending | —                                                         |
+| 9    | Session recovery                      | pending | —                                                         |
+| 10   | Inference transforms and signatures   | pending | —                                                         |
+| 11   | Inference pipelines and client        | pending | —                                                         |
+| 12   | Application execution and composition | pending | —                                                         |
+| 13   | OpenCode integration and packaging    | pending | —                                                         |
+| 14   | Final architecture verification       | pending | —                                                         |
 
 ## 1. Establish the migration baseline and ownership map
 
@@ -151,16 +151,168 @@ behavioral, packaging, and test contracts before changing implementations.
 
 **Acceptance criteria:**
 
-- [ ] Every runtime file has an intended owner, including constants, types,
+- [x] Every runtime file has an intended owner, including constants, types,
       config, fingerprints, image saving, errors, version checks, and the SDK.
-- [ ] The proposed dependency graph is acyclic.
-- [ ] Current test/build/typecheck/lint results distinguish existing failures
+- [x] The proposed dependency graph is acyclic.
+- [x] Current test/build/typecheck/lint results distinguish existing failures
       from migration regressions; failures still block completion.
-- [ ] Baseline smoke covers loading, routing, account management, and recovery.
-- [ ] Public exports and persisted-data formats are inventoried.
-- [ ] A behavioral test audit identifies meaningful invariants, redundant tests,
+- [x] Baseline smoke covers loading, routing, account management, and recovery.
+- [x] Public exports and persisted-data formats are inventoried.
+- [x] A behavioral test audit identifies meaningful invariants, redundant tests,
       private-helper coupling, nondeterminism, and required suites missing from CI.
       Deletions require a fault-detection rationale, not a target test count.
+
+### Proposed ownership map
+
+This is a responsibility map, not a move list. Mixed files are split only after
+the receiving boundary exists; their current path remains legacy-by-location.
+
+| Current source                                                                                                                                                                                                 | Intended owner in the target architecture                                                                                                                                                                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/v2-plugin.ts`                                                                                                                                                                                             | Split host registration/routing into `adapters/opencode/plugin.ts`; move concrete wiring to `app/composition.ts` and request orchestration to `app/execute-request.ts`. Keep the one live request route.                                                                                                                                   |
+| `src/google-sdk.ts`, `src/rpc.ts`, `src/shims.d.ts`                                                                                                                                                            | `adapters/opencode/`; preserve the isolated Google SDK module and host/RPC contracts. The SDK leaf may remain separate from `plugin.ts` to preserve its distinct module identity.                                                                                                                                                          |
+| `src/tui.ts`, `src/tui-dialog-shell.tsx`, `src/tui-account-list-dialog.tsx`, `src/tui-quota-dialog.tsx`, `src/tui-quota-controller.ts`, `src/plugin/account-ui-format.ts`                                      | `adapters/opencode/tui/`; UI rendering and presentation stay out of account policy.                                                                                                                                                                                                                                                        |
+| `src/hooks/auto-update-checker/{cache,checker,constants,index,logging,types}.ts`                                                                                                                               | `adapters/opencode/hooks/`; host event/toast integration remains here, with generic logging routed through its boundary.                                                                                                                                                                                                                   |
+| `src/plugin/config/{index,loader,models,schema,updater}.ts`                                                                                                                                                    | `adapters/opencode/config/`; host config-file and provider/model registration details stay at the host boundary. Pass validated config values into modules rather than importing host APIs there.                                                                                                                                          |
+| `src/plugin/accounts.ts`, `src/plugin/rotation.ts`                                                                                                                                                             | `modules/accounts/account-pool.ts` and `modules/accounts/selection/`; separate pool membership from selection/health policy.                                                                                                                                                                                                               |
+| `src/plugin/account-service.ts`                                                                                                                                                                                | Split account administration, target resolution, DTO construction, and persistence policy into `modules/accounts/account-admin.ts`; keep RPC/TUI delivery in `adapters/opencode/`. Do not move its host client dependency into the module.                                                                                                 |
+| `src/plugin/auth.ts`, account/auth portions of `src/plugin/types.ts`                                                                                                                                           | `modules/accounts/refresh/` and the accounts public contract; keep refresh-part packing and account types separate from vendor token exchange.                                                                                                                                                                                             |
+| `src/plugin/refresh-queue.ts`                                                                                                                                                                                  | `modules/accounts/refresh/`; retain lifecycle ordering and inject the refresh operation.                                                                                                                                                                                                                                                   |
+| `src/plugin/quota.ts`, quota portions of `src/plugin/account-service.ts`                                                                                                                                       | Split quota policy/aggregation/cache semantics into `modules/accounts/quota/`; move Antigravity HTTP and response-wire parsing to `adapters/antigravity/quota-client.ts`.                                                                                                                                                                  |
+| `src/plugin/verify.ts`, `src/plugin/verification.ts`                                                                                                                                                           | Keep account verification outcomes/policy in `modules/accounts/verification/`; move Google response parsing and network calls to the Antigravity adapter. The adapter directory owns this integration even if the exact leaf is decided with the ports in step 2.                                                                          |
+| `src/plugin/engine.ts`                                                                                                                                                                                         | Split the current router: cross-module retries/warmup/coordination to `app/execute-request.ts`, account selection/quota/refresh policy to `modules/accounts/`, request/response work to `modules/inference/`, Antigravity calls to `adapters/antigravity/`, and host toasts to `adapters/opencode/`. Preserve one active route throughout. |
+| Account storage schema, migrations, dedupe, replace/tombstone rules in `src/plugin/storage.ts`                                                                                                                 | `modules/accounts/persistence/`; the storage contract and invariants stay with accounts.                                                                                                                                                                                                                                                   |
+| Filesystem/locking/path/write portions of `src/plugin/storage.ts`                                                                                                                                              | `adapters/filesystem/account-store.ts`; implement the accounts persistence contract without moving policy into the adapter.                                                                                                                                                                                                                |
+| `src/plugin/cache.ts`, `src/plugin/cache/signature-cache.ts`, `src/plugin/stores/signature-store.ts`                                                                                                           | Separate auth snapshot behavior into accounts refresh; keep signature policy and in-memory signature stores in `modules/inference/signatures/`; move disk serialization/path operations to `adapters/filesystem/signature-store.ts`.                                                                                                       |
+| `src/plugin/request.ts`, `src/plugin/request-helpers.ts`, `src/plugin/transform/{claude,cross-model-sanitizer,gemini,index,model-resolver,types}.ts`, `src/plugin/core/streaming/{index,transformer,types}.ts` | `modules/inference/{request,response,transform,streaming}/`; split pure transforms from protocol-envelope/network work and keep transforms pure.                                                                                                                                                                                           |
+| `src/plugin/thinking-recovery.ts`, `src/plugin/recovery.ts`, `src/plugin/recovery/{constants,storage,types}.ts`                                                                                                | `modules/session-recovery/`; separate in-request turn repair from session-error detection and repair. Keep storage needs in the module contract; OpenCode message/part layout and file access belong to `adapters/opencode/`. Inference reaches recovery only through its public contract.                                                 |
+| `src/antigravity/oauth.ts`, `src/plugin/token.ts`, `src/plugin/project.ts`, `src/plugin/fingerprint.ts`, `src/plugin/version.ts`                                                                               | `adapters/antigravity/`; preserve OAuth, token, project-discovery, fingerprint, and version wire behavior.                                                                                                                                                                                                                                 |
+| External-request portions of `src/plugin/request.ts`                                                                                                                                                           | `adapters/antigravity/inference-client.ts`; do not move account selection, retries, or inference policy there.                                                                                                                                                                                                                             |
+| `src/plugin/errors.ts`                                                                                                                                                                                         | `modules/inference/` for inference/request errors; split only if a distinct account or adapter error contract is demonstrated.                                                                                                                                                                                                             |
+| `src/plugin/image-saver.ts`                                                                                                                                                                                    | `adapters/filesystem/`; image-output path and writes are infrastructure, not inference policy. Add/fold a cohesive leaf within this adapter during migration; do not add a new top-level capability.                                                                                                                                       |
+| `src/lib/logger/index.ts`                                                                                                                                                                                      | `platform/logging/`; keep logger contracts/dispatch-neutral facilities domain- and vendor-agnostic.                                                                                                                                                                                                                                        |
+| `src/lib/logger/file.ts`                                                                                                                                                                                       | `adapters/filesystem/debug-log.ts`; it writes to disk and is a destination, not a platform facility.                                                                                                                                                                                                                                       |
+| `src/plugin/logger.ts`, `src/plugin/logging-utils.ts`, `src/plugin/debug.ts`                                                                                                                                   | Split neutral log event/policy/formatting into `platform/logging/`; host TUI/console delivery into `adapters/opencode/`; file paths/writers into `adapters/filesystem/debug-log.ts`. Account labels and domain context remain with their owning module.                                                                                    |
+| `src/constants.ts`                                                                                                                                                                                             | Split by responsibility: Antigravity endpoints, OAuth identity, headers, and protocol metadata to `adapters/antigravity/`; provider/host identifiers to `adapters/opencode/`; model transform instructions and schema/signature values to `modules/inference/`. Do not retain a global constants dumping ground.                           |
+| `src/plugin/types.ts` (remaining types)                                                                                                                                                                        | Split by ownership: host client surfaces to `adapters/opencode/`, account/auth contracts to `modules/accounts/`, inference/request/streaming contracts to `modules/inference/`, and recovery message contracts to `modules/session-recovery/`.                                                                                             |
+
+The repository-root `index.ts` remains the package facade because package.json
+publishes it; it is outside `src/` and is not a module. Build scripts and
+`script/build-tui.mjs` remain package tooling. Preserve package exports `.`,
+`./tui`, `./rpc`, and the named OAuth/type re-exports from `index.ts`.
+
+### Proposed dependency direction
+
+Arrows mean “depends on.” The proposed graph has no cycle:
+
+```text
+adapters/opencode/plugin ──▶ app/composition
+                                  ├─▶ modules/accounts
+                                  ├─▶ modules/inference ──▶ modules/session-recovery
+                                  ├─▶ modules/session-recovery
+                                  ├─▶ adapters/antigravity ──▶ module ports
+                                  └─▶ adapters/filesystem ───▶ module ports
+
+modules/accounts ──────────▶ platform/logging
+modules/inference ─────────▶ platform/logging
+modules/session-recovery ──▶ platform/logging
+adapters/* ────────────────▶ platform/logging
+```
+
+Accounts and inference are sibling dependencies of app, not dependencies of
+one another. The app supplies concrete adapters to module ports; modules never
+import adapter implementations. Inference's current recovery use becomes a
+public session-recovery contract; recovery does not depend back on inference.
+Account-family values cross the application boundary as data, not as an import
+from inference's resolver. Every module/adaptor may use platform logging, which
+has no imports back into higher layers.
+
+### Baseline contracts and formats
+
+- Package exports: `.`, `./tui`, and `./rpc`; root `index.ts` also re-exports
+  OAuth functions/types. `src/google-sdk.ts` has a separate runtime URL used by
+  the host hook and must remain isolated from the plugin entrypoint.
+- Account persistence is JSON schema v4 with v1→v4 load migrations, POSIX file
+  mode `0600`, a 10-account cap, single-lock replace transactions, packed refresh
+  values accepting two and three segments, and bounded generation-aware
+  credential-free tombstones (50). See `docs/dev/account-storage.md` and
+  `docs/specs/04-state-config-lifecycle.md`.
+- Signature persistence is a separate disk cache (`version: "1.0"`) with
+  memory/disk TTL and background writes. Session recovery currently reads
+  OpenCode's host-owned `storage/message` and `storage/part` JSON layout; that
+  host-version-sensitive access must remain behind an adapter.
+- Runtime behavioral contracts remain those in `docs/specs/00-07`, including
+  single-engine routing, Google API-key passthrough, credential isolation,
+  signature preservation, replace/tombstone semantics, and provider-agnostic
+  session retry recovery.
+
+### Baseline test audit
+
+- Post-change `bun run test` passed: 48 Vitest files, 1,146 tests. The native
+  TUI renderer test is separate: `bun run test:tui` passed with 13 tests after
+  a clean build. `.github/workflows/test.yml` does not invoke `test:tui`; step 3
+  owns putting that suite on the normal PR path.
+- `src/plugin/request.test.ts` imports `__testExports` and tests private helpers
+  from `src/plugin/request.ts`. Replace only when inference boundaries expose
+  the public behaviors or a helper becomes a cohesive module; do not add another
+  test-only export.
+- `src/constants.test.ts` has two runtime `HeaderSet` type tests and two loops
+  of 50 randomized header checks. Type correctness belongs to TypeScript; random
+  trials do not prove the platform invariant. Keep protocol behavior coverage,
+  but make allowed platform cases deterministic rather than asserting lucky rolls.
+- `src/plugin/errors.test.ts` includes generic `Error` inheritance/throw-catch,
+  trivial assigned-field/reference checks, and default-message wording. Keep
+  only error details that callers actually use as contract; avoid testing JS
+  mechanics or freezing incidental prose.
+- Account/RPC tests contain negative `JSON.stringify(...).not.toContain(...)`
+  checks. Some cases also assert DTO behavior, but serialization scans are not
+  structural allowlist assertions. At the DTO boundary, assert credential fields
+  are absent and only intended safe fields can cross; keep string scans secondary.
+- `src/plugin/account-service.test.ts` mocks several internal modules. As ports
+  emerge, prefer testing account behavior through public contracts and mock
+  external persistence/network/host boundaries, not internal call choreography.
+- The five largest named suites are `request-helpers.test.ts` (64,157 bytes),
+  `accounts.test.ts` (58,311), `gemini.test.ts` (51,747),
+  `account-service.test.ts` (49,858), and `request.test.ts` (43,944). Split them
+  along extracted behavior; size alone is not grounds to delete coverage.
+- `accounts.test.ts` stubbed global `process` in `beforeEach` without teardown;
+  `auth.test.ts` reset fake timers before tests but not after the fake-clock
+  boundary case. This step added teardown in those suites and controls the
+  `accessTokenExpired` clock at a fixed instant. The shared
+  `test/storage-isolation.ts` restores process environment in `afterAll`.
+- Several tests use clock control, and cleanup styles differ. Review cleanup
+  when touching each suite; do not claim every fake timer/global is unclean from
+  a textual search alone. Existing `as never` fixtures in account-service tests
+  are a separate type-boundary audit, not a reason to cast normal fixtures.
+- Tests should be split by semantic behavior, not one per method. Internal
+  session-key equality is an implementation assertion unless a documented
+  signature-cache identity contract requires it; retain exact wire-format tests.
+
+### Step 1 baseline results
+
+- Working tree was clean before the step. Baseline `bun run test`: 48 files,
+  1,146 passed. `bun run test:tui`: clean production build plus 13 native TUI
+  tests passed. `bun run typecheck` and `bun run lint` passed.
+- `bun run typecheck` and `bun run lint` passed after the test cleanup.
+- The initial repository-wide `bun run format:check` reported 145 files needing
+  formatting, including untouched repository files and the test files later
+  formatted for this task. Do not reformat unrelated files; the final
+  changed-file Prettier check passed.
+- Focused smoke passed 4 files / 113 tests, covering plugin setup/routing,
+  native execution, account management, and recovery. Command:
+  `bunx vitest run src/v2-plugin.setup.test.ts src/plugin/engine.test.ts src/plugin/account-service.test.ts src/plugin/recovery.test.ts`.
+- Build evidence is the clean `bun run build` invoked by `bun run test:tui`.
+- Public and storage contracts are inventoried above; the proposed dependency
+  graph is acyclic by construction. No live host/OAuth call is needed for this
+  baseline because the four focused suites exercise the plugin through the
+  repository's mocked host boundary.
+- Documentation link/count smoke passed (14 steps, 27 rules); `git diff --check`
+  and changed-file Prettier passed.
+- Oracle reviewed the final ownership map, dependency graph, formats, and test
+  audit; no blocking findings remain. Independent code review found no blocker.
+- No runtime functions or methods changed. The two test-only teardown callbacks
+  add no undocumented helper functions.
+- Completion commit: `test: isolate suite state and map architecture baseline`.
 
 ## 2. Establish public module APIs and ports
 
