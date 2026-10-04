@@ -20,19 +20,25 @@ remain available.
 
 ## Antigravity models
 
-| Model                                    | Variants                | Notes                            |
-| ---------------------------------------- | ----------------------- | -------------------------------- |
-| `antigravity-gemini-3.8-flash`           | `low`, `medium`, `high` | Gemini 3.8 Flash                 |
-| `antigravity-gemini-3.7-flash`           | `low`, `medium`, `high` | Gemini 3.7 Flash                 |
-| `antigravity-gemini-3.6-flash`           | `low`, `medium`, `high` | Gemini 3.6 Flash                 |
-| `antigravity-gemini-3.1-pro`             | `low`, `high`           | Gemini 3.1 Pro                   |
-| `antigravity-claude-sonnet-4-6-thinking` | —                       | Claude Sonnet 4.6 with thinking  |
-| `antigravity-claude-opus-4-6-thinking`   | —                       | Claude Opus 4.6 with thinking    |
-| `antigravity-gpt-oss-120b-medium`        | —                       | GPT-OSS 120B at medium reasoning |
+| Model                                    | Variants                | Notes                                     |
+| ---------------------------------------- | ----------------------- | ----------------------------------------- |
+| `antigravity-gemini-4-argon`             | —                       | Gemini 4 Argon (Unreleased; may not work) |
+| `antigravity-gemini-3.8-flash`           | `low`, `medium`, `high` | Gemini 3.8 Flash                          |
+| `antigravity-gemini-3.7-flash`           | `low`, `medium`, `high` | Gemini 3.7 Flash                          |
+| `antigravity-gemini-3.6-flash`           | `low`, `medium`, `high` | Gemini 3.6 Flash                          |
+| `antigravity-gemini-3.1-pro`             | `low`, `high`           | Gemini 3.1 Pro                            |
+| `antigravity-claude-sonnet-4-6-thinking` | —                       | Claude Sonnet 4.6 with thinking           |
+| `antigravity-claude-opus-4-6-thinking`   | —                       | Claude Opus 4.6 with thinking             |
+| `antigravity-gpt-oss-120b-medium`        | —                       | GPT-OSS 120B at medium reasoning          |
 
 The Gemini 3.8 Flash model is sent to Antigravity's `gemini-3.8-flash-tiered`
 backend ID. Legacy Gemini preview IDs are still normalized by request routing,
 but are not published as selectable catalog entries.
+
+Gemini 4 Argon is listed ahead of general availability so it can be tested as
+soon as Antigravity exposes it. Its API model ID and limits are provisional;
+the catalog currently uses a 1,048,576-token context and 65,536-token output
+limit, and requests may fail until the service supports the model.
 
 Gemini 2.5 IDs such as `gemini-2.5-flash`, `gemini-2.5-pro`, and
 `gemini-2.5-flash-image` are not supported through Antigravity OAuth. Use a

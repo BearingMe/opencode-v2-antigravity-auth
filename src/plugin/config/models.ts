@@ -43,6 +43,11 @@ const TEXT_ONLY_MODALITIES: ModelModalities = {
 }
 
 export const OPENCODE_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
+  "antigravity-gemini-4-argon": {
+    name: "Gemini 4 Argon (Unreleased)",
+    limit: { context: 1048576, output: 65536 },
+    modalities: DEFAULT_MODALITIES,
+  },
   "antigravity-gemini-3.8-flash": {
     name: "Gemini 3.8 Flash",
     limit: { context: 1048576, output: 65536 },

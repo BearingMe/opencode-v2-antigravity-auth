@@ -1,3 +1,5 @@
+import { formatPercentage, formatProgressBarParts, splitDuration } from "../utils/formatting.js"
+
 export interface AccountOneLinerInput {
   email: string
   enabled?: boolean
@@ -7,9 +9,6 @@ export interface AccountOneLinerInput {
   status?: string
   selectedByFamily?: { claude: boolean; gemini: boolean }
 }
-
-const FULL_BLOCK = "█"
-const EMPTY_BLOCK = "░"
 
 function isUsableFraction(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1
@@ -21,21 +20,14 @@ export function renderQuotaBar(fraction: number | null | undefined, width = 12):
 }
 
 export function quotaBarParts(fraction: number | null | undefined, width = 12): { bar: string; percentage: string } {
-  const safeWidth = Number.isInteger(width) && width > 0 ? width : 12
-  if (!isUsableFraction(fraction)) return { bar: EMPTY_BLOCK.repeat(safeWidth), percentage: "unknown" }
-  const filled = Math.round(fraction * safeWidth)
-  const empty = safeWidth - filled
-  const pct = Math.round(fraction * 100)
-  return { bar: `${FULL_BLOCK.repeat(filled)}${EMPTY_BLOCK.repeat(empty)}`, percentage: `${pct}%` }
+  return formatProgressBarParts(fraction, width)
 }
 
 export function formatResetCountdown(resetTime: number | null | undefined, now: number = Date.now()): string {
   if (typeof resetTime !== "number" || !Number.isFinite(resetTime)) return "reset unknown"
   const diff = resetTime - now
   if (diff <= 0) return "resetting now"
-  const days = Math.floor(diff / 86_400_000)
-  const hours = Math.floor((diff % 86_400_000) / 3_600_000)
-  const minutes = Math.floor((diff % 3_600_000) / 60_000)
+  const { days, hours, minutes } = splitDuration(diff)
   if (days > 0) return `resets in ${days}d ${hours}h`
   if (hours > 0) return `resets in ${hours}h ${minutes}m`
   if (minutes > 0) return `resets in ${minutes}m`
@@ -94,8 +86,7 @@ export interface QuotaSummarySnapshot {
 
 /** Formats a quota fraction with the two decimal places used by Antigravity's quota panel. */
 export function formatQuotaPercentage(fraction: number | null | undefined): string {
-  if (!isUsableFraction(fraction)) return "unknown"
-  return `${(fraction * 100).toFixed(2)}%`
+  return formatPercentage(fraction, 2) ?? "unknown"
 }
 
 /** Describes whether a quota window is usable now or when its next reset arrives. */

@@ -3,8 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import {
   HealthScoreTracker,
   TokenBucketTracker,
-  addJitter,
-  randomDelay,
   sortByLruWithHealth,
   selectHybridAccount,
   type AccountWithMetrics,
@@ -351,65 +349,6 @@ describe("TokenBucketTracker", () => {
 
       vi.restoreAllMocks()
     })
-  })
-})
-
-describe("addJitter", () => {
-  it("returns value within jitter range", () => {
-    const base = 1000
-    const jitterFactor = 0.3
-
-    for (let i = 0; i < 100; i++) {
-      const result = addJitter(base, jitterFactor)
-      expect(result).toBeGreaterThanOrEqual(base * (1 - jitterFactor))
-      expect(result).toBeLessThanOrEqual(base * (1 + jitterFactor))
-    }
-  })
-
-  it("uses default jitter factor of 0.3", () => {
-    const base = 1000
-
-    for (let i = 0; i < 100; i++) {
-      const result = addJitter(base)
-      expect(result).toBeGreaterThanOrEqual(700)
-      expect(result).toBeLessThanOrEqual(1300)
-    }
-  })
-
-  it("never returns negative values", () => {
-    for (let i = 0; i < 100; i++) {
-      const result = addJitter(10, 0.9)
-      expect(result).toBeGreaterThanOrEqual(0)
-    }
-  })
-
-  it("returns rounded values", () => {
-    for (let i = 0; i < 100; i++) {
-      const result = addJitter(1000)
-      expect(Number.isInteger(result)).toBe(true)
-    }
-  })
-})
-
-describe("randomDelay", () => {
-  it("returns value within min-max range", () => {
-    for (let i = 0; i < 100; i++) {
-      const result = randomDelay(100, 500)
-      expect(result).toBeGreaterThanOrEqual(100)
-      expect(result).toBeLessThanOrEqual(500)
-    }
-  })
-
-  it("returns rounded values", () => {
-    for (let i = 0; i < 100; i++) {
-      const result = randomDelay(100, 500)
-      expect(Number.isInteger(result)).toBe(true)
-    }
-  })
-
-  it("handles min === max", () => {
-    const result = randomDelay(100, 100)
-    expect(result).toBe(100)
   })
 })
 

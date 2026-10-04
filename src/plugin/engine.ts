@@ -34,6 +34,8 @@ import { disposeDiskSignatureCache } from "./cache.js"
 import { extractVerificationErrorDetails } from "./verification.js"
 import type { AntigravityConfig } from "./config/index.js"
 import type { OAuthAuthDetails, PluginClient, ProjectContextResult } from "./types.js"
+import { sleep } from "../utils/timing.js"
+import { formatDuration } from "../utils/formatting.js"
 
 const log = createLogger("engine")
 
@@ -188,32 +190,6 @@ function trackAccountFailure(accountIndex: number): { failures: number; shouldCo
 
 function resetAccountFailureState(accountIndex: number): void {
   accountFailureState.delete(accountIndex)
-}
-
-export function sleep(ms: number, signal?: AbortSignal | null): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(signal.reason instanceof Error ? signal.reason : new Error("Aborted"))
-      return
-    }
-
-    const timeout = setTimeout(() => {
-      cleanup()
-      resolve()
-    }, ms)
-
-    const onAbort = () => {
-      cleanup()
-      reject(signal?.reason instanceof Error ? signal.reason : new Error("Aborted"))
-    }
-
-    const cleanup = () => {
-      clearTimeout(timeout)
-      signal?.removeEventListener("abort", onAbort)
-    }
-
-    signal?.addEventListener("abort", onAbort, { once: true })
-  })
 }
 
 export function toUrlString(value: RequestInfo | string): string {
@@ -419,20 +395,6 @@ async function extractRetryInfoFromBody(response: Response): Promise<RateLimitBo
   }
 }
 
-export function formatWaitTime(ms: number): string {
-  if (ms < 1000) return `${ms}ms`
-  const seconds = Math.ceil(ms / 1000)
-  if (seconds < 60) return `${seconds}s`
-  const minutes = Math.floor(seconds / 60)
-  const remainingSeconds = seconds % 60
-  if (minutes < 60) {
-    return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`
-  }
-  const hours = Math.floor(minutes / 60)
-  const remainingMinutes = minutes % 60
-  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`
-}
-
 export type EngineToastVariant = "info" | "warning" | "success" | "error"
 
 export interface EngineRequestOptions {
@@ -571,7 +533,7 @@ export async function executeAntigravityRequest(
         const maxWaitMs = (config.max_rate_limit_wait_seconds ?? 300) * 1000
 
         if (softQuotaWaitMs === null || (maxWaitMs > 0 && softQuotaWaitMs > maxWaitMs)) {
-          const waitTimeFormatted = softQuotaWaitMs ? formatWaitTime(softQuotaWaitMs) : "unknown"
+          const waitTimeFormatted = softQuotaWaitMs ? formatDuration(softQuotaWaitMs) : "unknown"
           await showToast(`All accounts over ${threshold}% quota threshold. Resets in ${waitTimeFormatted}.`, "error")
           throw new Error(
             `Quota protection: All ${accountCount} account(s) are over ${threshold}% usage for ${family}. ` +
@@ -584,7 +546,7 @@ export async function executeAntigravityRequest(
 
         if (!softQuotaToastShown) {
           await showToast(
-            `All ${accountCount} account(s) over ${threshold}% quota. Waiting ${formatWaitTime(softQuotaWaitMs)}...`,
+            `All ${accountCount} account(s) over ${threshold}% quota. Waiting ${formatDuration(softQuotaWaitMs)}...`,
             "warning",
           )
           softQuotaToastShown = true
@@ -609,7 +571,7 @@ export async function executeAntigravityRequest(
 
       const maxWaitMs = (config.max_rate_limit_wait_seconds ?? 300) * 1000
       if (maxWaitMs > 0 && waitMs > maxWaitMs) {
-        const waitTimeFormatted = formatWaitTime(waitMs)
+        const waitTimeFormatted = formatDuration(waitMs)
         await showToast(`Rate limited for ${waitTimeFormatted}. Try again later or add another account.`, "error")
 
         throw new Error(

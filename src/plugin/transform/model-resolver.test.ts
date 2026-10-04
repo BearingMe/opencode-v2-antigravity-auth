@@ -127,4 +127,11 @@ describe("resolveAntigravityModel", () => {
       isThinkingModel: false,
     })
   })
+
+  it("passes through the unreleased Gemini 4 Argon model ID without assuming thinking support", () => {
+    expect(resolveAntigravityModel("antigravity-gemini-4-argon")).toEqual({
+      actualModel: "gemini-4-argon",
+      isThinkingModel: false,
+    })
+  })
 })

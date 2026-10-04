@@ -216,6 +216,7 @@ describe("V2 Antigravity runtime bridge", () => {
       "antigravity-gemini-3.6-flash",
       "antigravity-gemini-3.7-flash",
       "antigravity-gemini-3.8-flash",
+      "antigravity-gemini-4-argon",
       "antigravity-gpt-oss-120b-medium",
     ])
     expect(addProvider).toHaveBeenCalledOnce()

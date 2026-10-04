@@ -148,27 +148,6 @@ export class HealthScoreTracker {
 }
 
 // ============================================================================
-// JITTER UTILITIES
-// ============================================================================
-
-/**
- * Add random jitter to a delay value.
- * Helps break predictable timing patterns.
- */
-export function addJitter(baseMs: number, jitterFactor: number = 0.3): number {
-  const jitterRange = baseMs * jitterFactor
-  const jitter = (Math.random() * 2 - 1) * jitterRange // -jitterRange to +jitterRange
-  return Math.max(0, Math.round(baseMs + jitter))
-}
-
-/**
- * Generate a random delay within a range.
- */
-export function randomDelay(minMs: number, maxMs: number): number {
-  return Math.round(minMs + Math.random() * (maxMs - minMs))
-}
-
-// ============================================================================
 // LRU SELECTION
 // ============================================================================
 

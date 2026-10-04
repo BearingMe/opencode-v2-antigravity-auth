@@ -4,6 +4,7 @@ import { formatRefreshParts } from "./auth.ts"
 import { DEFAULT_CONFIG } from "./config/schema.ts"
 import { AntigravityTokenRefreshError } from "./token.ts"
 import type { PluginClient } from "./types.ts"
+import { formatDuration } from "../utils/formatting.ts"
 
 const { mockPrepare, mockTransform, mockEnsureProjectContext, mockRefreshAccessToken } = vi.hoisted(() => ({
   mockPrepare: vi.fn(),
@@ -34,7 +35,6 @@ vi.mock("./token.ts", async (importOriginal) => {
 import {
   executeAntigravityRequest,
   extractModelFromUrl,
-  formatWaitTime,
   getModelFamilyFromUrl,
   isNativeEngineEnabled,
   refreshOAuthCredentialUnified,
@@ -82,9 +82,9 @@ describe("engine request helpers", () => {
   })
 
   it("formats wait times like V1", () => {
-    expect(formatWaitTime(500)).toBe("500ms")
-    expect(formatWaitTime(5000)).toBe("5s")
-    expect(formatWaitTime(90000)).toBe("1m 30s")
+    expect(formatDuration(500)).toBe("500ms")
+    expect(formatDuration(5000)).toBe("5s")
+    expect(formatDuration(90000)).toBe("1m 30s")
   })
 
   it("reads Retry-After headers with V1 precedence", () => {

@@ -14,6 +14,9 @@
 
 ### Added
 
+- Added a selectable `antigravity-gemini-4-argon` catalog entry marked
+  `(Unreleased)`, with provisional limits for early testing before general
+  availability.
 - `/antigravity` dialog + `AntigravityAccounts` RPC (`list`, `quota`,
   `verify`, `mutate`, `deleteAll`, `ping`) for interactive account
   management; login (`opencode auth login`, one account per run, max 10)

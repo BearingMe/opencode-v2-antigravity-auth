@@ -21,6 +21,7 @@ describe("OPENCODE_MODEL_DEFINITIONS", () => {
       "antigravity-gemini-3.6-flash",
       "antigravity-gemini-3.7-flash",
       "antigravity-gemini-3.8-flash",
+      "antigravity-gemini-4-argon",
       "antigravity-gpt-oss-120b-medium",
     ])
   })
@@ -55,10 +56,22 @@ describe("OPENCODE_MODEL_DEFINITIONS", () => {
     })
   })
 
+  it("adds Gemini 4 Argon as an unreleased model with conservative limits", () => {
+    const model = getModel("antigravity-gemini-4-argon")
+
+    expect(model).toMatchObject({
+      name: "Gemini 4 Argon (Unreleased)",
+      limit: { context: 1048576, output: 65536 },
+      modalities: { input: ["text", "image", "pdf"], output: ["text"] },
+    })
+    expect(model.variants).toBeUndefined()
+  })
+
   it("uses the picker labels from the requested model list", () => {
     expect(
       Object.fromEntries(Object.entries(OPENCODE_MODEL_DEFINITIONS).map(([id, model]) => [id, model.name])),
     ).toEqual({
+      "antigravity-gemini-4-argon": "Gemini 4 Argon (Unreleased)",
       "antigravity-gemini-3.8-flash": "Gemini 3.8 Flash",
       "antigravity-gemini-3.7-flash": "Gemini 3.7 Flash",
       "antigravity-gemini-3.6-flash": "Gemini 3.6 Flash",
