@@ -1,6 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { ANTIGRAVITY_PROVIDER_ID } from "../constants"
+import { clearCachedAuth, resolveCachedAuth, storeCachedAuth } from "./cache"
+import { ensureProjectContext, invalidateProjectContextCache } from "./project"
 import { AntigravityTokenRefreshError, refreshAccessToken } from "./token"
 import type { OAuthAuthDetails, PluginClient } from "./types"
 
@@ -11,6 +13,7 @@ const baseAuth: OAuthAuthDetails = {
   expires: Date.now() - 1000,
 }
 
+/** Creates the minimal host auth client required by token refresh tests. */
 function createClient() {
   return {
     auth: {
@@ -26,6 +29,13 @@ describe("refreshAccessToken", () => {
     vi.restoreAllMocks()
   })
 
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+    clearCachedAuth()
+    invalidateProjectContextCache()
+  })
+
   it("updates the caller when refresh token is unchanged", async () => {
     const client = createClient()
     const fetchMock = vi.fn(async () => {
@@ -37,7 +47,7 @@ describe("refreshAccessToken", () => {
         { status: 200 },
       )
     })
-    global.fetch = fetchMock as unknown as typeof fetch
+    vi.stubGlobal("fetch", fetchMock)
 
     const result = await refreshAccessToken(baseAuth, client, ANTIGRAVITY_PROVIDER_ID)
 
@@ -57,7 +67,7 @@ describe("refreshAccessToken", () => {
         { status: 200 },
       )
     })
-    global.fetch = fetchMock as unknown as typeof fetch
+    vi.stubGlobal("fetch", fetchMock)
 
     const result = await refreshAccessToken(baseAuth, client, ANTIGRAVITY_PROVIDER_ID)
 
@@ -77,11 +87,38 @@ describe("refreshAccessToken", () => {
         { status: 400, statusText: "Bad Request" },
       )
     })
-    global.fetch = fetchMock as unknown as typeof fetch
+    vi.stubGlobal("fetch", fetchMock)
 
     await expect(refreshAccessToken(baseAuth, client, ANTIGRAVITY_PROVIDER_ID)).rejects.toMatchObject({
       name: "AntigravityTokenRefreshError",
       code: "invalid_grant",
     })
+  })
+
+  it("evicts cached auth and project context on invalid_grant", async () => {
+    const auth = { ...baseAuth, refresh: "synthetic-refresh|project-hint" }
+    let projectChecks = 0
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input) === "https://oauth2.googleapis.com/token") {
+          return Response.json({ error: "invalid_grant" }, { status: 400, statusText: "Bad Request" })
+        }
+        projectChecks += 1
+        return Response.json({ cloudaicompanionProject: `managed-${projectChecks}` })
+      }),
+    )
+    const cachedAuth = { ...auth, access: "cached-access", expires: Date.now() + 60_000 }
+    storeCachedAuth(cachedAuth)
+    await ensureProjectContext({ ...auth, access: "project-access" })
+
+    await expect(refreshAccessToken(auth, createClient(), ANTIGRAVITY_PROVIDER_ID)).rejects.toBeInstanceOf(
+      AntigravityTokenRefreshError,
+    )
+
+    const staleAuth = { ...auth, access: undefined, expires: 0 }
+    expect(resolveCachedAuth(staleAuth).access).toBeUndefined()
+    expect((await ensureProjectContext({ ...auth, access: "project-access" })).auth.refresh).toContain("managed-2")
+    expect(projectChecks).toBe(2)
   })
 })

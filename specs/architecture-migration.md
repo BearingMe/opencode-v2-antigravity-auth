@@ -547,12 +547,44 @@ account policies through ports.
 
 **Acceptance criteria:**
 
-- [ ] HTTP requests, headers, endpoints, and wire parsing live in the adapter.
-- [ ] Scheduling, quota decisions, and eligibility stay module-owned.
-- [ ] One unified token-refresh path remains.
-- [ ] OAuth state checks, degraded discovery, and `invalid_grant` cleanup remain.
-- [ ] Quota zero/unknown/windows/last-good-cache semantics remain unchanged.
-- [ ] Verification transport has an explicit Antigravity integration owner.
+- [x] HTTP requests, headers, endpoints, and wire parsing live in the adapter.
+- [x] Scheduling, quota decisions, and eligibility stay in policy modules,
+      outside the transport adapters. Final relocation from legacy `plugin/`
+      paths into `modules/accounts/` remains Step 8 work.
+- [x] One unified token-refresh path remains.
+- [x] OAuth state checks, degraded discovery, and `invalid_grant` cleanup remain.
+- [x] Quota zero/unknown/windows/last-good-cache semantics remain unchanged.
+- [x] Verification transport has an explicit Antigravity integration owner.
+
+### Step 7 progress notes
+
+- Added Antigravity OAuth, token, project, quota, verification, and provider
+  constants adapters. `src/constants.ts`, `src/antigravity/oauth.ts`, and
+  `src/plugin/verification.ts` retain compatibility exports.
+- Connected token refresh, OAuth/managed-project discovery, quota probes, and
+  verification through accounts ports. Retry timing, project context/cache,
+  quota aggregation/presentation, refresh invalidation, and verification
+  outcomes remain in policy callers; no Step 8 administration/lifecycle move
+  or inference-router change was made.
+- Preserved callback-state comparison, empty-project degraded discovery,
+  refresh-token packing, `invalid_grant` cleanup, quota `0` versus unknown,
+  explicit weekly/5h windows, last-good snapshots, and cancellation through
+  response parsing. The project facade retains its raw `loadCodeAssist` shape.
+- Added deterministic mocked-boundary tests for OAuth/token/project/quota and
+  verification transport, including project endpoint fallback/retry behavior,
+  body-read timeouts, and cancellation. Added a built-package smoke using only
+  synthetic OAuth credentials and strict mocked HTTP, including the transformed
+  verification request.
+- Updated subsystem, architecture, compatibility, and quota-contract docs.
+- Validation: `bun run test` (62 files / 1,190 tests), `bun run test:tui`
+  (clean build / 13 tests), `bun run test:antigravity:smoke`, typecheck, lint,
+  boundary check and fixtures (7 tests / 22 expectations), changed-file
+  Prettier, and `git diff --check` passed.
+- Oracle confirmed Step 7 ownership is satisfied by separating policy from
+  adapters, with target-path relocation deferred to Step 8. Review's timeout,
+  smoke-contract, and onboarding-sequencing findings were resolved; no
+  actionable findings remain. Mocked smoke is not a live vendor check.
+- Completion commit: pending.
 
 ## 8. Migrate account administration and lifecycle policies
 

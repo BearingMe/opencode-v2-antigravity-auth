@@ -46,10 +46,11 @@ src/
 ├── google-sdk.ts              # Isolated AI SDK module (hook routing key; models must use aisdk:<ANTIGRAVITY_SDK>)
 ├── rpc.ts                     # AntigravityAccounts RPC contract (credential-free)
 ├── tui.ts                     # /antigravity dialog UI (host-rendered dialogs only)
-├── constants.ts               # Endpoints, headers, OAuth identity, model routing
-├── antigravity/oauth.ts       # PKCE authorize URL + code exchange + project discovery
+├── constants.ts               # Compatibility exports for provider/model constants
+├── antigravity/oauth.ts       # Compatibility facade for OAuth authorization and exchange
 ├── hooks/auto-update-checker/ # Version check (root sessions only; never installs)
 ├── adapters/
+│   ├── antigravity/           # OAuth identity/endpoints/headers and account communication clients
 │   ├── filesystem/            # Account store, config ignores, and debug-file destination
 │   └── opencode/              # Host logging destinations
 ├── modules/accounts/
@@ -61,13 +62,13 @@ src/
     ├── engine.ts              # Native request/rotation engine (sole router)
     ├── account-service.ts     # Shared account store service (tool + RPC backend)
     ├── account-ui-format.ts   # Quota bars, countdowns, one-liners (pure)
-    ├── auth.ts / token.ts     # Refresh-part packing, unified refresh path
-    ├── verify.ts / verification.ts  # Access verification + error helpers
+    ├── auth.ts / token.ts     # Refresh-part packing, unified refresh policy
+    ├── verify.ts / verification.ts  # Access verification policy + compatibility exports
     ├── request.ts / request-helpers.ts  # Transform core + schema/thinking utils
     ├── transform/             # Pure per-family transforms (claude/gemini/sanitizer/resolver)
     ├── core/streaming/        # SSE transformer
     ├── thinking-recovery.ts / recovery/  # Turn repair + session-error hook
-    ├── quota.ts               # Antigravity fetchAvailableModels quota probing
+    ├── quota.ts               # Account quota refresh, aggregation, and result policy
     ├── accounts.ts / rotation.ts # Compatibility facades for the accounts module
     ├── storage.ts               # Compatibility facade for the v4 account store
     ├── fingerprint.ts / project.ts  # Device fingerprints + managed project context
@@ -92,6 +93,12 @@ Account membership and selection policy now live in
 `modules/accounts/account-pool.ts` and `modules/accounts/selection/`.
 `plugin/accounts.ts` and `plugin/rotation.ts` preserve existing callers while
 the request engine and administration service migrate in later steps.
+
+Antigravity OAuth/token/project/quota/verification HTTP and response parsing
+live in `adapters/antigravity/`. Plugin-facing refresh, project-context,
+quota, verification, and OAuth modules retain their orchestration and
+compatibility APIs; credential-refresh, project-discovery, quota-probe, and
+access-verification ports connect callers to transport clients.
 
 Historical (removed, do not reintroduce): V1 `src/plugin.ts`, `cli.ts`,
 `server.ts` (localhost OAuth listener), `ui/`, and `plugin/search.ts`

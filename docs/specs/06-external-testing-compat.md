@@ -86,14 +86,18 @@ event` transforms. V2 API explicitly "may change before stable".
 - `src/plugin/verify.ts` + `verify.test.ts`:
   `verifyAccountAccess` (blocked→disabled+URL, ok passthrough,
   error-without-disable).
-- `src/plugin/verification.ts` + `verification.test.ts`: shared
+- `src/adapters/antigravity/verification-parser.ts` (re-exported by
+  `src/plugin/verification.ts`) + `verification.test.ts`: shared
   verification-error helpers (URL normalization, error-detail extraction).
 - No search tool or search module remains; endpoint orderings are PROD→DAILY
   load, DAILY→PROD fallback.
 - `hooks/auto-update-checker`: `checker.test.ts` (config/JSONC/entry
   forms), `index.test.ts` (prerelease skip, toast-only mode,
   once-per-instance, child ignore, local-dev warning; fake timers).
-- Gaps: NO tests in `src/antigravity/`; `script/` E2E is excluded from
+- Antigravity communication clients have isolated mocked-HTTP tests under
+  `src/adapters/antigravity/`; the built-package smoke is
+  `bun run test:antigravity:smoke`.
+- Gaps: `script/` E2E is excluded from
   typecheck and live-endpoint E2E needs real quota. `src/tui.ts` pure gates
   (`isInvalidRpcResponse`, `isStaleMutate`) and the `rpc.ts` transport codec
   mirror are unit-covered (`tui-behavior.test.ts`,
@@ -123,7 +127,8 @@ event` transforms. V2 API explicitly "may change before stable".
 ## Known divergences (normative for reviewers)
 
 1. D-REFRESH-DUAL (unified):
-   `src/plugin/token.ts :: refreshAccessToken`
+   `src/plugin/token.ts :: refreshAccessToken`, backed by
+   `adapters/antigravity/token-client.ts`
    (skew, `invalid_grant` eviction, project-id preservation, cache store)
    is the single refresh implementation, called via
    `src/plugin/engine.ts :: refreshOAuthCredentialUnified` and the V2
@@ -156,7 +161,7 @@ invalidateCache` remain exported. New code MUST use
    recovery hook crosses that boundary. Do not assume recovery is
    Google-only; narrowing it needs product decision.
 8. D-SECRET-COMMITTED (accepted risk): the Antigravity OAuth `client_secret`
-   is committed in `src/constants.ts` (CLI-spoof requirement) and duplicated
+   is committed in `src/adapters/antigravity/constants.ts` (CLI-spoof requirement) and duplicated
    in `scripts/check-quota.mjs`. Rotation means changing both; scripts
    SHOULD import from a single source rather than re-hardcoding.
 9. Header contract (Explicit): `x-goog-user-project` MUST be
@@ -191,8 +196,10 @@ invalidateCache` remain exported. New code MUST use
 ## References (repository evidence)
 
 - Entries: `src/v2-plugin.ts`, `src/constants.ts`,
+  `src/adapters/antigravity/constants.ts`,
   `src/google-sdk.ts`, `src/shims.d.ts`
-- OAuth: `src/antigravity/oauth.ts`
+- OAuth/account communication: `src/antigravity/oauth.ts`,
+  `src/adapters/antigravity/{oauth,token,project,quota,verification}-client.ts`
 - Update: `src/hooks/auto-update-checker/{index,checker,cache,constants,
 types,logging}.ts` + `checker.test.ts`, `index.test.ts`
 - Core: `src/plugin/{auth,token,cache,request,request-helpers,accounts,

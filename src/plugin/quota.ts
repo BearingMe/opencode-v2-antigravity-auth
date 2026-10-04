@@ -1,23 +1,29 @@
-import { ANTIGRAVITY_ENDPOINT_PROD, getAntigravityHeaders, ANTIGRAVITY_PROVIDER_ID } from "../constants"
+import { ANTIGRAVITY_PROVIDER_ID } from "../constants"
+import {
+  availableModelsQuotaProbe,
+  groupedQuotaProbe,
+  parseQuotaSummaryResponse,
+  type FetchAvailableModelEntry,
+} from "../adapters/antigravity/quota-client.js"
 import { accessTokenExpired, formatRefreshParts, parseRefreshParts } from "./auth"
 import { logQuotaFetch, logQuotaStatus } from "./debug"
 import { ensureProjectContext } from "./project"
 import { refreshAccessToken } from "./token"
 import { getModelFamily } from "./transform/model-resolver"
 import type { PluginClient, OAuthAuthDetails } from "./types"
-import type { AccountMetadataV3, QuotaSummaryBucket, QuotaSummaryGroup, QuotaSummaryWindow } from "./storage"
+import type { AccountMetadataV3, QuotaSummaryGroup } from "./storage"
 
-const FETCH_TIMEOUT_MS = 10000
-const SUMMARY_FETCH_TIMEOUT_MS = 5_000
-
+/** Quota family names displayed by account management. */
 export type QuotaGroup = "claude" | "gemini-pro" | "gemini-flash"
 
+/** Aggregated per-family quota values from Antigravity's model endpoint. */
 export interface QuotaGroupSummary {
   remainingFraction?: number
   resetTime?: string
   modelCount: number
 }
 
+/** Full account quota result before credential-free presentation. */
 export interface QuotaSummary {
   groups: Partial<Record<QuotaGroup, QuotaGroupSummary>>
   modelCount: number
@@ -26,8 +32,10 @@ export interface QuotaSummary {
   quotaSummaryStatus?: "ok" | "error" | "unknown"
 }
 
+/** Outcome of checking one account's Antigravity quota. */
 export type AccountQuotaStatus = "ok" | "disabled" | "error"
 
+/** Account-indexed quota result with any safely updateable credential metadata. */
 export interface AccountQuotaResult {
   index: number
   email?: string
@@ -38,34 +46,7 @@ export interface AccountQuotaResult {
   updatedAccount?: AccountMetadataV3
 }
 
-interface FetchAvailableModelsResponse {
-  models?: Record<string, FetchAvailableModelEntry>
-}
-
-interface FetchAvailableModelEntry {
-  quotaInfo?: {
-    remainingFraction?: number
-    resetTime?: string
-  }
-  displayName?: string
-  modelName?: string
-}
-
-/** Untrusted bucket fields returned by retrieveUserQuotaSummary. */
-interface FetchQuotaSummaryBucket {
-  window?: unknown
-  remainingFraction?: unknown
-  resetTime?: unknown
-  disabled?: unknown
-}
-
-/** Untrusted group fields returned by retrieveUserQuotaSummary. */
-interface FetchQuotaSummaryGroup {
-  displayName?: unknown
-  description?: unknown
-  buckets?: unknown
-}
-
+/** Builds the transient OAuth shape used to refresh a stored quota account. */
 function buildAuthFromAccount(account: AccountMetadataV3): OAuthAuthDetails {
   return {
     type: "oauth",
@@ -79,18 +60,7 @@ function buildAuthFromAccount(account: AccountMetadataV3): OAuthAuthDetails {
   }
 }
 
-function normalizeRemainingFraction(value: unknown): number | undefined {
-  // Missing, non-finite, or out-of-range values are unknown, not exhausted.
-  // Valid 0 (exhausted) and 1 (full) pass through unchanged; nothing is clamped.
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return undefined
-  }
-  if (value < 0 || value > 1) {
-    return undefined
-  }
-  return value
-}
-
+/** Converts a provider reset timestamp to epoch milliseconds when valid. */
 function parseResetTime(resetTime?: string): number | null {
   if (!resetTime) return null
   const timestamp = Date.parse(resetTime)
@@ -100,72 +70,10 @@ function parseResetTime(resetTime?: string): number | null {
   return timestamp
 }
 
-/** Keeps text copied from upstream quota metadata bounded and terminal-safe. */
-function safeSummaryText(value: unknown, maxLength: number): string | undefined {
-  if (typeof value !== "string") return undefined
-  const text = Array.from(value)
-    .filter((character) => {
-      const codePoint = character.codePointAt(0) ?? 0
-      return codePoint >= 0x20 && (codePoint < 0x7f || codePoint > 0x9f)
-    })
-    .join("")
-    .trim()
-    .slice(0, maxLength)
-  return text || undefined
-}
+/** Compatibility export for the adapter's grouped quota response parser. */
+export { parseQuotaSummaryResponse }
 
-/** Accept only the two quota windows returned by the summary endpoint. */
-function parseSummaryWindow(value: unknown): QuotaSummaryWindow | undefined {
-  return value === "weekly" || value === "5h" ? value : undefined
-}
-
-/**
- * Parses Antigravity's grouped weekly and five-hour quota response.
- * Invalid windows and unusable bucket values stay absent instead of implying a full quota.
- */
-export function parseQuotaSummaryResponse(response: unknown): QuotaSummaryGroup[] | undefined {
-  if (typeof response !== "object" || response === null || Array.isArray(response)) return undefined
-  const root = response as Record<string, unknown>
-  const summary = typeof root.quotaSummary === "object" && root.quotaSummary !== null ? root.quotaSummary : undefined
-  const rawGroups = Array.isArray(root.groups)
-    ? root.groups
-    : summary && typeof summary === "object" && Array.isArray((summary as Record<string, unknown>).groups)
-      ? ((summary as Record<string, unknown>).groups as unknown[])
-      : undefined
-  if (!rawGroups) return undefined
-
-  const groups: QuotaSummaryGroup[] = []
-  for (const rawGroup of rawGroups.slice(0, 10)) {
-    if (typeof rawGroup !== "object" || rawGroup === null || Array.isArray(rawGroup)) continue
-    const group = rawGroup as FetchQuotaSummaryGroup
-    const displayName = safeSummaryText(group.displayName, 120)
-    if (!displayName || !Array.isArray(group.buckets)) continue
-
-    const buckets: Partial<Record<QuotaSummaryWindow, QuotaSummaryBucket>> = {}
-    for (const rawBucket of group.buckets) {
-      if (typeof rawBucket !== "object" || rawBucket === null || Array.isArray(rawBucket)) continue
-      const bucket = rawBucket as FetchQuotaSummaryBucket
-      const window = parseSummaryWindow(bucket.window)
-      if (!window || bucket.disabled === true || buckets[window]) continue
-
-      const remainingFraction = normalizeRemainingFraction(bucket.remainingFraction)
-      const rawResetTime = safeSummaryText(bucket.resetTime, 80)
-      const resetTime = rawResetTime && parseResetTime(rawResetTime) !== null ? rawResetTime : undefined
-      if (remainingFraction === undefined && resetTime === undefined) continue
-
-      buckets[window] = {
-        ...(remainingFraction === undefined ? {} : { remainingFraction }),
-        ...(resetTime === undefined ? {} : { resetTime }),
-      }
-    }
-
-    if (Object.keys(buckets).length === 0) continue
-    const description = safeSummaryText(group.description, 300)
-    groups.push({ displayName, ...(description ? { description } : {}), buckets })
-  }
-  return groups
-}
-
+/** Assigns supported upstream models to the quota family displayed by the plugin. */
 function classifyQuotaGroup(modelName: string, displayName?: string): QuotaGroup | null {
   const combined = `${modelName} ${displayName ?? ""}`.toLowerCase()
   if (combined.includes("claude")) {
@@ -179,6 +87,7 @@ function classifyQuotaGroup(modelName: string, displayName?: string): QuotaGroup
   return family === "gemini-flash" ? "gemini-flash" : "gemini-pro"
 }
 
+/** Aggregates each family's known model readings without turning unknown into zero. */
 function aggregateQuota(models?: Record<string, FetchAvailableModelEntry>): QuotaSummary {
   const groups: Partial<Record<QuotaGroup, QuotaGroupSummary>> = {}
   if (!models) {
@@ -191,9 +100,8 @@ function aggregateQuota(models?: Record<string, FetchAvailableModelEntry>): Quot
     if (!group) {
       continue
     }
-    const quotaInfo = entry.quotaInfo
-    const remainingFraction = quotaInfo ? normalizeRemainingFraction(quotaInfo.remainingFraction) : undefined
-    const resetTime = quotaInfo?.resetTime
+    const remainingFraction = entry.remainingFraction
+    const resetTime = entry.resetTime
     const resetTimestamp = parseResetTime(resetTime)
 
     totalCount += 1
@@ -229,90 +137,7 @@ function aggregateQuota(models?: Record<string, FetchAvailableModelEntry>): Quot
   return { groups, modelCount: totalCount }
 }
 
-/** Fetches and consumes an Antigravity response within one timeout/cancellation scope. */
-async function fetchWithTimeout<T>(
-  url: string,
-  options: RequestInit,
-  readResponse: (response: Response) => Promise<T>,
-  timeoutMs = FETCH_TIMEOUT_MS,
-  signal?: AbortSignal,
-): Promise<T> {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), timeoutMs)
-  const abort = () => controller.abort(signal?.reason)
-  signal?.addEventListener("abort", abort, { once: true })
-  if (signal?.aborted) abort()
-  try {
-    const response = await fetch(url, { ...options, signal: controller.signal })
-    return await readResponse(response)
-  } finally {
-    clearTimeout(timeout)
-    signal?.removeEventListener("abort", abort)
-  }
-}
-
-async function fetchAvailableModels(
-  accessToken: string,
-  projectId: string,
-  quotaSignal?: AbortSignal,
-): Promise<FetchAvailableModelsResponse> {
-  const endpoint = ANTIGRAVITY_ENDPOINT_PROD
-  const quotaUserAgent = getAntigravityHeaders()["User-Agent"] || "antigravity/windows/amd64"
-
-  const body = projectId ? { project: projectId } : {}
-  return fetchWithTimeout(
-    `${endpoint}/v1internal:fetchAvailableModels`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        "User-Agent": quotaUserAgent,
-      },
-      body: JSON.stringify(body),
-    },
-    async (response) => {
-      if (response.ok) return (await response.json()) as FetchAvailableModelsResponse
-
-      const message = await response.text().catch(() => "")
-      const snippet = message.trim().slice(0, 200)
-      throw new Error(`fetchAvailableModels ${response.status} at ${endpoint}${snippet ? `: ${snippet}` : ""}`)
-    },
-    FETCH_TIMEOUT_MS,
-    quotaSignal,
-  )
-}
-
-/** Retrieves the supplementary grouped quota; callers may degrade if it is unavailable. */
-async function fetchQuotaSummary(
-  accessToken: string,
-  projectId: string,
-  quotaSignal?: AbortSignal,
-): Promise<QuotaSummaryGroup[]> {
-  const quotaUserAgent = getAntigravityHeaders()["User-Agent"] || "antigravity/windows/amd64"
-  return fetchWithTimeout(
-    `${ANTIGRAVITY_ENDPOINT_PROD}/v1internal:retrieveUserQuotaSummary`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        "User-Agent": quotaUserAgent,
-      },
-      body: JSON.stringify(projectId ? { project: projectId } : {}),
-    },
-    async (response) => {
-      if (!response.ok) throw new Error(`retrieveUserQuotaSummary returned ${response.status}`)
-
-      const groups = parseQuotaSummaryResponse(await response.json())
-      if (!groups) throw new Error("Invalid retrieveUserQuotaSummary response")
-      return groups
-    },
-    SUMMARY_FETCH_TIMEOUT_MS,
-    quotaSignal,
-  )
-}
-
+/** Copies rotated credential/project values back to a stored quota account. */
 function applyAccountUpdates(account: AccountMetadataV3, auth: OAuthAuthDetails): AccountMetadataV3 | undefined {
   const parts = parseRefreshParts(auth.refresh)
   if (!parts.refreshToken) {
@@ -334,6 +159,7 @@ function applyAccountUpdates(account: AccountMetadataV3, auth: OAuthAuthDetails)
   return changed ? updated : undefined
 }
 
+/** Refreshes account credentials as needed, resolves project context, then probes both quota endpoints. */
 export async function checkAccountsQuota(
   accounts: AccountMetadataV3[],
   client: PluginClient,
@@ -365,8 +191,16 @@ export async function checkAccountsQuota(
       // Quota cancellation covers the Antigravity probe only; token refresh
       // and project-context resolution above are left untouched.
       const [modelsResult, summaryResult] = await Promise.allSettled([
-        fetchAvailableModels(auth.access ?? "", projectContext.effectiveProjectId, quotaSignal),
-        fetchQuotaSummary(auth.access ?? "", projectContext.effectiveProjectId, quotaSignal),
+        availableModelsQuotaProbe.check({
+          accessToken: auth.access ?? "",
+          projectId: projectContext.effectiveProjectId,
+          signal: quotaSignal,
+        }),
+        groupedQuotaProbe.check({
+          accessToken: auth.access ?? "",
+          projectId: projectContext.effectiveProjectId,
+          signal: quotaSignal,
+        }),
       ])
 
       const quotaResult: QuotaSummary =

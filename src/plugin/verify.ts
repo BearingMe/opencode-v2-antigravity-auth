@@ -2,15 +2,21 @@ import { formatRefreshParts, parseRefreshParts } from "./auth.js"
 import { ensureProjectContext } from "./project.js"
 import { prepareAntigravityRequest } from "./request.js"
 import { AntigravityTokenRefreshError, refreshAccessToken } from "./token.js"
-import { extractVerificationErrorDetails } from "./verification.js"
+import {
+  antigravityAccessVerificationPort,
+  createVerificationProbeRequest,
+} from "../adapters/antigravity/verification-client.js"
+import { extractVerificationErrorDetails } from "../adapters/antigravity/verification-parser.js"
 import type { PluginClient } from "./types.js"
 
+/** Account-facing result after mapping provider verification requirements. */
 export type VerificationProbeResult = {
   status: "ok" | "blocked" | "error"
   message: string
   verifyUrl?: string
 }
 
+/** Refreshes one account and maps an Antigravity probe into an account verification result. */
 export async function verifyAccountAccess(
   account: {
     refreshToken: string
@@ -52,26 +58,18 @@ export async function verifyAccountAccess(
   }
 
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 20000)
-
-  let response: Response
+  const timeoutId = setTimeout(() => controller.abort(), 20_000)
+  let response: Awaited<ReturnType<typeof antigravityAccessVerificationPort.verify>>
   try {
     const project = await ensureProjectContext(refreshedAuth)
+    const probeRequest = createVerificationProbeRequest(controller.signal)
     const prepared = prepareAntigravityRequest(
-      "https://generativelanguage.googleapis.com/v1beta/models/antigravity-gemini-3.1-pro:generateContent",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: "Reply OK" }] }],
-          generationConfig: { maxOutputTokens: 16, temperature: 0 },
-        }),
-        signal: controller.signal,
-      },
+      probeRequest.request,
+      probeRequest.init,
       refreshedAuth.access,
       project.effectiveProjectId,
     )
-    response = await fetch(prepared.request, prepared.init)
+    response = await antigravityAccessVerificationPort.verify({ request: prepared.request, init: prepared.init })
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       return { status: "error", message: "Verification check timed out." }
@@ -81,18 +79,11 @@ export async function verifyAccountAccess(
     clearTimeout(timeoutId)
   }
 
-  let responseBody = ""
-  try {
-    responseBody = await response.text()
-  } catch {
-    responseBody = ""
-  }
-
   if (response.ok) {
     return { status: "ok", message: "Account verification check passed." }
   }
 
-  const extracted = extractVerificationErrorDetails(responseBody)
+  const extracted = extractVerificationErrorDetails(response.body)
   if (response.status === 403 && extracted.validationRequired) {
     return {
       status: "blocked",

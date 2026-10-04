@@ -1,141 +1,27 @@
-/**
- * Constants used for Antigravity OAuth flows and Cloud Code Assist API integration.
- */
-export const ANTIGRAVITY_CLIENT_ID = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"
-
-/**
- * Client secret issued for the Antigravity OAuth application.
- */
-export const ANTIGRAVITY_CLIENT_SECRET = "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"
-
-/**
- * Scopes required for Antigravity integrations.
- */
-export const ANTIGRAVITY_SCOPES: readonly string[] = [
-  "https://www.googleapis.com/auth/cloud-platform",
-  "https://www.googleapis.com/auth/userinfo.email",
-  "https://www.googleapis.com/auth/userinfo.profile",
-  "https://www.googleapis.com/auth/cclog",
-  "https://www.googleapis.com/auth/experimentsandconfigs",
-]
-
-/**
- * OAuth redirect URI used by the local CLI callback server.
- */
-export const ANTIGRAVITY_REDIRECT_URI = "http://localhost:51121/oauth-callback"
-
-/**
- * Root endpoints for the Antigravity API (in fallback order).
- * CLIProxy and Vibeproxy use the daily sandbox endpoint first,
- * then fallback to prod if needed.
- */
-export const ANTIGRAVITY_ENDPOINT_DAILY = "https://daily-cloudcode-pa.sandbox.googleapis.com"
-export const ANTIGRAVITY_ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com"
-
-/**
- * Endpoint fallback order (daily → prod).
- * Shared across request handling and project discovery to mirror CLIProxy behavior.
- */
-export const ANTIGRAVITY_ENDPOINT_FALLBACKS = [ANTIGRAVITY_ENDPOINT_DAILY, ANTIGRAVITY_ENDPOINT_PROD] as const
-
-/**
- * Preferred endpoint order for project discovery (prod first, then fallbacks).
- * loadCodeAssist appears to be best supported on prod for managed project resolution.
- */
-export const ANTIGRAVITY_LOAD_ENDPOINTS = [ANTIGRAVITY_ENDPOINT_PROD, ANTIGRAVITY_ENDPOINT_DAILY] as const
-
-/**
- * Primary endpoint to use (daily sandbox - same as CLIProxy/Vibeproxy).
- */
-export const ANTIGRAVITY_ENDPOINT = ANTIGRAVITY_ENDPOINT_DAILY
-
-/**
- * Hardcoded project id used when Antigravity does not return one (e.g., business/workspace accounts).
- */
-export const ANTIGRAVITY_DEFAULT_PROJECT_ID = "rising-fact-p41fc"
-
-export const ANTIGRAVITY_VERSION_FALLBACK = "1.18.3"
-let antigravityVersion = ANTIGRAVITY_VERSION_FALLBACK
-let versionLocked = false
-
-export function getAntigravityVersion(): string {
-  return antigravityVersion
-}
-
-/**
- * Set the runtime Antigravity version. Can only be called once (at startup).
- * Subsequent calls are silently ignored to prevent accidental mutation.
- */
-export function setAntigravityVersion(version: string): void {
-  if (versionLocked) return
-  antigravityVersion = version
-  versionLocked = true
-}
-
-/**
- * Static fallback version string.
- *
- * @deprecated Use `getAntigravityVersion()` instead.
- */
-export const ANTIGRAVITY_VERSION = ANTIGRAVITY_VERSION_FALLBACK
-
-export function getAntigravityHeaders(): HeaderSet & { "Client-Metadata": string } {
-  return {
-    "User-Agent": `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Antigravity/${getAntigravityVersion()} Chrome/138.0.7204.235 Electron/37.3.1 Safari/537.36`,
-    "X-Goog-Api-Client": "google-cloud-sdk vscode_cloudshelleditor/0.1",
-    "Client-Metadata": `{"ideType":"ANTIGRAVITY","platform":"${process.platform === "win32" ? "WINDOWS" : "MACOS"}","pluginType":"GEMINI"}`,
-  }
-}
-
-/**
- * Static header set snapshot using fallback version.
- *
- * @deprecated Use `getAntigravityHeaders()` instead.
- */
-export const ANTIGRAVITY_HEADERS = {
-  "User-Agent": `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Antigravity/${ANTIGRAVITY_VERSION} Chrome/138.0.7204.235 Electron/37.3.1 Safari/537.36`,
-  "X-Goog-Api-Client": "google-cloud-sdk vscode_cloudshelleditor/0.1",
-  "Client-Metadata": `{"ideType":"ANTIGRAVITY","platform":"${process.platform === "win32" ? "WINDOWS" : "MACOS"}","pluginType":"GEMINI"}`,
-} as const
-
-/**
- * User agent used by the existing Google OAuth and Code Assist discovery flow.
- * Keep its wire value stable; it is separate from Antigravity content requests.
- */
-export const ANTIGRAVITY_AUTH_USER_AGENT = "google-api-nodejs-client/9.15.1"
-
-const ANTIGRAVITY_PLATFORMS = ["windows/amd64", "darwin/arm64", "darwin/amd64"] as const
-
-const ANTIGRAVITY_API_CLIENTS = [
-  "google-cloud-sdk vscode_cloudshelleditor/0.1",
-  "google-cloud-sdk vscode/1.96.0",
-  "google-cloud-sdk vscode/1.95.0",
-] as const
-
-function randomFrom<T>(arr: readonly T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]!
-}
-
-export type HeaderSet = {
-  "User-Agent": string
-  "X-Goog-Api-Client"?: string
-  "Client-Metadata"?: string
-}
-
-export function getRandomizedHeaders(): HeaderSet {
-  const platform = randomFrom(ANTIGRAVITY_PLATFORMS)
-  const metadataPlatform = platform.startsWith("windows") ? "WINDOWS" : "MACOS"
-  return {
-    "User-Agent": `antigravity/${getAntigravityVersion()} ${platform}`,
-    "X-Goog-Api-Client": randomFrom(ANTIGRAVITY_API_CLIENTS),
-    "Client-Metadata": `{"ideType":"ANTIGRAVITY","platform":"${metadataPlatform}","pluginType":"GEMINI"}`,
-  }
-}
-
-/**
- * Provider identifier shared between the plugin loader and credential store.
- */
+/** Provider identifier shared between the plugin loader and credential store. */
 export const ANTIGRAVITY_PROVIDER_ID = "antigravity"
+
+export {
+  ANTIGRAVITY_CLIENT_ID,
+  ANTIGRAVITY_CLIENT_SECRET,
+  ANTIGRAVITY_SCOPES,
+  ANTIGRAVITY_REDIRECT_URI,
+  ANTIGRAVITY_ENDPOINT_DAILY,
+  ANTIGRAVITY_ENDPOINT_PROD,
+  ANTIGRAVITY_ENDPOINT_FALLBACKS,
+  ANTIGRAVITY_LOAD_ENDPOINTS,
+  ANTIGRAVITY_ENDPOINT,
+  ANTIGRAVITY_DEFAULT_PROJECT_ID,
+  ANTIGRAVITY_VERSION_FALLBACK,
+  getAntigravityVersion,
+  setAntigravityVersion,
+  ANTIGRAVITY_VERSION,
+  getAntigravityHeaders,
+  ANTIGRAVITY_HEADERS,
+  ANTIGRAVITY_AUTH_USER_AGENT,
+  getRandomizedHeaders,
+} from "./adapters/antigravity/constants.js"
+export type { HeaderSet } from "./adapters/antigravity/constants.js"
 
 // ============================================================================
 // TOOL HALLUCINATION PREVENTION (Ported from LLM-API-Key-Proxy)

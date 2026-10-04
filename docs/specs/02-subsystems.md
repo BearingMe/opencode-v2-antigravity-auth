@@ -1,7 +1,11 @@
 # 02 — Subsystem Specifications
 
-## 2.1 OAuth authorize + exchange — `src/antigravity/oauth.ts` (leaf, stateless)
+## 2.1 OAuth authorize + exchange — compatibility facade + Antigravity adapter
 
+- `src/antigravity/oauth.ts` preserves the public `authorizeAntigravity` and
+  `exchangeAntigravity` API. OAuth endpoint construction and wire parsing live
+  in `src/adapters/antigravity/oauth-client.ts`; project discovery HTTP lives
+  in `project-client.ts`.
 - `authorizeAntigravity(projectId="")` builds
   `https://accounts.google.com/o/oauth2/v2/auth` with `client_id`,
   `response_type=code`, `redirect_uri=http://localhost:51121/oauth-callback`,
@@ -12,10 +16,10 @@ generatePKCE`. No I/O.
 - `exchangeAntigravity(code, state)` never throws; returns
   `success{refresh,access,expires,email?,projectId} | failed{error}`.
   Sequence: `decodeState` → `Date.now()` startTime → POST
-  `oauth2.googleapis.com/token` (form-urlencoded, Google OAuth UA) → non-ok
+  adapter POST to `oauth2.googleapis.com/token` (form-urlencoded, Google OAuth UA) → non-ok
   yields raw-text `failed` → GET userinfo (failure tolerated → `{}`) →
   missing `refresh_token` yields `failed` → conditional
-  `fetchProjectID(access)` → pack `refresh|projectId` (2 segments only) →
+  adapter project discovery → pack `refresh|projectId` (2 segments only) →
   `expires = calculateTokenExpiry(startTime, expires_in)`.
 - `fetchProjectID` POSTs `{metadata:{ideType:ANTIGRAVITY,
 platform:WINDOWS|MACOS, pluginType:GEMINI}}` to deduped
@@ -27,7 +31,7 @@ platform:WINDOWS|MACOS, pluginType:GEMINI}}` to deduped
   userinfo fetches are unbounded (risk, see §07).
 - Stateless; no cache/persistence/retry except the multi-endpoint loop.
 
-## 2.2 Token helpers + refresh — `src/plugin/auth.ts`, `token.ts`
+## 2.2 Token helpers + refresh — account policy + Antigravity token adapter
 
 - `parseRefreshParts` splits `refresh|projectId|managedProjectId`;
   `formatRefreshParts` serializes. Callers MUST tolerate the 2-segment form
@@ -35,8 +39,9 @@ platform:WINDOWS|MACOS, pluginType:GEMINI}}` to deduped
 - `accessTokenExpired` uses a 60 s clock-skew buffer. `calculateTokenExpiry
 (requestTimeMs, expiresInSeconds)` defaults 3600 s; NaN/≤0 → immediate
   expiry.
-- `refreshAccessToken` (`src/plugin/token.ts`) POSTs
-  `grant_type=refresh_token` with client id/secret, parses varied error
+- `refreshAccessToken` (`src/plugin/token.ts`) is the single refresh policy
+  and delegates the POST to `adapters/antigravity/token-client.ts`, which
+  sends `grant_type=refresh_token` with client id/secret and parses varied error
   shapes, throws `AntigravityTokenRefreshError{code,description,status,
 statusText}` on `!ok`; `invalid_grant` invalidates project cache and clears
   cached auth; preserves project ids when the server omits `refresh_token`;
@@ -137,10 +142,11 @@ fingerprint+history[5],cachedQuota+updatedAt,verification*}`.
   `FIRST_RETRY 1 s / SWITCH 5 s`, dedup window 2 s, state reset 120 s,
   `MAX_CONSECUTIVE_FAILURES=5` → 30 s cooldown.
 
-## 2.6 Quota probing — `src/plugin/quota.ts`
+## 2.6 Quota probing — account policy + Antigravity quota adapter
 
-`fetchAvailableModels` (10 s) and best-effort `retrieveUserQuotaSummary`
-(5 s), parallel; `classifyQuotaGroup` (claude substring; gemini-3 →
+`adapters/antigravity/quota-client.ts` owns `fetchAvailableModels` (10 s),
+best-effort `retrieveUserQuotaSummary` (5 s), and wire parsing. Plugin quota
+policy runs both probes in parallel; `classifyQuotaGroup` (claude substring; gemini-3 →
 pro/flash via `getModelFamily`); per-model aggregate = min remaining + earliest
 reset. Summary buckets retain explicit weekly/5h windows and group labels.
 Separate per-model and grouped snapshots persist in v4 with independent
@@ -183,14 +189,20 @@ composes ONLY `User-Agent` (applied on the antigravity path in
 requests). `getRandomizedHeaders("antigravity")` never emits linux
 (Linux masquerades as macOS).
 
-## 2.9 Managed projects — `src/plugin/project.ts`
+## 2.9 Managed projects — policy in `src/plugin/project.ts`, transport in
+
+`src/adapters/antigravity/project-client.ts`
 
 `loadManagedProject` (`loadCodeAssist` + duetProject across LOAD+FALLBACK,
-nodejs UA + Client-Metadata), `onboardManagedProject` (onboardUser 10×5 s),
+nodejs UA + Client-Metadata), adapter onboarding sessions (one `onboardUser`
+attempt per current endpoint, each request/body read bounded at 10 s),
+`plugin/project.ts :: onboardManagedProject` (10×5 s retries per endpoint),
 `ensureProjectContext` (empty without token; refresh-keyed cache + pending
 dedup; managed short-circuit; else load→onboard FREE→fallback
 `projectId`→`ANTIGRAVITY_DEFAULT_PROJECT_ID`; caches under new key).
-`invalidateProjectContextCache` on `invalid_grant`/rotation.
+`invalidateProjectContextCache` on `invalid_grant`/rotation. Verification
+HTTP/body parsing is owned by `adapters/antigravity/verification-client.ts`
+and `verification-parser.ts`; `plugin/verify.ts` retains account outcome policy.
 
 ## 2.10 Streaming — `src/plugin/core/streaming/transformer.ts`
 

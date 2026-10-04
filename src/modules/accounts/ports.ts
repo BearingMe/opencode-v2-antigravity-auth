@@ -13,8 +13,29 @@ export interface AccountPersistencePort<State> {
 }
 
 /** Credential refresh operation required by account lifecycle policy. */
-export interface AccountCredentialRefreshPort<Credential> {
-  refresh(credential: Credential): Promise<Credential>
+export interface AccountCredentialRefreshPort<Credential, RefreshedCredential = Credential> {
+  refresh(credential: Credential): Promise<RefreshedCredential>
+}
+
+/** Project discovery required by OAuth account setup. */
+export interface AccountOAuthProjectDiscoveryPort<Credential, Result> {
+  discover(credential: Credential): Promise<Result>
+}
+
+/** Result from one provider onboarding attempt. */
+export type AccountManagedProjectOnboardingAttempt =
+  { kind: "complete"; projectId: string } | { kind: "pending" } | { kind: "endpoint-unavailable" }
+
+/** Stateful endpoint cursor with no retry timing or delay policy. */
+export interface AccountManagedProjectOnboardingSession {
+  attempt(): Promise<AccountManagedProjectOnboardingAttempt>
+  nextEndpoint(): boolean
+}
+
+/** Managed-project transport needed by account project-context policy. */
+export interface AccountManagedProjectPort<LoadInput, Discovery, OnboardInput> {
+  load(input: LoadInput): Promise<Discovery | null>
+  startOnboarding(input: OnboardInput): AccountManagedProjectOnboardingSession
 }
 
 /** Quota probe required by account quota policy. */
