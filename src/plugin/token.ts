@@ -3,11 +3,12 @@ import {
   antigravityCredentialRefreshPort,
   type RefreshedOAuthToken,
 } from "../adapters/antigravity/token-client.js"
-import { formatRefreshParts, parseRefreshParts, calculateTokenExpiry } from "./auth"
-import { clearCachedAuth, storeCachedAuth } from "./cache"
-import { createLogger } from "./logger"
-import { invalidateProjectContextCache } from "./project"
-import type { OAuthAuthDetails, PluginClient, RefreshParts } from "./types"
+import { createAccountCredentialRefreshPolicy } from "../modules/accounts/index.js"
+import { calculateTokenExpiry, formatRefreshParts, parseRefreshParts } from "./auth.js"
+import { clearCachedAuth, storeCachedAuth } from "./cache.js"
+import { createLogger } from "./logger.js"
+import { invalidateProjectContextCache } from "./project.js"
+import type { OAuthAuthDetails, PluginClient, RefreshParts } from "./types.js"
 
 const log = createLogger("token")
 
@@ -29,65 +30,39 @@ export class AntigravityTokenRefreshError extends Error {
   }
 }
 
-/**
- * Refreshes an Antigravity OAuth access token, updates persisted credentials, and handles revocation.
- */
-export async function refreshAccessToken(
+const credentialRefreshPolicy = createAccountCredentialRefreshPolicy<
+  OAuthAuthDetails,
+  RefreshParts,
+  RefreshedOAuthToken
+>({
+  port: antigravityCredentialRefreshPort,
+  parseParts: parseRefreshParts,
+  formatParts: formatRefreshParts,
+  calculateExpiry: calculateTokenExpiry,
+  now: () => Date.now(),
+  storeCachedCredential: storeCachedAuth,
+  invalidateProjectContext: invalidateProjectContextCache,
+  clearCachedCredential: clearCachedAuth,
+  parseEndpointFailure: (error) => {
+    if (!(error instanceof OAuthTokenEndpointError)) return undefined
+    return {
+      message: error.message,
+      code: error.code,
+      description: error.description,
+      status: error.status,
+      statusText: error.statusText,
+    }
+  },
+  createRefreshError: (failure) => new AntigravityTokenRefreshError(failure),
+  isRefreshError: (error) => error instanceof AntigravityTokenRefreshError,
+  logger: log,
+})
+
+/** Compatibility entry into the unified account credential refresh policy. */
+export function refreshAccessToken(
   auth: OAuthAuthDetails,
-  client: PluginClient,
-  providerId: string,
+  _client: PluginClient,
+  _providerId: string,
 ): Promise<OAuthAuthDetails | undefined> {
-  const parts = parseRefreshParts(auth.refresh)
-  if (!parts.refreshToken) {
-    return undefined
-  }
-
-  try {
-    const startTime = Date.now()
-    let payload: RefreshedOAuthToken
-    try {
-      payload = await antigravityCredentialRefreshPort.refresh(parts.refreshToken)
-    } catch (error) {
-      if (!(error instanceof OAuthTokenEndpointError)) throw error
-
-      const details = [error.code, error.description].filter(Boolean).join(": ")
-      log.warn("Token refresh failed", { status: error.status, code: error.code, details })
-      if (error.code === "invalid_grant") {
-        log.warn("Google revoked the stored refresh token - reauthentication required")
-        invalidateProjectContextCache(auth.refresh)
-        clearCachedAuth(auth.refresh)
-      }
-      throw new AntigravityTokenRefreshError({
-        message: error.message,
-        code: error.code,
-        description: error.description,
-        status: error.status,
-        statusText: error.statusText,
-      })
-    }
-
-    const refreshedParts: RefreshParts = {
-      refreshToken: payload.refreshToken ?? parts.refreshToken,
-      projectId: parts.projectId,
-      managedProjectId: parts.managedProjectId,
-    }
-
-    const updatedAuth: OAuthAuthDetails = {
-      ...auth,
-      access: payload.accessToken,
-      expires: calculateTokenExpiry(startTime, payload.expiresIn),
-      refresh: formatRefreshParts(refreshedParts),
-    }
-
-    storeCachedAuth(updatedAuth)
-    invalidateProjectContextCache(auth.refresh)
-
-    return updatedAuth
-  } catch (error) {
-    if (error instanceof AntigravityTokenRefreshError) {
-      throw error
-    }
-    log.error("Unexpected token refresh error", { error: String(error) })
-    return undefined
-  }
+  return credentialRefreshPolicy.refresh(auth)
 }

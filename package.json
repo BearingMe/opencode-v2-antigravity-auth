@@ -65,6 +65,7 @@
     "test:tui": "bun run build && bun --conditions=browser test test/tui-quota-render.test.ts",
     "test:logging:smoke": "bun run script/test-logging-smoke.mjs",
     "test:account-store:smoke": "bun run script/test-account-store-smoke.mjs",
+    "test:account-admin:smoke": "bun run build && bun run script/test-account-admin-smoke.mjs",
     "test:antigravity:smoke": "bun run build && bun run script/test-antigravity-communication-smoke.mjs",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",

@@ -102,13 +102,14 @@ only as compatibility boundaries during migration.
 - `TransformContext/Result`, `StreamingCallbacks/SignatureStore`
   (`src/plugin/transform/types.ts`, `src/plugin/core/streaming/types.ts`).
 - `antigravity_accounts` tool (`src/v2-plugin.ts :: manageAccounts`,
-  backed by `src/plugin/account-service.ts`).
+  backed by `src/modules/accounts/account-admin.ts` through the compatibility
+  facade in `src/plugin/account-service.ts`).
   No search tool is registered; the D-SEARCH-MUTEX guard in
   `transform/gemini.ts` stays for SDK-supplied search tools.
 - Production account UI (`src/tui.ts :: /antigravity` dialog,
   `src/rpc.ts :: AntigravityAccounts` with `list/quota/verify/mutate/
 deleteAll/ping`) — the interactive management surface sharing the
-  `account-service.ts` backend with the legacy tool. `ping` returns
+  account-admin use cases with the legacy tool. `ping` returns
   `ANTIGRAVITY_RPC_ACCOUNTS_OK`.
 - V2 login surface: the standalone `antigravity` integration with its
   `antigravity-oauth` method and required

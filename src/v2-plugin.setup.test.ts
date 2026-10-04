@@ -10,36 +10,68 @@ const {
   mockLoadManager,
   mockUnifiedRefresh,
   mockRefreshQueue,
+  mockCreateRefreshQueue,
+  createdRefreshQueues,
+  resetRefreshQueueMocks,
+  lifecycleEvents,
   mockDisposeResources,
   written,
-} = vi.hoisted(() => ({
-  authorizeAntigravity: vi.fn(async () => ({
-    url: "https://accounts.google.com/auth?state=encoded-state",
-    verifier: "verifier",
-    projectId: "",
-  })),
-  exchangeAntigravity: vi.fn(async () => ({
-    type: "success" as const,
-    refresh: "new-refresh-token",
-    access: "new-access-token",
-    expires: Date.now() + 3600_000,
-    email: "new@example.com",
-    projectId: "new-project",
-  })),
-  loadAccounts: vi.fn(),
-  updateAccounts: vi.fn(),
-  verifyAccountAccess: vi.fn(async () => ({ status: "ok" as const, message: "verified" })),
-  mockNativeFetch: vi.fn(),
-  mockLoadManager: vi.fn(),
-  mockUnifiedRefresh: vi.fn(async (credential: unknown) => credential),
-  mockRefreshQueue: {
-    setAccountManager: vi.fn(),
-    start: vi.fn(),
-    stop: vi.fn(),
-  },
-  mockDisposeResources: vi.fn(async () => undefined),
-  written: [] as unknown[],
-}))
+} = vi.hoisted(() => {
+  const lifecycleEvents: string[] = []
+  /** Builds an observable queue double with its own lifecycle identity. */
+  const makeRefreshQueue = (id: number) => ({
+    setAccountManager: vi.fn(() => lifecycleEvents.push(`queue-${id}:set-manager`)),
+    start: vi.fn(() => lifecycleEvents.push(`queue-${id}:start`)),
+    stop: vi.fn(() => lifecycleEvents.push(`queue-${id}:stop`)),
+  })
+  const mockRefreshQueue = makeRefreshQueue(1)
+  const createdRefreshQueues: Array<typeof mockRefreshQueue> = [mockRefreshQueue]
+  let returnInitialQueue = true
+  const mockCreateRefreshQueue = vi.fn(() => {
+    if (returnInitialQueue) {
+      returnInitialQueue = false
+      lifecycleEvents.push("create-queue-1")
+      return mockRefreshQueue
+    }
+    const id = createdRefreshQueues.length + 1
+    const queue = makeRefreshQueue(id)
+    createdRefreshQueues.push(queue)
+    lifecycleEvents.push(`create-queue-${id}`)
+    return queue
+  })
+  return {
+    authorizeAntigravity: vi.fn(async () => ({
+      url: "https://accounts.google.com/auth?state=encoded-state",
+      verifier: "verifier",
+      projectId: "",
+    })),
+    exchangeAntigravity: vi.fn(async () => ({
+      type: "success" as const,
+      refresh: "new-refresh-token",
+      access: "new-access-token",
+      expires: Date.now() + 3600_000,
+      email: "new@example.com",
+      projectId: "new-project",
+    })),
+    loadAccounts: vi.fn(),
+    updateAccounts: vi.fn(),
+    verifyAccountAccess: vi.fn(async () => ({ status: "ok" as const, message: "verified" })),
+    mockNativeFetch: vi.fn(),
+    mockLoadManager: vi.fn(),
+    mockUnifiedRefresh: vi.fn(async (credential: unknown) => credential),
+    mockRefreshQueue,
+    mockCreateRefreshQueue,
+    createdRefreshQueues,
+    resetRefreshQueueMocks: () => {
+      returnInitialQueue = true
+      createdRefreshQueues.length = 0
+      createdRefreshQueues.push(mockRefreshQueue)
+    },
+    lifecycleEvents,
+    mockDisposeResources: vi.fn(async () => undefined),
+    written: [] as unknown[],
+  }
+})
 
 // Transactional storage mock mirroring src/plugin/storage.ts updateAccounts:
 // the updater runs against a clone of the latest loadAccounts value and its
@@ -79,7 +111,7 @@ vi.mock("./plugin/accounts.js", () => ({
   AccountManager: { loadFromDisk: mockLoadManager },
 }))
 vi.mock("./plugin/refresh-queue.js", () => ({
-  createProactiveRefreshQueue: vi.fn(() => mockRefreshQueue),
+  createProactiveRefreshQueue: mockCreateRefreshQueue,
 }))
 
 import plugin, { createChildSessionTracker, refreshOAuthCredential } from "./v2-plugin.js"
@@ -88,6 +120,8 @@ const sdkPackage = new URL("./google-sdk.js", import.meta.url).href
 describe("V2 Antigravity runtime bridge", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    lifecycleEvents.length = 0
+    resetRefreshQueueMocks()
     written.length = 0
     loadAccounts.mockResolvedValue({
       version: 4,
@@ -499,10 +533,35 @@ describe("V2 Antigravity runtime bridge", () => {
     expect(mockRefreshQueue.setAccountManager).toHaveBeenCalledOnce()
     expect(mockRefreshQueue.start).toHaveBeenCalledOnce()
 
+    // A successful account mutation stops the old queue and manager. The next
+    // native request creates a fresh manager and proactive queue.
+    loadAccounts.mockResolvedValue({
+      version: 4,
+      accounts: [{ id: "acc-one", email: "one@example.com", refreshToken: "token-one", addedAt: 1, lastUsed: 1 }],
+      activeIndex: 0,
+    })
+    await call("mutate", { id: "acc-one", op: "enable" })
+    expect(mockRefreshQueue.stop).toHaveBeenCalledOnce()
+    await fetchModel.fetch(requestUrl, requestInit)
+    expect(mockLoadManager).toHaveBeenCalledTimes(2)
+    expect(mockCreateRefreshQueue).toHaveBeenCalledTimes(2)
+    expect(createdRefreshQueues).toHaveLength(2)
+    expect(createdRefreshQueues[1]).not.toBe(createdRefreshQueues[0])
+    expect(lifecycleEvents).toEqual([
+      "create-queue-1",
+      "queue-1:set-manager",
+      "queue-1:start",
+      "queue-1:stop",
+      "create-queue-2",
+      "queue-2:set-manager",
+      "queue-2:start",
+    ])
+
     expect(cleanup).toEqual(expect.any(Function))
     await cleanup?.()
     expect(accountsDispose).toHaveBeenCalledOnce()
     expect(mockRefreshQueue.stop).toHaveBeenCalledOnce()
+    expect(createdRefreshQueues[1]?.stop).toHaveBeenCalledOnce()
     expect(mockDisposeResources).toHaveBeenCalledOnce()
   })
 

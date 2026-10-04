@@ -197,6 +197,77 @@ export type {
   AccountStateUpdate,
 } from "./ports.js"
 
+export {
+  createAccountAdmin,
+  ensureAccountIds,
+  listAccounts,
+  MAX_SAVED_ACCOUNTS,
+  LEGACY_TOOL_SELECT_UPDATES_BOTH_FAMILIES,
+  resolveAccountTarget,
+  toAccountList,
+} from "./account-admin.js"
+export type {
+  AccountAdminDependencies,
+  AccountAdminService,
+  MutationFailure,
+  MutationOutcome,
+  MutationOp,
+  MutateOptions,
+  OAuthPersistInput,
+  OAuthPersistOutcome,
+  ResolutionFailure,
+  TargetResolution,
+} from "./account-admin.js"
+
+export { createAccountQuotaPolicy } from "./quota/policy.js"
+export { aggregateAccountQuota } from "./quota/aggregate.js"
+export { checkAccountQuotas } from "./quota/check.js"
+export type { AccountQuotaCheckDependencies, AccountQuotaLogger } from "./quota/check.js"
+export type {
+  AccountQuotaPolicyDependencies,
+  QuotaCheckOutcome,
+  QuotaPresentationGroup,
+  RedactedQuotaResult,
+} from "./quota/policy.js"
+
+export type {
+  AccountQuotaGroup,
+  AccountQuotaGroupSummary,
+  AccountQuotaModelReading,
+  AccountQuotaProbeResult,
+  AccountQuotaResult,
+  AccountQuotaSummary,
+} from "./quota/types.js"
+export type { AccountAccessVerificationResult } from "./verification/types.js"
+export { verifyAccount } from "./verification/policy.js"
+export type { AccountVerificationPolicyDependencies } from "./verification/policy.js"
+export { createProjectContextPolicy } from "./project-context/policy.js"
+export type {
+  ManagedProjectDiscovery,
+  ProjectContextCredential,
+  ProjectContextLogger,
+  ProjectContextPolicyDependencies,
+  ProjectContextPort,
+  ProjectContextResult,
+} from "./project-context/policy.js"
+export { AccountRefreshQueue, DEFAULT_PROACTIVE_REFRESH_CONFIG } from "./refresh/queue.js"
+export { createAccountCredentialRefreshPolicy } from "./refresh/policy.js"
+export type {
+  AccountCredentialRefreshFailure,
+  AccountCredentialRefreshPolicyDependencies,
+  AccountOAuthCredential,
+  AccountRefreshLogger,
+  RefreshedAccountCredential,
+} from "./refresh/policy.js"
+export type {
+  ProactiveRefreshConfig,
+  RefreshQueueAccount,
+  RefreshQueueCredential,
+  RefreshQueueDependencies,
+  RefreshQueueLogger,
+  RefreshQueueManager,
+} from "./refresh/queue.js"
+
 export * from "./persistence/policy.js"
 export * from "./persistence/service.js"
 export { AccountStoreUnreadableError } from "./persistence/errors.js"

@@ -1,13 +1,22 @@
-import type { AccountAdministration, AccountPool, AccountSelectionInput } from "../../modules/accounts/index.js"
-import type { PluginClient } from "../../plugin/types.js"
+import { randomUUID } from "node:crypto"
+import { ANTIGRAVITY_PROVIDER_ID } from "../../constants.js"
 import {
-  deleteAllAccounts,
-  getQuotaPresentation,
-  listAccounts,
-  mutateAccount,
-  persistOAuthAccount,
-  verifyAccount,
-} from "../../plugin/account-service.js"
+  createAccountAdmin,
+  type AccountAdminService,
+  type AccountPool,
+  type AccountSelectionInput,
+} from "../../modules/accounts/index.js"
+import {
+  fingerprintRefreshToken,
+  loadAccounts,
+  saveAccounts,
+  saveAccountsReplace,
+  updateAccounts,
+} from "../../plugin/storage.js"
+import type { PluginClient } from "../../plugin/types.js"
+import { checkAccountsQuota } from "../../plugin/quota.js"
+import { verifyAccountAccess } from "../../plugin/verify.js"
+import { createLogger } from "../../plugin/logger.js"
 import type { AccountManager, ManagedAccount } from "../../plugin/accounts.js"
 
 /**
@@ -15,23 +24,31 @@ import type { AccountManager, ManagedAccount } from "../../plugin/accounts.js"
  *
  * @example `createLegacyAccountAdministration(client, "antigravity")`
  */
-export function createLegacyAccountAdministration(client: PluginClient, providerId: string): AccountAdministration {
-  return {
-    /** Lists safe account summaries from the existing service. */
-    list: listAccounts,
-    /** Reads or refreshes quota presentation through the host client. */
-    quota: (options) => getQuotaPresentation(client, options, providerId),
-    /** Verifies the requested saved account through the host client. */
-    verify: (target) => verifyAccount(target, client, providerId),
-    /** Applies the existing fail-closed account mutation policy. */
-    mutate: (target, operation, options) => mutateAccount(target, operation, options),
-    /** Removes all saved accounts using the existing transactional service. */
-    deleteAll: deleteAllAccounts,
-    /** Persists an OAuth result using the existing account store. */
-    persistOAuth: async (input, action) => {
-      await persistOAuthAccount(input, action)
+export function createLegacyAccountAdministration(
+  client?: PluginClient,
+  providerId = ANTIGRAVITY_PROVIDER_ID,
+): AccountAdminService {
+  const log = createLogger("account-service")
+  return createAccountAdmin({
+    persistence: {
+      load: loadAccounts,
+      save: saveAccounts,
+      saveReplace: saveAccountsReplace,
+      update: updateAccounts,
     },
-  } satisfies AccountAdministration
+    fingerprintRefreshToken,
+    generateId: randomUUID,
+    now: Date.now,
+    checkQuota: (accounts, signal) => {
+      if (!client) throw new Error("An OpenCode client is required for quota checks")
+      return checkAccountsQuota(accounts, client, providerId, signal)
+    },
+    verifyAccount: (account) => {
+      if (!client) throw new Error("An OpenCode client is required for account verification")
+      return verifyAccountAccess(account, client, providerId)
+    },
+    warn: (message) => log.warn(message),
+  })
 }
 
 /**

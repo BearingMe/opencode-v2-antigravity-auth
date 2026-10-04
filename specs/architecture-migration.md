@@ -593,12 +593,39 @@ verification, and refresh policies into their accounts subdirectories.
 
 **Acceptance criteria:**
 
-- [ ] Administration does not depend directly on host clients.
-- [ ] Credential-free results are distinct from RPC schemas/TUI presentation.
-- [ ] Refresh queue start/stop/replacement ordering is preserved.
-- [ ] Mutations/auth changes still invalidate and reset the manager correctly.
-- [ ] List/quota/verify/enable/disable/select/delete/delete-all contracts remain.
-- [ ] Admin smoke covers success, stale targets, and failure handling.
+- [x] Administration does not depend directly on host clients.
+- [x] Credential-free results are distinct from RPC schemas/TUI presentation.
+- [x] Refresh queue start/stop/replacement ordering is preserved.
+- [x] Mutations/auth changes still invalidate and reset the manager correctly.
+- [x] List/quota/verify/enable/disable/select/delete/delete-all contracts remain.
+- [x] Admin smoke covers success, stale targets, and failure handling.
+
+**Verified completion:**
+
+- Moved account administration into `src/modules/accounts/account-admin.ts`;
+  quota aggregation, checks, snapshots and presentation into `quota/`;
+  verification writes into `verification/`; and token refresh, project-context
+  lookup/onboarding, and proactive queue decisions into `refresh/` and
+  `project-context/`. Plugin and application bridges retain host/provider
+  composition and compatibility exports. RPC schema validation remains outside
+  credential-free domain results.
+- Preserved queue ordering and manager invalidation on successful mutations,
+  delete-all, login changes, and verification changes. Added lifecycle-order
+  coverage and made in-flight verification for a durable account fail closed
+  when that identity is removed and re-added with a new ID.
+- Added an isolated account-admin smoke for OAuth persistence/listing, stale
+  targets, capacity failure without partial writes, and delete-all.
+- Validation passed: `bun run test` (67 files / 1,205 tests), `bun run test:tui`
+  (13 tests / 164 expectations), `bun run test:account-admin:smoke`, typecheck,
+  lint, architecture boundary check, changed-file Prettier, and
+  `git diff --check`. Both the account-admin smoke and TUI suite built
+  successfully; credentials in the admin smoke are synthetic. Full-repository
+  `format:check` is not a migration gate because unrelated baseline files are
+  unformatted.
+- JSDoc was audited for changed runtime functions and helpers. Oracle confirmed
+  the host/provider boundaries and, after the durable-ID verification race fix,
+  the stale-target and queue-ordering concerns are resolved. Independent review
+  found no actionable findings. No live vendor quota/auth check was performed.
 
 ## 9. Migrate session recovery
 

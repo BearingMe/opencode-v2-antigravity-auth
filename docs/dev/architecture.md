@@ -55,24 +55,29 @@ src/
 │   └── opencode/              # Host logging destinations
 ├── modules/accounts/
 │   ├── account-pool.ts        # Membership, family cursors, cooldowns, and pool bookkeeping
+│   ├── account-admin.ts       # Credential-free administration use cases and mutations
+│   ├── project-context/       # Managed-project discovery, onboarding, and cache policy
+│   ├── quota/                 # Account quota aggregation, snapshots, and presentation
+│   ├── verification/          # Account verification outcomes and persistence policy
+│   ├── refresh/               # Unified credential refresh and proactive queue policy
 │   ├── persistence/           # Stored schema, migrations, dedupe, and tombstone policy
 │   └── selection/             # Health/token-bucket scoring, hybrid selection, and backoff
 ├── platform/logging/          # Neutral events, policy, and safe log formatting
 └── plugin/
     ├── engine.ts              # Native request/rotation engine (sole router)
-    ├── account-service.ts     # Shared account store service (tool + RPC backend)
+    ├── account-service.ts     # Compatibility façade and RPC quota-schema validation
     ├── account-ui-format.ts   # Quota bars, countdowns, one-liners (pure)
-    ├── auth.ts / token.ts     # Refresh-part packing, unified refresh policy
+    ├── auth.ts / token.ts     # Refresh-part packing and provider/cache composition
     ├── verify.ts / verification.ts  # Access verification policy + compatibility exports
     ├── request.ts / request-helpers.ts  # Transform core + schema/thinking utils
     ├── transform/             # Pure per-family transforms (claude/gemini/sanitizer/resolver)
     ├── core/streaming/        # SSE transformer
     ├── thinking-recovery.ts / recovery/  # Turn repair + session-error hook
-    ├── quota.ts               # Account quota refresh, aggregation, and result policy
+    ├── quota.ts               # Antigravity quota refresh/probe adapter composition
     ├── accounts.ts / rotation.ts # Compatibility facades for the accounts module
     ├── storage.ts               # Compatibility facade for the v4 account store
-    ├── fingerprint.ts / project.ts  # Device fingerprints + managed project context
-    ├── refresh-queue.ts          # Proactive account refresh lifecycle
+    ├── fingerprint.ts / project.ts  # Device fingerprints + project-context composition
+    ├── refresh-queue.ts          # Proactive refresh compatibility façade
     ├── config/                # Zod schema, loader, model definitions, opencode.json updater
     ├── cache/ / stores/       # Signature caches (memory + disk)
     └── debug.ts / logger.ts / logging-utils.ts / version.ts / errors.ts / types.ts

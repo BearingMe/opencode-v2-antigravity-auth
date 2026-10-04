@@ -16,46 +16,55 @@ const { loadAccounts, updateAccounts, checkAccountsQuota, verifyAccountAccess, q
   }),
 )
 
-vi.mock("./storage.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./storage.js")>()
+vi.mock("../../plugin/storage.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../plugin/storage.js")>()
   // Tombstone helpers and the token fingerprint stay real: only the
   // file-backed load/update paths are faked.
   return { ...actual, loadAccounts, updateAccounts }
 })
-vi.mock("./quota.js", () => ({ checkAccountsQuota }))
-vi.mock("./verify.js", () => ({ verifyAccountAccess }))
-vi.mock("./logger.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./logger.js")>()
-  return {
-    ...actual,
-    createLogger: (module: string) => {
-      const logger = actual.createLogger(module)
-      return module === "account-service" ? { ...logger, warn: quotaCacheWarn } : logger
-    },
-  }
+vi.mock("../../plugin/quota.js", () => ({ checkAccountsQuota }))
+vi.mock("../../plugin/verify.js", () => ({ verifyAccountAccess }))
+
+import { manageAccounts } from "../../v2-plugin.js"
+import { createAccountAdmin, MAX_SAVED_ACCOUNTS, resolveAccountTarget } from "./index.js"
+import { fingerprintRefreshToken, saveAccounts, saveAccountsReplace } from "../../plugin/storage.js"
+import type { AccountStorageV4, AccountTarget, QuotaPresentationOptions } from "./index.js"
+
+let nextAccountId = 0
+let clockNow = 1_000_000
+
+const accountAdmin = createAccountAdmin({
+  persistence: {
+    load: loadAccounts,
+    save: saveAccounts,
+    saveReplace: saveAccountsReplace,
+    update: updateAccounts,
+  },
+  fingerprintRefreshToken,
+  generateId: () => `test-account-${++nextAccountId}`,
+  now: () => clockNow,
+  checkQuota: checkAccountsQuota,
+  verifyAccount: verifyAccountAccess,
+  warn: quotaCacheWarn,
 })
 
-import { manageAccounts } from "../v2-plugin.js"
-import {
-  MAX_SAVED_ACCOUNTS,
-  checkQuota,
-  deleteAllAccounts,
-  fingerprintRefreshToken,
-  getQuotaPresentation,
-  listAccounts,
-  mutateAccount,
-  persistOAuthAccount,
-  persistRefreshRotation,
-  resolveAccountTarget,
-  verifyAccount,
-} from "./account-service.js"
+const listAccounts = () => accountAdmin.list()
+const checkQuota = (_client?: unknown, _providerId?: string) => accountAdmin.checkQuota()
+const getQuotaPresentation = (_client?: unknown, options?: QuotaPresentationOptions) => accountAdmin.quota(options)
+const verifyAccount = (target: AccountTarget, _client?: unknown, _providerId?: string) => accountAdmin.verify(target)
+const mutateAccount = (...args: Parameters<typeof accountAdmin.mutate>) => accountAdmin.mutate(...args)
+const deleteAllAccounts = () => accountAdmin.deleteAll()
+const persistOAuthAccount = (...args: Parameters<typeof accountAdmin.persistOAuthAccount>) =>
+  accountAdmin.persistOAuthAccount(...args)
+const persistRefreshRotation = (...args: Parameters<typeof accountAdmin.persistRefreshRotation>) =>
+  accountAdmin.persistRefreshRotation(...args)
 
 // Transactional storage mock: runs the updater against a clone of the latest
 // loadAccounts value and records the replacement store. Updaters that return
 // their input unchanged signal "no change" and record nothing, mirroring
 // updateAccounts in src/plugin/storage.ts.
 updateAccounts.mockImplementation(
-  async (updater: (current: unknown) => Promise<{ storage: unknown; result: unknown }>) => {
+  async (updater: (current: AccountStorageV4) => Promise<{ storage: AccountStorageV4; result: unknown }>) => {
     const current = (await loadAccounts()) ?? { version: 4, accounts: [], activeIndex: 0 }
     const input = structuredClone(current)
     const { storage, result } = await updater(input)
@@ -67,6 +76,8 @@ updateAccounts.mockImplementation(
 beforeEach(() => {
   vi.clearAllMocks()
   written.length = 0
+  nextAccountId = 0
+  clockNow = 1_000_000
 })
 
 /**
@@ -234,7 +245,7 @@ describe("getQuotaPresentation", () => {
   })
 
   it.each(["EACCES", "ENOSPC", "ELOCKED"])("returns fresh quota despite a %s cache-write failure", async (code) => {
-    const cachedAt = Date.now() - 1000
+    const cachedAt = clockNow - 1000
     const source = account({
       id: "stable",
       cachedQuota: { claude: { remainingFraction: 0.9, modelCount: 1 } },
@@ -271,7 +282,7 @@ describe("getQuotaPresentation", () => {
       const source = account({
         id: "stable",
         cachedQuota: { claude: { remainingFraction: 0.9, modelCount: 1 } },
-        cachedQuotaUpdatedAt: Date.now() - 1000,
+        cachedQuotaUpdatedAt: clockNow - 1000,
       })
       loadAccounts.mockResolvedValue(storage([source]))
       checkAccountsQuota.mockImplementationOnce(async () => {
@@ -282,7 +293,7 @@ describe("getQuotaPresentation", () => {
                 {
                   ...source,
                   ...(change === "reconnect" ? { refreshToken: "new-login-token" } : {}),
-                  ...(change === "newer check" ? { cachedQuotaUpdatedAt: Date.now() + 1000 } : {}),
+                  ...(change === "newer check" ? { cachedQuotaUpdatedAt: clockNow + 1000 } : {}),
                   ...(change === "disable" ? { enabled: false } : {}),
                 },
               ]
@@ -387,6 +398,7 @@ describe("getQuotaPresentation", () => {
     })
 
     loadAccounts.mockResolvedValue(saved)
+    clockNow = (fresh.accounts[0]?.quotaSummary.checkedAt ?? clockNow) + 1
     checkAccountsQuota.mockResolvedValue([{ index: 0, status: "error", error: "summary unavailable" }])
     const stale = await getQuotaPresentation({} as never, { staleAfterMs: 0 })
     expect(stale.accounts[0]?.quotaSummary).toMatchObject({
@@ -397,8 +409,7 @@ describe("getQuotaPresentation", () => {
   })
 
   it("returns a concurrent newer grouped snapshot instead of an older probe result", async () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(1_000)
+    clockNow = 1_000
     const olderSummary = [{ displayName: "Older check", buckets: { weekly: { remainingFraction: 0.2 } } }]
     const newerSummary = [{ displayName: "Newer check", buckets: { weekly: { remainingFraction: 0.8 } } }]
     const source = account({
@@ -408,7 +419,7 @@ describe("getQuotaPresentation", () => {
     })
     loadAccounts.mockResolvedValue(storage([source]))
     checkAccountsQuota.mockImplementationOnce(async () => {
-      vi.setSystemTime(2_000)
+      clockNow = 2_000
       loadAccounts.mockResolvedValue(
         storage([
           account({
@@ -432,23 +443,19 @@ describe("getQuotaPresentation", () => {
       ]
     })
 
-    try {
-      const result = await getQuotaPresentation({} as never)
-      expect(result.accounts[0]?.quotaSummary).toMatchObject({
-        checkedAt: 2_000,
-        freshness: "fresh",
-        groups: [{ displayName: "Newer check", buckets: { weekly: { remainingFraction: 0.8 } } }],
-      })
-    } finally {
-      vi.useRealTimers()
-    }
+    const result = await getQuotaPresentation({} as never)
+    expect(result.accounts[0]?.quotaSummary).toMatchObject({
+      checkedAt: 2_000,
+      freshness: "fresh",
+      groups: [{ displayName: "Newer check", buckets: { weekly: { remainingFraction: 0.8 } } }],
+    })
   })
 
   it.each(["delete", "reconnect", "newer check", "disable"])("does not overwrite a concurrent %s", async (change) => {
     const source = account({
       id: "stable",
       cachedQuota: { claude: { remainingFraction: 0.9, modelCount: 1 } },
-      cachedQuotaUpdatedAt: Date.now() - 1000,
+      cachedQuotaUpdatedAt: clockNow - 1000,
     })
     loadAccounts.mockResolvedValue(storage([source]))
     checkAccountsQuota.mockImplementation(async () => {
@@ -459,7 +466,7 @@ describe("getQuotaPresentation", () => {
               {
                 ...source,
                 ...(change === "reconnect" ? { refreshToken: "new-login-token" } : {}),
-                ...(change === "newer check" ? { cachedQuotaUpdatedAt: Date.now() + 1000 } : {}),
+                ...(change === "newer check" ? { cachedQuotaUpdatedAt: clockNow + 1000 } : {}),
                 ...(change === "disable" ? { enabled: false } : {}),
               },
             ]
@@ -529,7 +536,7 @@ describe("getQuotaPresentation", () => {
   })
 
   it("marks failed refreshes as errors and cached values stale without leaking tokens", async () => {
-    const staleAt = Date.now() - 60_000
+    const staleAt = clockNow - 60_000
     loadAccounts.mockResolvedValue(
       storage(
         [
@@ -540,7 +547,7 @@ describe("getQuotaPresentation", () => {
             cachedQuota: { claude: { remainingFraction: 0.25, resetTime: "not-a-date", modelCount: 1 } },
             cachedQuotaUpdatedAt: staleAt,
             verificationRequired: true,
-            coolingDownUntil: Date.now() + 60_000,
+            coolingDownUntil: clockNow + 60_000,
           }),
           account({ id: "failed", email: "failed@example.com", refreshToken: "another-secret" }),
         ],
@@ -569,7 +576,7 @@ describe("getQuotaPresentation", () => {
       verificationRequired: true,
       coolingDown: true,
     })
-    expect(dto.accounts[0]?.cooldownUntil).toBeGreaterThan(Date.now())
+    expect(dto.accounts[0]?.cooldownUntil).toBeGreaterThan(clockNow)
     expect(dto.accounts[0]?.groups.claude).toEqual({ remainingFraction: 0.25, consumedPercent: 75, resetTime: null })
     expect(dto.accounts[1]).toMatchObject({ status: "error", freshness: "unchecked", checkedAt: null })
     expect(JSON.stringify(dto)).not.toContain("secret-refresh-token")
@@ -579,7 +586,7 @@ describe("getQuotaPresentation", () => {
   })
 
   it("labels a successful empty response unknown, selects per family, and supports cache-only reads", async () => {
-    const cachedAt = Date.now()
+    const cachedAt = clockNow
     loadAccounts.mockResolvedValue(
       storage(
         [
@@ -679,7 +686,7 @@ describe("getQuotaPresentation", () => {
   })
 
   it("keeps checkedAt at the cached timestamp when a refresh fails over cached data", async () => {
-    const cachedAt = Date.now() - 30_000
+    const cachedAt = clockNow - 30_000
     loadAccounts.mockResolvedValue(
       storage(
         [
@@ -827,6 +834,16 @@ describe("verifyAccount", () => {
     verifyAccountAccess.mockResolvedValue({ status: "ok", message: "Account verification check passed." })
 
     const outcome = await verifyAccount({ id: "acc-one" }, {} as never, "antigravity")
+
+    expect(outcome).toMatchObject({ ok: false, kind: "not-found" })
+    expect(written).toHaveLength(0)
+  })
+
+  it("does not apply a durable target's verification to a re-added account with the same token", async () => {
+    loadAccounts.mockResolvedValueOnce(storage([account({ id: "old-id", refreshToken: "same-token" })], 0))
+    loadAccounts.mockResolvedValue(storage([account({ id: "new-id", refreshToken: "same-token" })], 0))
+
+    const outcome = await verifyAccount({ id: "old-id" }, {} as never, "antigravity")
 
     expect(outcome).toMatchObject({ ok: false, kind: "not-found" })
     expect(written).toHaveLength(0)

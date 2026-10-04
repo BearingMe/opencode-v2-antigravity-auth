@@ -39,13 +39,17 @@ platform:WINDOWS|MACOS, pluginType:GEMINI}}` to deduped
 - `accessTokenExpired` uses a 60 s clock-skew buffer. `calculateTokenExpiry
 (requestTimeMs, expiresInSeconds)` defaults 3600 s; NaN/≤0 → immediate
   expiry.
-- `refreshAccessToken` (`src/plugin/token.ts`) is the single refresh policy
-  and delegates the POST to `adapters/antigravity/token-client.ts`, which
+- `refreshAccessToken` (`src/plugin/token.ts`) is the compatibility entry into
+  the single policy in `src/modules/accounts/refresh/policy.ts`, which delegates
+  the POST to `adapters/antigravity/token-client.ts`, which
   sends `grant_type=refresh_token` with client id/secret and parses varied error
   shapes, throws `AntigravityTokenRefreshError{code,description,status,
 statusText}` on `!ok`; `invalid_grant` invalidates project cache and clears
   cached auth; preserves project ids when the server omits `refresh_token`;
   stores cached auth + invalidates project cache on success.
+- Managed-project lookup, retry timing, cache coalescing, and fallback selection
+  live in `src/modules/accounts/project-context/policy.ts`; the plugin project
+  facade composes the Antigravity project port and preserves the raw loader API.
 - Refresh is unified: `src/plugin/engine.ts ::
 refreshOAuthCredentialUnified` and the V2 authorize-callback path both go
   through `src/plugin/token.ts :: refreshAccessToken` (skew handling,
@@ -238,20 +242,31 @@ non-streaming variant.
 - `image-saver.ts`: `saveImageToDisk`
   (`~/.opencode/generated-images/image-{ts}-{rand}.{ext}`, `""` on fail) →
   markdown `![...](path)` else data URL.
-- `account-service.ts`: shared service behind the `antigravity_accounts`
-  tool and `/antigravity` TUI quota views. Owns redacted DTOs
-  (`AccountSummary`, `QuotaPresentation`), target resolution
+- `modules/accounts/account-admin.ts`: account policy behind the
+  `antigravity_accounts` tool and `/antigravity` TUI. Owns credential-free list
+  and verification results, target resolution
   (id-vs-index, fail-closed on unknown ids/token values), single-lock
-  `updateAccounts` mutations (`select|enable|disable|delete`,
-  family-scoped cursor repair),
-  `persistOAuthAccount` (dedupe by refresh then case-insensitive email,
-  cap 10, single-lock `updateAccounts`), `persistRefreshRotation`, quota
-  presentation (per-account 12 s timeout clamped 1–30 s, 15 m staleness,
-  fetch-abort-only cancellation, successful snapshot persistence matched
-  to the checked account generation, retaining newer/last-good cache).
+  `updateAccounts` mutations (`select|enable|disable|delete`, family cursor
+  repair), OAuth dedupe/cap enforcement, and refresh-rotation persistence.
+- `modules/accounts/quota/`: quota aggregation/check policy, redacted internal
+  results, cache snapshots, per-account timeout and credential-free quota
+  presentation. The plugin compatibility façade validates the host RPC quota
+  schema separately. Cache writes remain matched to the checked account
+  generation and retain newer/last-good readings.
+- `modules/accounts/verification/` persists verification outcomes; Antigravity
+  request and response behavior remains in its adapter.
+- `modules/accounts/refresh/` owns unified credential refresh and proactive
+  queue scheduling. `v2-plugin.ts` still stops/replaces the queue and manager
+  on account/auth changes.
+- `plugin/account-service.ts`: compatibility façade for existing imports.
+  It no longer owns admin policy. The module service returns credential-free
+  results separately from RPC/TUI schemas and presentation.
+- `AccountSummary` and `QuotaPresentation` remain credential-free contracts;
+  list/quota/verify/enable/disable/select/delete/delete-all behavior is
+  unchanged.
 - `tui.ts` / `rpc.ts`: production `/antigravity` dialog + credential-free
   `AntigravityAccounts` RPC (`list/quota/verify/mutate/deleteAll/ping`),
-  sharing the `account-service.ts` backend with the legacy
+  sharing account-admin use cases with the legacy
   `antigravity_accounts` tool. Transport rule: omit absent optionals, never
   send explicit `undefined` (host JSON codec rejects it); stale mutation
   targets fail closed. Quota controller and built native rendering have
