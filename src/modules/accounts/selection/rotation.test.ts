@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 
 import {
   HealthScoreTracker,
@@ -11,10 +11,6 @@ import {
 } from "./rotation"
 
 describe("HealthScoreTracker", () => {
-  beforeEach(() => {
-    vi.useRealTimers()
-  })
-
   describe("initial state", () => {
     it("returns initial score for unknown account", () => {
       const tracker = new HealthScoreTracker()
@@ -128,52 +124,54 @@ describe("HealthScoreTracker", () => {
   describe("time-based recovery", () => {
     it("recovers points over time", () => {
       let mockTime = 0
-      vi.spyOn(Date, "now").mockImplementation(() => mockTime)
 
-      const tracker = new HealthScoreTracker({
-        initial: 70,
-        failurePenalty: -20,
-        recoveryRatePerHour: 10,
-      })
+      const tracker = new HealthScoreTracker(
+        {
+          initial: 70,
+          failurePenalty: -20,
+          recoveryRatePerHour: 10,
+        },
+        () => mockTime,
+      )
 
       tracker.recordFailure(0)
       expect(tracker.getScore(0)).toBe(50)
 
       mockTime = 2 * 60 * 60 * 1000
       expect(tracker.getScore(0)).toBe(70)
-
-      vi.restoreAllMocks()
     })
 
     it("caps recovery at maxScore", () => {
       let mockTime = 0
-      vi.spyOn(Date, "now").mockImplementation(() => mockTime)
 
-      const tracker = new HealthScoreTracker({
-        initial: 90,
-        successReward: 5,
-        recoveryRatePerHour: 20,
-        maxScore: 100,
-      })
+      const tracker = new HealthScoreTracker(
+        {
+          initial: 90,
+          successReward: 5,
+          recoveryRatePerHour: 20,
+          maxScore: 100,
+        },
+        () => mockTime,
+      )
 
       tracker.recordSuccess(0)
       expect(tracker.getScore(0)).toBe(95)
 
       mockTime = 60 * 60 * 1000
       expect(tracker.getScore(0)).toBe(100)
-
-      vi.restoreAllMocks()
     })
 
     it("floors recovered points (no partial points)", () => {
       let mockTime = 0
-      vi.spyOn(Date, "now").mockImplementation(() => mockTime)
 
-      const tracker = new HealthScoreTracker({
-        initial: 70,
-        failurePenalty: -10,
-        recoveryRatePerHour: 2,
-      })
+      const tracker = new HealthScoreTracker(
+        {
+          initial: 70,
+          failurePenalty: -10,
+          recoveryRatePerHour: 2,
+        },
+        () => mockTime,
+      )
 
       tracker.recordFailure(0)
       expect(tracker.getScore(0)).toBe(60)
@@ -183,8 +181,6 @@ describe("HealthScoreTracker", () => {
 
       mockTime = 30 * 60 * 1000
       expect(tracker.getScore(0)).toBe(61)
-
-      vi.restoreAllMocks()
     })
   })
 
@@ -216,10 +212,6 @@ describe("HealthScoreTracker", () => {
 })
 
 describe("TokenBucketTracker", () => {
-  beforeEach(() => {
-    vi.useRealTimers()
-  })
-
   describe("initial state", () => {
     it("returns initial tokens for unknown account", () => {
       const tracker = new TokenBucketTracker()
@@ -317,94 +309,64 @@ describe("TokenBucketTracker", () => {
   describe("token regeneration", () => {
     it("regenerates tokens over time", () => {
       let mockTime = 0
-      vi.spyOn(Date, "now").mockImplementation(() => mockTime)
 
-      const tracker = new TokenBucketTracker({
-        initialTokens: 50,
-        maxTokens: 50,
-        regenerationRatePerMinute: 6,
-      })
+      const tracker = new TokenBucketTracker(
+        {
+          initialTokens: 50,
+          maxTokens: 50,
+          regenerationRatePerMinute: 6,
+        },
+        () => mockTime,
+      )
 
       tracker.consume(0, 30)
       expect(tracker.getTokens(0)).toBe(20)
 
       mockTime = 5 * 60 * 1000
       expect(tracker.getTokens(0)).toBe(50)
-
-      vi.restoreAllMocks()
     })
 
     it("caps regeneration at maxTokens", () => {
       let mockTime = 0
-      vi.spyOn(Date, "now").mockImplementation(() => mockTime)
 
-      const tracker = new TokenBucketTracker({
-        initialTokens: 40,
-        maxTokens: 50,
-        regenerationRatePerMinute: 6,
-      })
+      const tracker = new TokenBucketTracker(
+        {
+          initialTokens: 40,
+          maxTokens: 50,
+          regenerationRatePerMinute: 6,
+        },
+        () => mockTime,
+      )
 
       tracker.consume(0, 1)
 
       mockTime = 10 * 60 * 1000
       expect(tracker.getTokens(0)).toBe(50)
-
-      vi.restoreAllMocks()
     })
   })
 })
 
 describe("addJitter", () => {
-  it("returns value within jitter range", () => {
-    const base = 1000
-    const jitterFactor = 0.3
-
-    for (let i = 0; i < 100; i++) {
-      const result = addJitter(base, jitterFactor)
-      expect(result).toBeGreaterThanOrEqual(base * (1 - jitterFactor))
-      expect(result).toBeLessThanOrEqual(base * (1 + jitterFactor))
-    }
+  it.each([
+    { random: 0, expected: 700 },
+    { random: 0.5, expected: 1_000 },
+    { random: 1, expected: 1_300 },
+  ])("applies the configured jitter at random=$random", ({ random, expected }) => {
+    expect(addJitter(1_000, 0.3, () => random)).toBe(expected)
   })
 
-  it("uses default jitter factor of 0.3", () => {
-    const base = 1000
-
-    for (let i = 0; i < 100; i++) {
-      const result = addJitter(base)
-      expect(result).toBeGreaterThanOrEqual(700)
-      expect(result).toBeLessThanOrEqual(1300)
-    }
-  })
-
-  it("never returns negative values", () => {
-    for (let i = 0; i < 100; i++) {
-      const result = addJitter(10, 0.9)
-      expect(result).toBeGreaterThanOrEqual(0)
-    }
-  })
-
-  it("returns rounded values", () => {
-    for (let i = 0; i < 100; i++) {
-      const result = addJitter(1000)
-      expect(Number.isInteger(result)).toBe(true)
-    }
+  it("never returns a negative delay", () => {
+    expect(addJitter(0, 2, () => 0)).toBe(0)
   })
 })
 
 describe("randomDelay", () => {
-  it("returns value within min-max range", () => {
-    for (let i = 0; i < 100; i++) {
-      const result = randomDelay(100, 500)
-      expect(result).toBeGreaterThanOrEqual(100)
-      expect(result).toBeLessThanOrEqual(500)
-    }
-  })
-
-  it("returns rounded values", () => {
-    for (let i = 0; i < 100; i++) {
-      const result = randomDelay(100, 500)
-      expect(Number.isInteger(result)).toBe(true)
-    }
+  it.each([
+    { random: 0, expected: 100 },
+    { random: 0.5, expected: 300 },
+    { random: 1, expected: 500 },
+  ])("selects the expected delay at random=$random", ({ random, expected }) => {
+    expect(randomDelay(100, 500, () => random)).toBe(expected)
   })
 
   it("handles min === max", () => {

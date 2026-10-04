@@ -2,14 +2,14 @@
 
 ## Major parts
 
-| Part            | Paths                                                          | Responsibility                                                                                                                                               |
-| --------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Shared identity | `src/constants.ts`, `src/shims.d.ts`, `src/google-sdk.ts`      | OAuth client id/secret/scopes/redirect, endpoint orders, Antigravity headers, version pinning, hardening prompts, search tuning                              |
-| Native engine   | `src/plugin/engine.ts`                                         | Request execution + rotation loop (sole router), unified OAuth refresh, thinking warmup                                                                      |
-| V2 bridge       | `src/v2-plugin.ts`                                             | V2 `integration/provider/model/aisdk/tool/session/event` transforms; routes via the native engine                                                            |
-| OAuth leaf      | `src/antigravity/oauth.ts`                                     | PKCE URL build + code exchange + `loadCodeAssist` project discovery                                                                                          |
-| Auto-update     | `src/hooks/auto-update-checker/*`                              | Root-session npm check, toast or pinned rewrite + cache invalidate                                                                                           |
-| Core domains    | `src/plugin/*` + `cache/config/core/recovery/stores/transform` | Request transform, schema/thinking utils, accounts/rotation/quota/storage/fingerprint/project/refresh, recovery ×2, streaming, debug/logger, version, images |
+| Part            | Paths                                                                            | Responsibility                                                                                                                                                                                       |
+| --------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shared identity | `src/constants.ts`, `src/shims.d.ts`, `src/google-sdk.ts`                        | OAuth client id/secret/scopes/redirect, endpoint orders, Antigravity headers, version pinning, hardening prompts, search tuning                                                                      |
+| Native engine   | `src/plugin/engine.ts`                                                           | Request execution + rotation loop (sole router), unified OAuth refresh, thinking warmup                                                                                                              |
+| V2 bridge       | `src/v2-plugin.ts`                                                               | V2 `integration/provider/model/aisdk/tool/session/event` transforms; routes via the native engine                                                                                                    |
+| OAuth leaf      | `src/antigravity/oauth.ts`                                                       | PKCE URL build + code exchange + `loadCodeAssist` project discovery                                                                                                                                  |
+| Auto-update     | `src/hooks/auto-update-checker/*`                                                | Root-session npm check, toast or pinned rewrite + cache invalidate                                                                                                                                   |
+| Core domains    | `src/modules/*` + `src/plugin/*` + `cache/config/core/recovery/stores/transform` | Account pool/selection and persistence policy, request transforms, schema/thinking utils, quota/storage adapters, fingerprint/project/refresh, recovery ×2, streaming, debug/logger, version, images |
 
 ## Dependency direction (normative)
 
@@ -22,6 +22,7 @@ v2-plugin.ts ──uses──> plugin/engine.ts :: executeAntigravityRequest
                     + antigravity/oauth + hooks/auto-update-checker
 plugin/* ──uses──> constants.ts (identity/endpoints/headers)
                    + plugin/{auth,storage,logger,debug} kernels
+plugin/{accounts,rotation}.ts ──compatibility facades──> modules/accounts/
 transform/*, request-helpers ──should stay──> pure re: I/O
                    (except cache + config reads)
 ```
@@ -80,8 +81,9 @@ outside this plugin's routing scope and MUST retain its configured route.
 ### Rule: R-ARCH-PURE-TRANSFORM
 
 **Requirement:** `src/plugin/transform/*` SHOULD be pure functions of
-`(payload, model, config)`. Network, filesystem, and account mutation belong
-in `request.ts`, `accounts.ts`, `storage.ts`, `quota.ts`, `project.ts`.
+`(payload, model, config)`. Network and filesystem work belong in adapters;
+account policy belongs in `src/modules/accounts/`, with plugin files retained
+only as compatibility boundaries during migration.
 
 **Status:** Strong (consistent implementation; cross-module report).
 
@@ -91,7 +93,10 @@ in `request.ts`, `accounts.ts`, `storage.ts`, `quota.ts`, `project.ts`.
   provider and integration are not modified. Antigravity traffic uses the
   native engine (`src/plugin/engine.ts`, `src/v2-plugin.ts`).
 - `account_selection_strategy = sticky | round-robin | hybrid` (default
-  `hybrid`) + health/token-bucket trackers (`src/plugin/rotation.ts`).
+  `hybrid`) + pool policy in `src/modules/accounts/account-pool.ts` and health,
+  token-bucket, and backoff policy in `src/modules/accounts/selection/`.
+  `src/plugin/accounts.ts` and `src/plugin/rotation.ts` remain compatibility
+  facades for existing callers.
 - `TransformContext/Result`, `StreamingCallbacks/SignatureStore`
   (`src/plugin/transform/types.ts`, `src/plugin/core/streaming/types.ts`).
 - `antigravity_accounts` tool (`src/v2-plugin.ts :: manageAccounts`,

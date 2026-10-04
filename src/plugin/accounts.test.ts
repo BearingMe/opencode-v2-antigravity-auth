@@ -1,13 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import {
-  AccountManager,
-  type ModelFamily,
-  parseRateLimitReason,
-  calculateBackoffMs,
-  type RateLimitReason,
-  resolveQuotaGroup,
-} from "./accounts"
+import { AccountManager, type ModelFamily, resolveQuotaGroup } from "./accounts"
 import { updateAccounts } from "./storage"
 import type { AccountMetadataV3, AccountStorageV4 } from "./storage"
 import type { OAuthAuthDetails } from "./types"
@@ -1032,72 +1025,6 @@ describe("AccountManager", () => {
       expect(manager.getMinWaitTimeForFamily("gemini", "gemini-3-pro-image")).toBe(30000)
 
       expect(manager.getMinWaitTimeForFamily("gemini", "gemini-3-pro")).toBe(0)
-    })
-
-    describe("parseRateLimitReason", () => {
-      it("parses QUOTA_EXHAUSTED from reason field", () => {
-        expect(parseRateLimitReason("QUOTA_EXHAUSTED", undefined)).toBe("QUOTA_EXHAUSTED")
-        expect(parseRateLimitReason("quota_exhausted", undefined)).toBe("QUOTA_EXHAUSTED")
-      })
-
-      it("parses RATE_LIMIT_EXCEEDED from reason field", () => {
-        expect(parseRateLimitReason("RATE_LIMIT_EXCEEDED", undefined)).toBe("RATE_LIMIT_EXCEEDED")
-      })
-
-      it("parses MODEL_CAPACITY_EXHAUSTED from reason field", () => {
-        expect(parseRateLimitReason("MODEL_CAPACITY_EXHAUSTED", undefined)).toBe("MODEL_CAPACITY_EXHAUSTED")
-      })
-
-      it("falls back to message parsing when reason is absent", () => {
-        expect(parseRateLimitReason(undefined, "Rate limit exceeded per minute")).toBe("RATE_LIMIT_EXCEEDED")
-        expect(parseRateLimitReason(undefined, "Too many requests")).toBe("RATE_LIMIT_EXCEEDED")
-        expect(parseRateLimitReason(undefined, "Quota exhausted for today")).toBe("QUOTA_EXHAUSTED")
-      })
-
-      it("returns UNKNOWN when no pattern matches", () => {
-        expect(parseRateLimitReason(undefined, "Some other error")).toBe("UNKNOWN")
-        expect(parseRateLimitReason(undefined, undefined)).toBe("UNKNOWN")
-      })
-    })
-
-    describe("calculateBackoffMs", () => {
-      it("uses retryAfterMs when provided", () => {
-        expect(calculateBackoffMs("QUOTA_EXHAUSTED", 0, 120_000)).toBe(120_000)
-        expect(calculateBackoffMs("RATE_LIMIT_EXCEEDED", 0, 45_000)).toBe(45_000)
-      })
-
-      it("enforces minimum 2s backoff", () => {
-        expect(calculateBackoffMs("QUOTA_EXHAUSTED", 0, 500)).toBe(2_000)
-        expect(calculateBackoffMs("RATE_LIMIT_EXCEEDED", 0, 1_000)).toBe(2_000)
-      })
-
-      it("applies exponential backoff for QUOTA_EXHAUSTED", () => {
-        expect(calculateBackoffMs("QUOTA_EXHAUSTED", 0)).toBe(60_000)
-        expect(calculateBackoffMs("QUOTA_EXHAUSTED", 1)).toBe(300_000)
-        expect(calculateBackoffMs("QUOTA_EXHAUSTED", 2)).toBe(1_800_000)
-        expect(calculateBackoffMs("QUOTA_EXHAUSTED", 3)).toBe(7_200_000)
-        expect(calculateBackoffMs("QUOTA_EXHAUSTED", 10)).toBe(7_200_000)
-      })
-
-      it("returns fixed backoff for RATE_LIMIT_EXCEEDED", () => {
-        expect(calculateBackoffMs("RATE_LIMIT_EXCEEDED", 0)).toBe(30_000)
-        expect(calculateBackoffMs("RATE_LIMIT_EXCEEDED", 5)).toBe(30_000)
-      })
-
-      it("returns short backoff for MODEL_CAPACITY_EXHAUSTED", () => {
-        // Base backoff is 45s with ±15s jitter (range: 30s to 60s)
-        const result = calculateBackoffMs("MODEL_CAPACITY_EXHAUSTED", 0)
-        expect(result).toBeGreaterThanOrEqual(30_000)
-        expect(result).toBeLessThanOrEqual(60_000)
-      })
-
-      it("returns soft retry for SERVER_ERROR", () => {
-        expect(calculateBackoffMs("SERVER_ERROR", 0)).toBe(20_000)
-      })
-
-      it("returns default backoff for UNKNOWN", () => {
-        expect(calculateBackoffMs("UNKNOWN", 0)).toBe(60_000)
-      })
     })
 
     describe("markRateLimitedWithReason", () => {

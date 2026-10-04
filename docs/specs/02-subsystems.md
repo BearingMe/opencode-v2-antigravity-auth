@@ -105,9 +105,9 @@ injectToolHardeningInstruction`; `fixToolResponseGrouping /
 validateAndFixClaudeToolPairing`; `isEmptyResponseBody /
 createSyntheticErrorResponse`.
 
-## 2.5 Multi-account pool + rotation — `accounts.ts`, `rotation.ts`
+## 2.5 Account pool + selection — `modules/accounts/account-pool.ts`, `selection/`
 
-- `RateLimitReason = QUOTA_EXHAUSTED | RATE_LIMIT_EXCEEDED |
+- `selection/backoff.ts :: RateLimitReason = QUOTA_EXHAUSTED | RATE_LIMIT_EXCEEDED |
 MODEL_CAPACITY_EXHAUSTED | SERVER_ERROR | UNKNOWN`.
   `parseRateLimitReason`: 529/503 → capacity, 500 → server, reason/message
   scan capacity>rate-limit>quota, 429 → UNKNOWN.
@@ -119,13 +119,20 @@ MODEL_CAPACITY_EXHAUSTED | SERVER_ERROR | UNKNOWN`.
 - `ManagedAccount{index,email,addedAt,lastUsed,parts,access,expires,enabled,
 rateLimitResetTimes,touchedForQuota,consecutiveFailures+TTL,
 fingerprint+history[5],cachedQuota+updatedAt,verification*}`.
+- Pool membership, family cursors, bookkeeping, and account cooldown state are
+  owned by `src/modules/accounts/account-pool.ts`. Health/token-bucket scoring,
+  hybrid selection, failure classification, and backoff are owned by
+  `src/modules/accounts/selection/`.
 - Selection: sticky / round-robin / hybrid (default hybrid) via
   `getCurrentOrNextForFamily` with Antigravity quota + soft-quota + cooldown
   filters, PID offset, cursor round-robin. Hybrid score =
   health×2 + tokens×5 + freshness×0.1 + stickiness bonus 150, switch
-  threshold 100 (`rotation.ts :: selectHybridAccount`,
+  threshold 100 (`selection/rotation.ts :: selectHybridAccount`,
   `HealthScoreTracker` init 70 +1/−10/−20, 2/h recovery, max 100, min-usable
   50; `TokenBucketTracker` max 50, regen 6/min).
+- `src/plugin/accounts.ts` and `src/plugin/rotation.ts` preserve the existing
+  plugin-facing API as compatibility facades; the request engine remains the
+  sole router and continues to own retry orchestration.
 - `src/plugin/engine.ts` adds its own capacity tiers `[5,10,20,30,60 s]`,
   `FIRST_RETRY 1 s / SWITCH 5 s`, dedup window 2 s, state reset 120 s,
   `MAX_CONSECUTIVE_FAILURES=5` → 30 s cooldown.

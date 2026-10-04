@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { AccountManager } from "./accounts.ts"
 import { formatRefreshParts } from "./auth.ts"
 import { DEFAULT_CONFIG } from "./config/schema.ts"
@@ -156,6 +156,10 @@ describe("refreshOAuthCredentialUnified (D-REFRESH-DUAL)", () => {
 })
 
 describe("executeAntigravityRequest", () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     resetEngineStateForTests()
@@ -326,6 +330,43 @@ describe("executeAntigravityRequest", () => {
     expect(manager.getAccountsSnapshot()[0]?.rateLimitResetTimes["gemini-antigravity:gemini-3-pro"]).toBeGreaterThan(
       Date.now(),
     )
+  })
+
+  it("cancels an exhaustion wait without dispatching another request", async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2025-01-01T00:00:00.000Z"))
+    const manager = makeManager([{ refreshToken: "rt-1", access: "at-1", expires: Date.now() + 3600_000 }])
+    const account = manager.getAccounts()[0]
+    expect(account).toBeDefined()
+    manager.markRateLimited(account!, 60_000, "gemini", "gemini-3-pro")
+    const fetchImpl = vi.fn(async () => new Response("unexpected"))
+    const controller = new AbortController()
+    const toastMessages: string[] = []
+    const onToast = vi.fn((message: string) => {
+      toastMessages.push(message)
+    })
+
+    const request = executeAntigravityRequest(
+      GEMINI_URL,
+      { method: "POST", signal: controller.signal },
+      {
+        client: makeClient(),
+        providerId: "antigravity",
+        config: { ...DEFAULT_CONFIG },
+        accountManager: manager,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        onToast,
+      },
+    )
+    await vi.advanceTimersByTimeAsync(0)
+    expect(onToast).toHaveBeenCalledOnce()
+    expect(toastMessages[0]).toContain("Waiting")
+    expect(vi.getTimerCount()).toBeGreaterThan(0)
+    controller.abort(new Error("request cancelled"))
+
+    await expect(request).rejects.toThrow("request cancelled")
+    expect(fetchImpl).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(0)
   })
 
   it("returns a synthetic prompt-too-long response on 400 instead of locking the session", async () => {

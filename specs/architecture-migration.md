@@ -134,7 +134,7 @@ the tracker may identify that commit by subject to avoid self-referential hashes
 | 3    | Mechanical boundary checks            | done    | `build: enforce architecture boundaries and required test suites`       |
 | 4    | Logging separation                    | done    | `refactor: separate logging facilities from destinations`               |
 | 5    | Account persistence                   | done    | `refactor: separate account persistence policy from filesystem storage` |
-| 6    | Account pool and selection            | pending | —                                                                       |
+| 6    | Account pool and selection            | done    | `refactor: migrate account pool and selection policies`                 |
 | 7    | Antigravity account communication     | pending | —                                                                       |
 | 8    | Account administration and lifecycle  | pending | —                                                                       |
 | 9    | Session recovery                      | pending | —                                                                       |
@@ -501,12 +501,44 @@ health, cooldown, and rotation policies into `selection/`.
 
 **Acceptance criteria:**
 
-- [ ] Sticky, round-robin, and hybrid strategies preserve behavior.
-- [ ] Limits, durable identity, and bookkeeping remain unchanged.
-- [ ] Selection depends on neither inference internals nor transports.
-- [ ] Failure and rate-limit state have explicit ownership.
-- [ ] Behavioral tests cover rotation, exhaustion, and cancellation with
+- [x] Sticky, round-robin, and hybrid strategies preserve behavior.
+- [x] Limits, durable identity, and bookkeeping remain unchanged.
+- [x] Selection depends on neither inference internals nor transports.
+- [x] Failure and rate-limit state have explicit ownership.
+- [x] Behavioral tests cover rotation, exhaustion, and cancellation with
       controlled time and independently derived expectations.
+
+### Step 6 progress notes
+
+- Moved the account manager implementation into
+  `src/modules/accounts/account-pool.ts`; injected time, randomness, persistence,
+  identity, fingerprint, and logging dependencies. Pool membership, family
+  cursors, stable IDs, failure bookkeeping, and transactional save/tombstone
+  behavior remain in the accounts module. The plugin-facing
+  `src/plugin/accounts.ts` facade and engine route remain intact.
+- Moved health/token-bucket trackers, hybrid selection, backoff classification,
+  and retry policy into `src/modules/accounts/selection/`. Kept the shared
+  index-keyed trackers and setup configuration; `src/plugin/rotation.ts` remains
+  a compatibility facade. The account module has no inference or transport
+  implementation imports.
+- Moved selection tests with the policy and replaced stochastic range loops
+  with controlled randomness/time. Added pool tests for sticky, round-robin,
+  hybrid, cooldown exhaustion/recovery, and an engine integration test proving
+  cancellation clears an active exhaustion wait before request dispatch.
+- Extended the built-package account-store smoke to construct the module pool
+  against an isolated synthetic config directory and verify selection and
+  persisted bookkeeping, in addition to existing migration, stale-delete, and
+  corrupt-store checks. No real account files are read or written.
+- Updated system, subsystem, lifecycle, testing, and developer architecture
+  references; audited runtime/test-helper JSDoc.
+- Validation: `bun run test` (55 files / 1,166 tests), `bun run test:tui`
+  (clean build / 13 tests), typecheck, lint, boundary check and fixtures
+  (7 tests / 22 expectations), changed-file Prettier, `git diff --check`,
+  account-store/pool smoke, and logging smoke all passed.
+- Oracle found no blocker. Review's cancellation-test finding was fixed by
+  proving the exhaustion timer is pending before abort; Oracle and review
+  follow-up confirmed the active-wait coverage. No unresolved findings remain.
+- Completion commit: `refactor: migrate account pool and selection policies`.
 
 ## 7. Extract Antigravity account communication
 

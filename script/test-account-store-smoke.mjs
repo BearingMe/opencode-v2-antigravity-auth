@@ -35,8 +35,30 @@ async function runAccountStoreSmoke() {
   assert.equal(migrated?.accounts[0]?.email, "smoke@example.invalid")
   assert.equal(JSON.parse(readFileSync(storePath, "utf8")).version, 4, "the migration should persist")
 
-  const staleSnapshot = migrated
-  const deleted = migrated.accounts[0]
+  const { AccountPoolManager } = await import("../dist/src/modules/accounts/index.js")
+  const { generateFingerprint, updateFingerprintVersion } = await import("../dist/src/plugin/fingerprint.js")
+  const manager = new AccountPoolManager(undefined, migrated, {
+    clock: { now: () => 100 },
+    update: storage.updateAccounts,
+    fingerprintToken: storage.fingerprintRefreshToken,
+    generateId: () => "synthetic-account-id",
+    generateFingerprint,
+    updateFingerprintVersion,
+    processId: 1,
+    formatAccountLabel: (_email, index) => `Account ${index + 1}`,
+    logSoftQuotaSkipped: () => undefined,
+    logSelection: () => undefined,
+    random: () => 0.5,
+  })
+  assert.equal(manager.getCurrentOrNextForFamily("gemini", undefined, "sticky")?.index, 0)
+  manager.markAccountUsed(0)
+  await manager.saveToDisk()
+  const poolSaved = await storage.loadAccounts()
+  assert.ok(poolSaved, "the synthetic pool save should produce a current store")
+  assert.equal(poolSaved?.accounts[0]?.lastUsed, 100, "pool bookkeeping should persist through the storage port")
+
+  const staleSnapshot = poolSaved
+  const deleted = poolSaved?.accounts[0]
   assert.ok(deleted, "the synthetic account should be available for deletion")
   const tombstone = storage.tombstoneForAccount(deleted, 100)
   await storage.updateAccounts((current) => ({
@@ -74,4 +96,6 @@ try {
   rmSync(configDir, { recursive: true, force: true })
 }
 
-console.log("Built-package account-store smoke passed (migration, stale-delete protection, and corrupt-store safety).")
+console.log(
+  "Built-package account-store smoke passed (migration, pool persistence, stale-delete protection, and corrupt-store safety).",
+)

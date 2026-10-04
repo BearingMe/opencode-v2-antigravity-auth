@@ -196,3 +196,30 @@ export type {
 export * from "./persistence/policy.js"
 export * from "./persistence/service.js"
 export { AccountStoreUnreadableError } from "./persistence/errors.js"
+export { AccountPoolManager, computeSoftQuotaCacheTtlMs, resolveQuotaGroup } from "./account-pool.js"
+export type {
+  AccountFingerprint,
+  AccountFingerprintVersion,
+  AccountPoolDependencies,
+  ManagedAccount,
+  PoolOAuthAuth,
+  PoolQuotaGroupSummary,
+  PoolRefreshParts,
+} from "./account-pool.js"
+export {
+  addJitter,
+  calculateBackoffMs,
+  DEFAULT_HEALTH_SCORE_CONFIG,
+  DEFAULT_TOKEN_BUCKET_CONFIG,
+  getHealthTracker,
+  getTokenTracker,
+  HealthScoreTracker,
+  initHealthTracker,
+  initTokenTracker,
+  parseRateLimitReason,
+  randomDelay,
+  selectHybridAccount,
+  sortByLruWithHealth,
+  TokenBucketTracker,
+} from "./selection/index.js"
+export type { AccountWithMetrics, HealthScoreConfig, RateLimitReason, TokenBucketConfig } from "./selection/index.js"

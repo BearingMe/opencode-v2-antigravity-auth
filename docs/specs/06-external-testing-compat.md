@@ -76,7 +76,8 @@ event` transforms. V2 API explicitly "may change before stable".
   thinking-recovery, token, storage (v1–v4, tombstones, replace semantics),
   account-service presentation, account-ui-format, cache, debug/logger —
   see `02-subsystems` and code refs (`request.test.ts`,
-  `model-resolver.test.ts`, `rotation.test.ts`, `quota-fallback.test.ts`,
+  `model-resolver.test.ts`, `modules/accounts/selection/rotation.test.ts`,
+  `modules/accounts/selection/backoff.test.ts`, `quota-fallback.test.ts`,
   `antigravity-account-rotation.test.ts`, `cross-model-integration.test.ts`).
 - `src/plugin/engine.test.ts`: native-engine tests (routing decision, quota
   fallback, warmup URL, wait formatting, native-enable flag,

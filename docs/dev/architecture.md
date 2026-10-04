@@ -53,7 +53,9 @@ src/
 │   ├── filesystem/            # Account store, config ignores, and debug-file destination
 │   └── opencode/              # Host logging destinations
 ├── modules/accounts/
-│   └── persistence/           # Stored schema, migrations, dedupe, and tombstone policy
+│   ├── account-pool.ts        # Membership, family cursors, cooldowns, and pool bookkeeping
+│   ├── persistence/           # Stored schema, migrations, dedupe, and tombstone policy
+│   └── selection/             # Health/token-bucket scoring, hybrid selection, and backoff
 ├── platform/logging/          # Neutral events, policy, and safe log formatting
 └── plugin/
     ├── engine.ts              # Native request/rotation engine (sole router)
@@ -66,9 +68,10 @@ src/
     ├── core/streaming/        # SSE transformer
     ├── thinking-recovery.ts / recovery/  # Turn repair + session-error hook
     ├── quota.ts               # Antigravity fetchAvailableModels quota probing
-    ├── accounts.ts / storage.ts  # Pool manager + v4 persistent store
+    ├── accounts.ts / rotation.ts # Compatibility facades for the accounts module
+    ├── storage.ts               # Compatibility facade for the v4 account store
     ├── fingerprint.ts / project.ts  # Device fingerprints + managed project context
-    ├── refresh-queue.ts / rotation.ts  # Proactive refresh + health/token-bucket scoring
+    ├── refresh-queue.ts          # Proactive account refresh lifecycle
     ├── config/                # Zod schema, loader, model definitions, opencode.json updater
     ├── cache/ / stores/       # Signature caches (memory + disk)
     └── debug.ts / logger.ts / logging-utils.ts / version.ts / errors.ts / types.ts
@@ -85,6 +88,11 @@ the locked filesystem implementation is in
 `adapters/filesystem/account-store.ts`. `plugin/storage.ts` remains a
 compatibility facade while existing callers migrate in later steps.
 
+Account membership and selection policy now live in
+`modules/accounts/account-pool.ts` and `modules/accounts/selection/`.
+`plugin/accounts.ts` and `plugin/rotation.ts` preserve existing callers while
+the request engine and administration service migrate in later steps.
+
 Historical (removed, do not reintroduce): V1 `src/plugin.ts`, `cli.ts`,
 `server.ts` (localhost OAuth listener), `ui/`, and `plugin/search.ts`
 (`google_search` tool). The D-SEARCH-MUTEX guard for model-declared web
@@ -93,8 +101,8 @@ search stays in the request pipeline.
 ## Boundaries
 
 - `transform/*` stays pure: `(payload, model, config)` in, transformed
-  payload out. Network, filesystem, and account mutation belong in
-  `request.ts`, `accounts.ts`, `storage.ts`, `quota.ts`, `project.ts`.
+  payload out. Network and filesystem work belongs in adapters; account
+  policy belongs in `modules/accounts/`.
 - `hooks/*` must not depend on auth/quota/accounts/storage/fingerprint/
   project. It only uses file debug logging.
 - External-origin fetches must never receive `x-goog-api-key` or

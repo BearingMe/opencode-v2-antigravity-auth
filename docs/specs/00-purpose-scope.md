@@ -43,8 +43,10 @@ In scope:
 - Request interception, model resolution, payload transforms, streaming
   transform (`src/plugin/request.ts`, `src/plugin/transform/*`,
   `src/plugin/request-helpers.ts`, `src/plugin/core/streaming/*`).
-- Multi-account pool, rotation, quota probing, fingerprints, project context
-  (`src/plugin/accounts.ts`, `rotation.ts`, `quota.ts`, `fingerprint.ts`,
+- Multi-account pool/selection and persistence policy
+  (`src/modules/accounts/account-pool.ts`, `modules/accounts/selection/`,
+  `modules/accounts/persistence/`), quota probing, fingerprints, project context
+  (`src/plugin/quota.ts`, `fingerprint.ts`,
   `project.ts`, `storage.ts`, `refresh-queue.ts`).
 - Recovery (in-flight turn repair + session-error hook), debug file/TUI
   logging split (`debug` vs `debug_tui`), version pinning,
