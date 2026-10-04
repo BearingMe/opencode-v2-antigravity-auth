@@ -1,0 +1,26 @@
+[
+  {
+    "source": "src/plugin/engine.ts",
+    "target": "src/app/legacy-bridges/accounts.ts",
+    "reason": "The legacy request engine still delegates account selection to the Step 2 bridge.",
+    "removeAfter": "Step 12: application execution and composition"
+  },
+  {
+    "source": "src/plugin/engine.ts",
+    "target": "src/app/legacy-bridges/inference.ts",
+    "reason": "The legacy request engine still delegates inference work to the Step 2 bridge.",
+    "removeAfter": "Step 12: application execution and composition"
+  },
+  {
+    "source": "src/v2-plugin.ts",
+    "target": "src/app/legacy-bridges/accounts.ts",
+    "reason": "The legacy plugin entrypoint still delegates account administration to the Step 2 bridge.",
+    "removeAfter": "Step 13: OpenCode integration and packaging"
+  },
+  {
+    "source": "src/v2-plugin.ts",
+    "target": "src/app/legacy-bridges/session-recovery.ts",
+    "reason": "The legacy plugin entrypoint still delegates session recovery to the Step 2 bridge.",
+    "removeAfter": "Step 13: OpenCode integration and packaging"
+  }
+]

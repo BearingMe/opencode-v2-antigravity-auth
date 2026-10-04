@@ -1,6 +1,6 @@
 # Modules
 
-`modules/` contains the system's independently understandable capabilities. Organize by conceptual ownership, not technical type. Future modules might include `accounts`, `inference`, or `session-recovery`.
+`modules/` contains the system's independently understandable capabilities. Organize by conceptual ownership, not technical type. Current modules are `accounts`, `inference`, and `session-recovery`.
 
 > A module should contain enough knowledge to change its responsibility safely while exposing as little knowledge as possible to the rest of the system.
 
@@ -18,3 +18,19 @@
 - Create a boundary before migrating implementation behind it. Prefer behavior-preserving moves; avoid combining relocation, redesign, and behavior changes unless unavoidable.
 - New architecture should reduce dependency knowledge, not just add folders. Filesystem organization alone is not enforcement; boundaries should eventually be mechanically enforceable, without circular dependencies.
 - Keep code regions small and independently understandable for people and AI agents.
+
+## Boundary checks
+
+Run `bun run check:boundaries` before changing imports across these boundaries.
+It resolves TypeScript imports (including `.js` specifiers that map to `.ts`)
+and checks public module entrypoints, dependency direction, host/filesystem
+imports, scoped legacy exceptions, and runtime import cycles. Type-only imports
+still obey boundary rules but do not create runtime-cycle edges.
+
+Modules and platform code may use the approved pure `zod` package; other
+external package imports need an explicit adapter/port or a reviewed checker
+allowance.
+
+Exact legacy bridge and runtime-cycle allowances, with their removal steps, live
+in `script/boundary-exceptions.json` and `script/boundary-cycle-exceptions.json`.
+Do not broaden an allowance to a directory or reuse it from another source file.

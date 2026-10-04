@@ -54,6 +54,8 @@
     "build": "tsc -p tsconfig.build.json && bun run script/build-tui.mjs",
     "build:schema": "bun run script/build-schema.ts",
     "typecheck": "tsc --noEmit",
+    "check:boundaries": "bun run script/check-boundaries.ts",
+    "check:boundaries:test": "bun test script/check-boundaries.test.ts",
     "lint": "eslint . --quiet",
     "lint:all": "eslint .",
     "lint:fix": "eslint . --fix",

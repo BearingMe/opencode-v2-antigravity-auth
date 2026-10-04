@@ -127,22 +127,22 @@ concise: commands/results, Oracle and review outcomes, smoke scenario/results,
 documentation audit, and any blockers. Update evidence in the same scoped commit;
 the tracker may identify that commit by subject to avoid self-referential hashes.
 
-| Step | Title                                 | Status  | Evidence / commit                                         |
-| ---- | ------------------------------------- | ------- | --------------------------------------------------------- |
-| 1    | Baseline and ownership map            | done    | `test: isolate suite state and map architecture baseline` |
-| 2    | Public APIs and ports                 | done    | `refactor: define module contracts and legacy bridges`    |
-| 3    | Mechanical boundary checks            | pending | —                                                         |
-| 4    | Logging separation                    | pending | —                                                         |
-| 5    | Account persistence                   | pending | —                                                         |
-| 6    | Account pool and selection            | pending | —                                                         |
-| 7    | Antigravity account communication     | pending | —                                                         |
-| 8    | Account administration and lifecycle  | pending | —                                                         |
-| 9    | Session recovery                      | pending | —                                                         |
-| 10   | Inference transforms and signatures   | pending | —                                                         |
-| 11   | Inference pipelines and client        | pending | —                                                         |
-| 12   | Application execution and composition | pending | —                                                         |
-| 13   | OpenCode integration and packaging    | pending | —                                                         |
-| 14   | Final architecture verification       | pending | —                                                         |
+| Step | Title                                 | Status  | Evidence / commit                                                 |
+| ---- | ------------------------------------- | ------- | ----------------------------------------------------------------- |
+| 1    | Baseline and ownership map            | done    | `test: isolate suite state and map architecture baseline`         |
+| 2    | Public APIs and ports                 | done    | `refactor: define module contracts and legacy bridges`            |
+| 3    | Mechanical boundary checks            | done    | `build: enforce architecture boundaries and required test suites` |
+| 4    | Logging separation                    | pending | —                                                                 |
+| 5    | Account persistence                   | pending | —                                                                 |
+| 6    | Account pool and selection            | pending | —                                                                 |
+| 7    | Antigravity account communication     | pending | —                                                                 |
+| 8    | Account administration and lifecycle  | pending | —                                                                 |
+| 9    | Session recovery                      | pending | —                                                                 |
+| 10   | Inference transforms and signatures   | pending | —                                                                 |
+| 11   | Inference pipelines and client        | pending | —                                                                 |
+| 12   | Application execution and composition | pending | —                                                                 |
+| 13   | OpenCode integration and packaging    | pending | —                                                                 |
+| 14   | Final architecture verification       | pending | —                                                                 |
 
 ## 1. Establish the migration baseline and ownership map
 
@@ -361,12 +361,46 @@ Make required automated suites gate normal CI.
 
 **Acceptance criteria:**
 
-- [ ] Cross-module imports use deliberate public contracts; deep imports fail.
-- [ ] Modules cannot import adapters or app; platform cannot import any of them.
-- [ ] Circular dependencies are detected.
-- [ ] Legacy exceptions are explicit and scoped, not blanket exclusions.
-- [ ] A deliberately invalid import demonstrably fails boundary validation.
-- [ ] Full Vitest and native Bun TUI suites gate PRs; neither is silently skipped.
+- [x] Cross-module imports use deliberate public contracts; deep imports fail.
+- [x] Modules cannot import adapters or app; platform cannot import any of them.
+- [x] Circular dependencies are detected.
+- [x] Legacy exceptions are explicit and scoped, not blanket exclusions.
+- [x] A deliberately invalid import demonstrably fails boundary validation.
+- [x] Full Vitest and native Bun TUI suites gate PRs; neither is silently skipped.
+
+### Step 3 progress notes
+
+- Added `bun run check:boundaries`, a TypeScript-resolved import check covering
+  static imports, re-exports, literal dynamic imports (including options),
+  CommonJS requires, `.js`-to-`.ts` paths, public module files, dependency
+  direction, external package policy, and runtime-only cycles. Type-only edges
+  still obey layer rules but do not form runtime cycles.
+- Modules and platform permit the pure `zod` dependency; other external
+  packages must be routed through an adapter/port or receive a reviewed,
+  explicit allowance. Accounts and inference remain independent; inference may
+  depend on session recovery's public API.
+- Four exact legacy-bridge import allowances name their removal steps in
+  `script/boundary-exceptions.json`. The pre-existing debug/logger/storage
+  cycle is recorded as three exact edges with Step 4 as its removal checkpoint;
+  adding an edge invalidates that exception.
+- The invalid-fixture CLI smoke returned nonzero and identified the offending
+  source line and private target. Checker fixtures passed (7 tests / 22
+  expectations), including side-effect imports/re-exports, type-only versus
+  runtime cycles, dynamic-import options, and exception scoping.
+- CI now runs the boundary check and fixtures, full Vitest, and the native TUI
+  suite; `test:tui` supplies the clean build previously run as a separate step.
+  Vitest uses at most two workers to avoid host CPU-count-driven memory
+  exhaustion without changing test selection.
+- Validation: `bun run check:boundaries`, `bun run check:boundaries:test`,
+  `bun run test` (49 files / 1,147 tests), and `bun run test:tui` (clean build
+  / 13 tests) passed. Typecheck, lint, changed-file Prettier, and
+  `git diff --check` passed.
+- Oracle consultation found no remaining blocker. Review findings for package
+  policy, exact cycle exceptions, empty imports/re-exports, and dynamic import
+  options were resolved; final review found no actionable findings. Checker
+  helpers and test helpers were JSDoc-audited; no product runtime behavior was
+  changed.
+- Completion commit: `build: enforce architecture boundaries and required test suites`.
 
 ## 4. Separate logging facilities from logging destinations
 
