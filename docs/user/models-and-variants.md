@@ -30,9 +30,11 @@ remain available.
 | `antigravity-claude-opus-4-6-thinking`   | —                       | Claude Opus 4.6 with thinking    |
 | `antigravity-gpt-oss-120b-medium`        | —                       | GPT-OSS 120B at medium reasoning |
 
-The Gemini 3.8 Flash model is sent to Antigravity's `gemini-3.8-flash-tiered`
-backend ID. Legacy Gemini preview IDs are still normalized by request routing,
-but are not published as selectable catalog entries.
+Gemini 3.6, 3.7, and 3.8 Flash are sent to Antigravity's corresponding
+`gemini-3.x-flash-tiered` backend IDs. Claude Sonnet 4.6 with thinking is sent
+as `claude-sonnet-4-6` with thinking enabled in the request configuration.
+Legacy Gemini preview IDs are still normalized by request routing, but are not
+published as selectable catalog entries.
 
 Gemini 2.5 IDs such as `gemini-2.5-flash`, `gemini-2.5-pro`, and
 `gemini-2.5-flash-image` are not supported through Antigravity OAuth. Use a

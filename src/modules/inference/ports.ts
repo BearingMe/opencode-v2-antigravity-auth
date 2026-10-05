@@ -19,6 +19,27 @@ export interface InferenceRequestPolicyPort {
   debugTuiEnabled(): boolean
 }
 
+/** Logging and runtime hooks required by the request/response pipeline. */
+export interface InferencePipelineRuntimePort<Fingerprint, DebugContext> {
+  endpoint: string
+  debugMessagePrefix: string
+  createRequestId(): string
+  hashConversationSeed(seed: string): string
+  getUserAgent(fingerprint?: Fingerprint): string
+  keepThinking(): boolean
+  debugTuiEnabled(): boolean
+  imageAspectRatio(): string | undefined
+  processImageData(input: { mimeType?: string; data?: string }): string | null | undefined
+  debug(message: string, fields?: Record<string, unknown>): void
+  warn(message: string, fields?: Record<string, unknown>): void
+  logResponse(
+    context: DebugContext | null | undefined,
+    response: Response,
+    meta?: { body?: string; note?: string; error?: unknown; headersOverride?: HeadersInit },
+  ): void
+  logCacheStats(model: string, cacheReadTokens: number, cacheWriteTokens: number, totalInputTokens: number): void
+}
+
 /** Recovery-error classification needed while repairing outgoing requests. */
 export interface InferenceRecoveryPort {
   detectErrorType(error: unknown): RecoveryErrorType | null

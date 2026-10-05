@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { AccountManager } from "./accounts.ts"
 import { formatRefreshParts } from "./auth.ts"
 import { DEFAULT_CONFIG } from "./config/schema.ts"
+import { ANTIGRAVITY_ENDPOINT_FALLBACKS } from "../constants.ts"
 import { AntigravityTokenRefreshError } from "./token.ts"
 import type { PluginClient } from "./types.ts"
 
@@ -263,6 +264,50 @@ describe("executeAntigravityRequest", () => {
     expect(mockTransform).toHaveBeenCalledOnce()
   })
 
+  it("runs Sonnet thinking warmup when the resolved backend ID omits the thinking suffix", async () => {
+    const manager = makeManager([{ refreshToken: "rt-1", access: "at-1", expires: Date.now() + 3600_000 }])
+    const wrappedRequest = JSON.stringify({
+      project: "test-project",
+      model: "claude-sonnet-4-6",
+      request: { contents: [{ role: "user", parts: [{ text: "hello" }] }] },
+    })
+    mockPrepare.mockImplementationOnce((_input: unknown, init?: RequestInit) => ({
+      request: "https://mock-endpoint/v1internal:generateContent",
+      init: { method: "POST", headers: {}, body: init?.body },
+      streaming: false,
+      requestedModel: "antigravity-claude-sonnet-4-6-thinking",
+      effectiveModel: "claude-sonnet-4-6",
+      projectId: "test-project",
+      sessionId: "sonnet-thinking-session",
+      needsSignedThinkingWarmup: true,
+    }))
+    const fetchImpl = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response("{}", { status: 200, headers: { "content-type": "application/json" } }),
+    )
+
+    await executeAntigravityRequest(
+      "https://generativelanguage.googleapis.com/v1beta/models/antigravity-claude-sonnet-4-6-thinking:generateContent",
+      { method: "POST", body: wrappedRequest },
+      {
+        client: makeClient(),
+        providerId: "antigravity",
+        config: { ...DEFAULT_CONFIG },
+        accountManager: manager,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      },
+    )
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+    const warmupCall = fetchImpl.mock.calls[0]
+    expect(String(warmupCall?.[0])).toContain(":streamGenerateContent?alt=sse")
+    const warmupBody = JSON.parse(warmupCall?.[1]?.body as string)
+    expect(warmupBody.request.generationConfig.thinkingConfig).toMatchObject({
+      include_thoughts: true,
+      thinking_budget: 16000,
+    })
+  })
+
   it("evicts invalid_grant accounts and continues with the next account", async () => {
     const manager = makeManager([
       { refreshToken: "rt-revoked" },
@@ -330,6 +375,78 @@ describe("executeAntigravityRequest", () => {
     expect(manager.getAccountsSnapshot()[0]?.rateLimitResetTimes["gemini-antigravity:gemini-3-pro"]).toBeGreaterThan(
       Date.now(),
     )
+  })
+
+  it("caps repeated capacity retries, refreshes fingerprint once, then tries endpoint fallback", async () => {
+    vi.useFakeTimers()
+    vi.spyOn(Math, "random").mockReturnValue(0.5)
+
+    const manager = makeManager([{ refreshToken: "rt-1", access: "at-1", expires: Date.now() + 3600_000 }])
+    const regenerateFingerprint = vi.spyOn(manager, "regenerateAccountFingerprint")
+    const [primaryEndpoint, fallbackEndpoint] = ANTIGRAVITY_ENDPOINT_FALLBACKS
+    expect(primaryEndpoint).toBeDefined()
+    expect(fallbackEndpoint).toBeDefined()
+
+    mockPrepare.mockImplementation(
+      (
+        input: unknown,
+        init: RequestInit | undefined,
+        accessToken: string,
+        projectId: string,
+        endpointOverride?: string,
+      ) => ({
+        request:
+          endpointOverride === primaryEndpoint ? "https://mock-endpoint/primary" : "https://mock-endpoint/fallback",
+        init: { method: "POST", headers: {}, body: init?.body },
+        streaming: false,
+        requestedModel: "gemini-3-pro",
+        effectiveModel: "gemini-3-pro",
+        projectId,
+        endpoint: endpointOverride,
+        accessToken,
+        input,
+      }),
+    )
+
+    const capacityError = JSON.stringify({
+      error: {
+        message: "Model capacity exhausted",
+        details: [{ "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason: "MODEL_CAPACITY_EXHAUSTED" }],
+      },
+    })
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "https://mock-endpoint/primary") {
+        return new Response(capacityError, { status: 503, headers: { "content-type": "application/json" } })
+      }
+      return new Response("{}", { status: 200, headers: { "content-type": "application/json" } })
+    })
+    const controller = new AbortController()
+    const safetyAbort = setTimeout(() => controller.abort(new Error("capacity retry loop did not terminate")), 30_000)
+
+    const request = executeAntigravityRequest(
+      GEMINI_URL,
+      { method: "POST", signal: controller.signal },
+      {
+        client: makeClient(),
+        providerId: "antigravity",
+        config: { ...DEFAULT_CONFIG, request_jitter_max_ms: 0 },
+        accountManager: manager,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      },
+    )
+
+    try {
+      await vi.advanceTimersByTimeAsync(30_000)
+      const response = await request
+
+      expect(response.status).toBe(200)
+      expect(fetchImpl).toHaveBeenCalledTimes(6)
+      expect(regenerateFingerprint).toHaveBeenCalledOnce()
+      expect(mockPrepare.mock.calls.at(-1)?.[4]).toBe(fallbackEndpoint)
+    } finally {
+      clearTimeout(safetyAbort)
+      vi.restoreAllMocks()
+    }
   })
 
   it("cancels an exhaustion wait without dispatching another request", async () => {

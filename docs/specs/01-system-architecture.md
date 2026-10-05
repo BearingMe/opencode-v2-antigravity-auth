@@ -100,9 +100,9 @@ diagnostics are supplied or handled by the request boundary.
   token-bucket, and backoff policy in `src/modules/accounts/selection/`.
   `src/plugin/accounts.ts` and `src/plugin/rotation.ts` remain compatibility
   facades for existing callers.
-- `TransformContext/Result` and signature policy/types live in
-  `src/modules/inference/`; `StreamingCallbacks` remain in
-  `src/plugin/core/streaming/types.ts`.
+- `TransformContext/Result`, request/response pipelines, signature policy, and
+  `StreamingCallbacks` live in `src/modules/inference/`; plugin request and
+  streaming paths are compatibility adapters.
 - `antigravity_accounts` tool (`src/v2-plugin.ts :: manageAccounts`,
   backed by `src/modules/accounts/account-admin.ts` through the compatibility
   facade in `src/plugin/account-service.ts`).

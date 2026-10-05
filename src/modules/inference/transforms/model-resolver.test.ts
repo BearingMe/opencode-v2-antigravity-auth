@@ -104,11 +104,11 @@ describe("resolveAntigravityModel", () => {
 
   it("routes the hardcoded Gemini Flash models to their Antigravity IDs", () => {
     expect(resolveAntigravityModel("antigravity-gemini-3.6-flash")).toMatchObject({
-      actualModel: "gemini-3.6-flash",
+      actualModel: "gemini-3.6-flash-tiered",
       thinkingLevel: "low",
     })
     expect(resolveAntigravityModel("antigravity-gemini-3.7-flash")).toMatchObject({
-      actualModel: "gemini-3.7-flash",
+      actualModel: "gemini-3.7-flash-tiered",
       thinkingLevel: "low",
     })
     expect(resolveAntigravityModel("antigravity-gemini-3.8-flash")).toMatchObject({
@@ -117,10 +117,18 @@ describe("resolveAntigravityModel", () => {
     })
   })
 
+  it.each(["low", "medium", "high"] as const)("preserves Gemini Flash tier %s on tiered inventory IDs", (tier) => {
+    expect(resolveAntigravityModel(`antigravity-gemini-3.6-flash-${tier}`)).toMatchObject({
+      actualModel: "gemini-3.6-flash-tiered",
+      thinkingLevel: tier,
+    })
+  })
+
   it("routes the hardcoded Claude and GPT-OSS models without adding variants", () => {
     expect(resolveAntigravityModel("antigravity-claude-sonnet-4-6-thinking")).toMatchObject({
-      actualModel: "claude-sonnet-4-6-thinking",
+      actualModel: "claude-sonnet-4-6",
       thinkingBudget: 32768,
+      isThinkingModel: true,
     })
     expect(resolveAntigravityModel("antigravity-gpt-oss-120b-medium")).toEqual({
       actualModel: "gpt-oss-120b-medium",

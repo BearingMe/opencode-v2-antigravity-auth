@@ -31,6 +31,7 @@ import type { AntigravityConfig } from "./config/index.js"
 import type { OAuthAuthDetails, PluginClient, ProjectContextResult } from "./types.js"
 import { createLegacyAccountPool } from "../app/legacy-bridges/accounts.js"
 import { legacyInference } from "../app/legacy-bridges/inference.js"
+import { createAntigravityInferenceClient } from "../adapters/antigravity/inference-client.js"
 
 const log = createLogger("engine")
 
@@ -39,6 +40,8 @@ const FIRST_RETRY_DELAY_MS = 1000
 const SWITCH_ACCOUNT_DELAY_MS = 5000
 const MAX_WARMUP_SESSIONS = 1000
 const MAX_WARMUP_RETRIES = 2
+const MAX_CAPACITY_RETRIES = 3
+const MAX_CAPACITY_FINGERPRINT_REFRESHES = 1
 const RATE_LIMIT_DEDUP_WINDOW_MS = 2000
 const RATE_LIMIT_STATE_RESET_MS = 120_000
 const MAX_CONSECUTIVE_FAILURES = 5
@@ -473,6 +476,7 @@ export async function executeAntigravityRequest(
 ): Promise<Response> {
   const { client, providerId, config, accountManager } = options
   const fetchImpl = options.fetchImpl ?? fetch
+  const inferenceClient = createAntigravityInferenceClient(fetchImpl)
 
   const urlString = toUrlString(input)
   const model = extractModelFromUrl(urlString)
@@ -782,10 +786,7 @@ export async function executeAntigravityRequest(
 
       const warmupBody = buildThinkingWarmupBody(
         typeof prepared.init.body === "string" ? prepared.init.body : undefined,
-        Boolean(
-          prepared.effectiveModel?.toLowerCase().includes("claude") &&
-          prepared.effectiveModel?.toLowerCase().includes("thinking"),
-        ),
+        prepared.needsSignedThinkingWarmup,
       )
       if (!warmupBody) {
         return
@@ -814,7 +815,7 @@ export async function executeAntigravityRequest(
 
       try {
         pushDebug("thinking-warmup: start")
-        const warmupResponse = await fetchImpl(warmupUrl, warmupInit)
+        const warmupResponse = await inferenceClient.send(warmupUrl, warmupInit)
         const transformed = await legacyInference.transformResponse({
           response: warmupResponse,
           streaming: true,
@@ -851,11 +852,13 @@ export async function executeAntigravityRequest(
       let forceThinkingRecovery = false
       let tokenConsumed = false
       let capacityRetryCount = 0
+      let capacityFingerprintRefreshCount = 0
       let lastEndpointIndex = -1
 
       for (let i = 0; i < ANTIGRAVITY_ENDPOINT_FALLBACKS.length; i++) {
         if (i !== lastEndpointIndex) {
           capacityRetryCount = 0
+          capacityFingerprintRefreshCount = 0
           lastEndpointIndex = i
         }
 
@@ -922,7 +925,7 @@ export async function executeAntigravityRequest(
             destination: new URL(toUrlString(prepared.request)).hostname,
             model: prepared.effectiveModel ?? prepared.requestedModel,
           })
-          const response = await fetchImpl(prepared.request, prepared.init)
+          const response = await inferenceClient.send(prepared.request, prepared.init)
           pushDebug(`status=${response.status} ${response.statusText}`)
 
           if (response.status === 429 || response.status === 503 || response.status === 529) {
@@ -955,20 +958,45 @@ export async function executeAntigravityRequest(
 
               await sleep(waitMs, abortSignal)
 
-              if (capacityRetryCount < 3) {
+              if (capacityRetryCount < MAX_CAPACITY_RETRIES) {
                 capacityRetryCount++
                 i -= 1
                 continue
-              } else {
+              }
+
+              if (capacityFingerprintRefreshCount < MAX_CAPACITY_FINGERPRINT_REFRESHES) {
+                capacityFingerprintRefreshCount++
                 pushDebug(
-                  `Max capacity retries (3) exhausted for endpoint ${currentEndpoint}, regenerating fingerprint...`,
+                  `Max capacity retries (${MAX_CAPACITY_RETRIES}) exhausted for endpoint ${currentEndpoint}, regenerating fingerprint...`,
                 )
                 const newFingerprint = accountManager.regenerateAccountFingerprint(account.index)
                 if (newFingerprint) {
                   pushDebug(`Fingerprint regenerated for account ${account.index}`)
                 }
+                i -= 1
                 continue
               }
+
+              pushDebug(`Capacity retries exhausted for endpoint ${currentEndpoint}; moving to fallback`)
+              lastFailure = createFailureContext(response)
+              if (i < ANTIGRAVITY_ENDPOINT_FALLBACKS.length - 1) {
+                await logResponseBody(debugContext, response, response.status)
+                continue
+              }
+
+              accountManager.markRateLimitedWithReason(
+                account,
+                family,
+                model,
+                rateLimitReason,
+                serverRetryMs,
+                config.failure_ttl_seconds * 1000,
+              )
+              accountManager.requestSaveToDisk()
+              getHealthTracker().recordRateLimit(account.index)
+              await showToast("Server capacity retries exhausted. Returning the last provider error.", "warning")
+              shouldSwitchAccount = true
+              break
             }
 
             const quotaKey = quotaKeyForFamily(family)

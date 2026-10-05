@@ -25,16 +25,19 @@ OpenCode ──▶ Plugin ──▶ Antigravity API ──▶ Claude/Gemini
    - Account selection (sticky/hybrid/round-robin, rate-limit aware),
      unified token refresh, project-context resolution, soft-quota gate,
      endpoint fallback (daily → prod), optional thinking warmup,
-     Antigravity fetch, streaming transform, success/failure bookkeeping,
+     Antigravity dispatch through `adapters/antigravity/inference-client.ts`,
+     streaming transform, success/failure bookkeeping,
      rotation and retry.
-3. **Transformation** (`modules/inference/transforms/*`,
-   `modules/inference/signature-*.ts`, `src/plugin/request.ts`,
-   `request-helpers.ts`, `core/streaming/*`)
+3. **Transformation** (`modules/inference/pipeline.ts`,
+   `modules/inference/transforms/*`, `modules/inference/request-helpers.ts`,
+   `modules/inference/streaming/*`, and signature policy). The plugin request
+   facade supplies config, debug, fingerprint, and image-storage adapters.
 
 - Model detection, thinking config, Claude thinking-strip, tool
   normalization to `functionDeclarations[]`, schema sanitization, tool-id
   assignment, `{ project, model, request }` wrapping; SSE streaming with
-  signature caching and `thought` → `reasoning` conversion.
+  signature caching and `thought` → `reasoning` conversion. Engine retains
+  account/retry orchestration; the Antigravity client owns fetch dispatch.
 
 Session recovery policy lives in `modules/session-recovery/`: pure in-request
 turn repair is separate from session-error recovery. The filesystem store and
@@ -59,7 +62,7 @@ src/
 ├── antigravity/oauth.ts       # Compatibility facade for OAuth authorization and exchange
 ├── hooks/auto-update-checker/ # Version check (root sessions only; never installs)
 ├── adapters/
-│   ├── antigravity/           # OAuth identity/endpoints/headers and account communication clients
+│   ├── antigravity/           # OAuth identity/endpoints/headers and account/inference clients
 │   ├── filesystem/            # Account/recovery/signature stores and debug-file destination
 │   └── opencode/              # Host logging destinations and session-recovery operations
 ├── modules/accounts/
@@ -72,7 +75,7 @@ src/
 │   ├── persistence/           # Stored schema, migrations, dedupe, and tombstone policy
 │   └── selection/             # Health/token-bucket scoring, hybrid selection, and backoff
 ├── modules/session-recovery/  # Error detection, session repair, and request-time turn repair
-├── modules/inference/         # Pure model transforms, schema cleaning, signature policy/cache, and ports
+├── modules/inference/         # Request helpers, transforms, schema cleaning, streaming, signatures, and ports
 ├── platform/logging/          # Neutral events, policy, and safe log formatting
 └── plugin/
     ├── engine.ts              # Native request/rotation engine (sole router)
@@ -80,9 +83,9 @@ src/
     ├── account-ui-format.ts   # Quota bars, countdowns, one-liners (pure)
     ├── auth.ts / token.ts     # Refresh-part packing and provider/cache composition
     ├── verify.ts / verification.ts  # Access verification policy + compatibility exports
-    ├── request.ts / request-helpers.ts  # Legacy request pipeline + response/protocol helpers
+    ├── request.ts / request-helpers.ts  # Compatibility APIs and config/debug adapters
     ├── transform/             # Compatibility exports for inference transforms
-    ├── core/streaming/        # SSE transformer
+    ├── core/streaming/        # Compatibility exports for inference SSE transformer
     ├── thinking-recovery.ts / recovery.ts # Compatibility facades for recovery policy
     ├── quota.ts               # Antigravity quota refresh/probe adapter composition
     ├── accounts.ts / rotation.ts # Compatibility facades for the accounts module

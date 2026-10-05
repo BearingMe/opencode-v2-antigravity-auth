@@ -38,8 +38,9 @@ failure tolerated; project failure tolerated to empty-project (deferred).
 Trigger: SDK call to `generativelanguage.googleapis.com/v1*/models/*:
 (generateContent|streamGenerateContent|countTokens)`.
 Participants: V2 `antigravityFetch` → `normalizeFetchBody` → native engine
-`executeAntigravityRequest` (`src/plugin/engine.ts`, sole router) → `accounts → token → project → request → fetch(Antigravity) →
-streaming transformer`.
+`executeAntigravityRequest` (`src/plugin/engine.ts`, sole router) →
+`accounts → token → project → modules/inference/pipeline.ts` →
+`adapters/antigravity/inference-client.ts` → inference streaming transformer.
 
 1. V2: `requireOAuthAuth`; reject non-model GL paths; strip credentials for
    external origins and direct-fetch.

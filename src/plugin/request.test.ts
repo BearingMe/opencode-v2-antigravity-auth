@@ -1144,6 +1144,44 @@ describe("request.ts", () => {
         expect(result.effectiveModel).toBe("gemini-3.1-pro-low")
       })
 
+      it("sends Claude Sonnet 4.6 thinking under its base ID with a valid thinking budget", () => {
+        const result = prepareAntigravityRequest(
+          "https://generativelanguage.googleapis.com/v1beta/models/antigravity-claude-sonnet-4-6-thinking:generateContent",
+          { method: "POST", body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "hello" }] }] }) },
+          mockAccessToken,
+          mockProjectId,
+        )
+        const wrapped = JSON.parse(result.init.body as string)
+
+        expect(result.effectiveModel).toBe("claude-sonnet-4-6")
+        expect(wrapped.request.generationConfig).toMatchObject({
+          thinkingConfig: { include_thoughts: true, thinking_budget: 32768 },
+          maxOutputTokens: 64000,
+        })
+      })
+
+      it("requests a Sonnet thinking signature warmup for an unsigned tool turn", () => {
+        const result = withKeepThinking(true, () =>
+          prepareAntigravityRequest(
+            "https://generativelanguage.googleapis.com/v1beta/models/antigravity-claude-sonnet-4-6-thinking:generateContent",
+            {
+              method: "POST",
+              body: JSON.stringify({
+                contents: [
+                  { role: "user", parts: [{ text: "sonnet warmup regression conversation" }] },
+                  { role: "model", parts: [{ functionCall: { name: "lookup", args: {} } }] },
+                ],
+              }),
+            },
+            mockAccessToken,
+            "sonnet-warmup-test-project",
+          ),
+        )
+
+        expect(result.effectiveModel).toBe("claude-sonnet-4-6")
+        expect(result.needsSignedThinkingWarmup).toBe(true)
+      })
+
       it("keeps supported non-Gemini-3 models unchanged", () => {
         const result = prepareAntigravityRequest(
           "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",

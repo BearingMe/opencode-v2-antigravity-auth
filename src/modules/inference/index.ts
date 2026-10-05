@@ -90,12 +90,16 @@ export interface InferenceApi<Fingerprint = InferenceFingerprint, DebugContext =
 export type {
   InferencePorts,
   InferenceRecoveryPort,
+  InferencePipelineRuntimePort,
   InferenceRequestPolicyPort,
   InferenceSignatureCachePort,
   InferenceSignaturePersistencePort,
 } from "./ports.js"
 
 export {
+  ANTIGRAVITY_SYSTEM_INSTRUCTION,
+  CLAUDE_DESCRIPTION_PROMPT,
+  CLAUDE_TOOL_SYSTEM_INSTRUCTION,
   EMPTY_SCHEMA_PLACEHOLDER_DESCRIPTION,
   EMPTY_SCHEMA_PLACEHOLDER_NAME,
   MIN_SIGNATURE_LENGTH,
@@ -137,9 +141,16 @@ export {
 } from "./signature-policy.js"
 export type { SignatureRepairOptions } from "./signature-policy.js"
 export type { RequestSanitizationOptions } from "./signature-policy.js"
-export {
-  deepFilterThinkingBlocks,
-  filterMessagesThinkingBlocks,
-  filterUnsignedThinkingBlocks,
-} from "./thinking-filter.js"
+export * from "./request-helpers.js"
+export type { RequestThinkingConfig } from "./request-helpers.js"
 export type { ThinkingFilterOptions } from "./thinking-filter.js"
+export {
+  cacheThinkingSignaturesFromResponse,
+  createStreamingTransformer,
+  createThoughtBuffer,
+  deduplicateThinkingText,
+  transformSseLine,
+  transformStreamingPayload,
+} from "./streaming/index.js"
+export type { StreamingCallbacks, StreamingOptions, ThoughtBuffer } from "./streaming/index.js"
+export { createInferencePipeline } from "./pipeline.js"

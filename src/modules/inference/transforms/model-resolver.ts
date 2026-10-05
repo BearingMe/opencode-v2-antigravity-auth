@@ -264,6 +264,13 @@ export function resolveAntigravityModel(requestedModel: string): ResolvedModel {
   const isGemini3 = lower.includes("gemini-3")
 
   if (!isGemini3) {
+    if (/^(?:antigravity-)?claude-sonnet-4-6-thinking$/i.test(requestedModel)) {
+      return {
+        actualModel: "claude-sonnet-4-6",
+        thinkingBudget: THINKING_TIER_BUDGETS.claude.high,
+        isThinkingModel: true,
+      }
+    }
     return resolveModelWithTier(requestedModel)
   }
 
@@ -271,9 +278,10 @@ export function resolveAntigravityModel(requestedModel: string): ResolvedModel {
     .replace(/-preview-customtools$/i, "")
     .replace(/-preview$/i, "")
     .replace(/^antigravity-/i, "")
-  // Antigravity's inventory exposes Gemini 3.8 Flash under its tiered ID.
-  if (transformedModel === "gemini-3.8-flash") {
-    transformedModel = "gemini-3.8-flash-tiered"
+  // Antigravity accepts tiered inventory IDs for Gemini Flash 3.6–3.8.
+  const flashTier = transformedModel.match(/^(gemini-3\.[678]-flash)(?:-(minimal|low|medium|high))?$/i)
+  if (flashTier?.[1]) {
+    transformedModel = `${flashTier[1]}-tiered${flashTier[2] ? `-${flashTier[2]}` : ""}`
   }
 
   const isGemini3Pro = isGemini3ProModel(transformedModel)

@@ -40,11 +40,13 @@ In scope:
   `src/plugin/token.ts`, `src/v2-plugin.ts :: refreshOAuthCredential`).
 - Dedicated provider/integration registration without reading or mutating
   OpenCode's Google provider or sign-in connection.
-- Request interception, model resolution, payload transforms, streaming
-  transform (`src/plugin/request.ts`, `src/modules/inference/transforms/*`,
-  `src/modules/inference/signature-*`, `src/plugin/request-helpers.ts`,
-  `src/plugin/core/streaming/*`). Legacy `src/plugin/transform/*` paths are
-  compatibility exports during migration.
+- Request interception, model resolution, payload transforms, and streaming
+  (`src/modules/inference/pipeline.ts`, `src/modules/inference/transforms/*`,
+  `src/modules/inference/signature-*`, `src/modules/inference/streaming/*`).
+  `src/plugin/request.ts`, `src/plugin/request-helpers.ts`, and
+  `src/plugin/core/streaming/*` retain compatibility APIs and adapter wiring.
+  Legacy `src/plugin/transform/*` paths are compatibility exports during
+  migration.
 - Multi-account pool/selection and persistence policy
   (`src/modules/accounts/account-pool.ts`, `modules/accounts/selection/`,
   `modules/accounts/persistence/`), quota probing, fingerprints, project context

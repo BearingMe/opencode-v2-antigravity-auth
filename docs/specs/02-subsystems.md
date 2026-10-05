@@ -58,7 +58,11 @@ refreshOAuthCredential` is a thin wrapper that delegates to the unified
   path and persists refresh rotation; new code MUST NOT add a parallel
   refresh implementation.
 
-## 2.3 Request preparation — `src/plugin/request.ts`
+## 2.3 Request preparation — `src/modules/inference/pipeline.ts`
+
+The plugin-facing `src/plugin/request.ts` compatibility API supplies the
+config, debug, fingerprint, and image-storage callbacks; request policy remains
+inference-owned.
 
 `prepareAntigravityRequest(input, init, accessToken, projectId,
 endpointOverride, forceThinkingRecovery, opts)`:
@@ -215,7 +219,7 @@ dedup; managed short-circuit; else load→onboard FREE→fallback
 HTTP/body parsing is owned by `adapters/antigravity/verification-client.ts`
 and `verification-parser.ts`; `plugin/verify.ts` retains account outcome policy.
 
-## 2.10 Streaming — `src/plugin/core/streaming/transformer.ts`
+## 2.10 Streaming — `src/modules/inference/streaming/transformer.ts`
 
 `createStreamingTransformer(store, callbacks, options)`: TextDecoder
 line-buffered TransformStream; per-line `transformSseLine` (per-candidate
@@ -223,7 +227,8 @@ thought accumulation, Claude index 0, fullText+signature store,
 delta-only dedup via sentBuffer+displayedHashes DJB2, one-shot debug
 inject, `transformThinkingParts`); usageMetadata detection + synthetic
 zero-usage injection on flush. `transformStreamingPayload` is the
-non-streaming variant.
+non-streaming variant. `src/plugin/core/streaming/*` retains compatibility
+exports.
 
 ## 2.11 Recovery (two layers)
 
@@ -301,7 +306,7 @@ thinking_disabled_violation`; gated by `session_recovery` and deduplicates
 - `modules/inference/signature-cache.ts` owns the 1 h in-memory cache, 100-entry
   per-scope cap, expiry-then-oldest-quarter eviction, and disk-port promotion.
   `modules/inference/signature-store.ts` owns the signed-thinking store;
-  streaming thought buffers remain with streaming compatibility code.
+  streaming thought buffers remain with the inference streaming pipeline.
 - `adapters/filesystem/signature-cache-store.ts` owns the version-1 disk file,
   48 h TTL, 60 s batched writes, atomic merge/write, and 30 min memory cleanup.
   Disk keys retain the composite signature scope plus the 16-hex SHA-256 text key.

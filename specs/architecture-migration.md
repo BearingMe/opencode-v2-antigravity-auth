@@ -138,8 +138,8 @@ the tracker may identify that commit by subject to avoid self-referential hashes
 | 7    | Antigravity account communication     | done    | `2cd7ef3`                                                               |
 | 8    | Account administration and lifecycle  | done    | `98da1fb`, `8c70e45`                                                    |
 | 9    | Session recovery                      | done    | `refactor: migrate session recovery policies`                           |
-| 10   | Inference transforms and signatures   | pending | —                                                                       |
-| 11   | Inference pipelines and client        | pending | —                                                                       |
+| 10   | Inference transforms and signatures   | done    | `8e77da0`                                                               |
+| 11   | Inference pipelines and client        | done    | `refactor: migrate inference request and response pipelines`            |
 | 12   | Application execution and composition | pending | —                                                                       |
 | 13   | OpenCode integration and packaging    | pending | —                                                                       |
 | 14   | Final architecture verification       | pending | —                                                                       |
@@ -721,12 +721,56 @@ signature policy into inference; separate disk signature persistence.
 
 **Acceptance criteria:**
 
-- [ ] The client owns communication, not selection or app orchestration.
-- [ ] Inference does not call concrete HTTP/filesystem implementations.
-- [ ] SSE, reasoning conversion, signatures, and cleanup remain compatible.
-- [ ] Fallback, aborts, empty responses, and error classification retain behavior.
-- [ ] Streaming/non-streaming smoke passes for affected model families.
-- [ ] Wire-envelope handling versus inference policy is explicitly reviewed.
+- [x] The client owns communication, not selection or app orchestration.
+- [x] Inference does not call concrete HTTP/filesystem implementations.
+- [x] SSE, reasoning conversion, signatures, and cleanup remain compatible.
+- [x] Fallback, aborts, empty responses, and error classification retain behavior.
+- [x] Streaming/non-streaming smoke passes for affected model families.
+- [x] Wire-envelope handling versus inference policy is explicitly reviewed.
+
+**Ownership decision:** The inference request policy owns Antigravity model and
+payload shaping, including the `{ project, model, request }` wire envelope.
+The inference client sends the prepared URL and `RequestInit` unchanged. The
+native engine retains account selection, warmup/retry decisions, endpoint
+fallback, and response bookkeeping. Request preparation, response
+normalization, and streaming policy now live in `modules/inference`; the
+plugin-facing request facade supplies host/runtime adapters. The engine still
+uses the same single execution path.
+
+### Step 11 completion evidence
+
+- Moved request preparation and response normalization into
+  `modules/inference/pipeline.ts`; moved shared request helpers and SSE
+  transforms under inference. Plugin request/helper/streaming modules remain
+  compatibility facades and supply config, logging, fingerprint, and image
+  persistence callbacks. The inference client forwards the prepared request;
+  it does not select accounts, retry, or interpret responses.
+- Kept the `{ project, model, request }` wire envelope as inference policy and
+  retained account selection, endpoint fallback, warmup/retry decisions, and
+  bookkeeping in the native engine. Capacity retries remain bounded to three
+  retries per endpoint and one fingerprint refresh; the engine test verifies
+  fallback after the retry cap.
+- Live wire-ID probes succeeded for Gemini Flash 3.6/3.7 using their
+  `-tiered` backend IDs, and Sonnet 4.6 Thinking using
+  `claude-sonnet-4-6` with a 32,768-token thinking budget. Catalog IDs remain
+  unchanged. Regression coverage verifies Sonnet preparation requests a
+  signature warmup for an unsigned tool turn and the engine executes that
+  warmup when the resolved ID omits `-thinking`.
+- Validation passed: `bun run test` (76 files / 1,212 tests),
+  `bun run typecheck`, `bun run lint`, `bun run check:boundaries`,
+  `bun run check:boundaries:test` (7 tests / 22 expectations), changed-file
+  Prettier, and `git diff --check`. `bun run test:tui` passed (clean build,
+  13 tests / 164 expectations); `bun run test:antigravity:smoke` passed against
+  the built package with synthetic credentials and mocked HTTP.
+- Live streaming CLI requests and non-streaming `generateContent` requests
+  returned `WORKING` for Gemini Flash 3.6, Gemini Flash 3.7, and Claude Sonnet
+  4.6 Thinking. The repo-wide `bun run format:check` still reports 82
+  untouched files; every changed file passes Prettier.
+- Oracle confirmed the ownership split, transport-only client, bounded retries,
+  and Sonnet warmup fix. Independent review found no remaining code blocker.
+  New/moved runtime functions were JSDoc-audited; architecture, subsystem,
+  end-to-end, and model documentation were updated.
+- Completion commit: `refactor: migrate inference request and response pipelines`.
 
 ## 12. Extract application execution and composition
 
