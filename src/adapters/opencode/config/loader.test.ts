@@ -17,6 +17,7 @@ const ENV_KEYS = [
   "OPENCODE_ANTIGRAVITY_SCHEDULING_MODE",
 ]
 
+/** Clears the config variables isolated by these loader tests. */
 function clearTestEnv(): void {
   for (const key of ENV_KEYS) {
     delete process.env[key]

@@ -22,21 +22,21 @@ No linter or formatter is configured; style is enforced by convention
 
 - `constants.test.ts`: Antigravity UA format/platform alignment/never-Linux
   and header-set optionality.
-- `v2-plugin.test.ts`: plugin id/setup, `normalizeFetchBody` behaviors,
+- `adapters/opencode/plugin.test.ts`: plugin id/setup, `normalizeFetchBody` behaviors,
   destination/path validation, OAuth callback parsing.
-- `v2-plugin.accounts.test.ts`: delete-reselect, out-of-range no-write,
+- `adapters/opencode/plugin.accounts.test.ts`: delete-reselect, out-of-range no-write,
   list purity, blocked→disabled+URL, ok passthrough, error-without-disable.
-- `v2-plugin.setup.test.ts`: full mocked V2 setup — registration, label,
+- `adapters/opencode/plugin.setup.test.ts`: full mocked V2 setup — registration, label,
   API-key passthrough, unauthenticated throw, authorize→persist, SDK route
   with `apiKey="antigravity-oauth"`, JSON-body routing, child-tracker
   duplicate-at-capacity.
 - `rpc-transport.test.ts`: Effect-codec mirror of handler returns (host has
   no `@opencode/protocol` here); guards the omit-`undefined` transport rule.
-- `tui-behavior.test.ts`: pure TUI gates (`isInvalidRpcResponse`,
+- `adapters/opencode/tui/index.test.ts`: pure TUI gates (`isInvalidRpcResponse`,
   `isStaleMutate` — stale `{ ok: false }` takes the stale path, never the
   success toast), plus deferred missing-account notice acknowledgement,
   replacement, and unload regressions.
-- `tui-quota-controller.test.ts`: overlap protection, returned error status,
+- `adapters/opencode/tui/quota-controller.test.ts`: overlap protection, returned error status,
   unexpected rejection/retry, late-result disposal, and navigation outcomes.
 - `test/tui-quota-render.test.ts`: native Bun/OpenTUI rendering of the built
   account list verifies single-cell dot colors, the shared legend/login hint,
@@ -58,9 +58,9 @@ No linter or formatter is configured; style is enforced by convention
   hybrid selection, recovery and thinking-recovery, token, storage (v1–v4,
   tombstones, replace semantics), cache, debug/logger, verification,
   version, account-service presentation, account UI formatting.
-- `engine.test.ts`: native-engine parity (routing, quota fallback, warmup
+- `app/execute-request.test.ts`: native-engine parity (routing, quota fallback, warmup
   URL, wait formatting, unified-refresh delegation).
-- `hooks/auto-update-checker`: config/JSONC/entry forms, prerelease skip,
+- `adapters/opencode/hooks/auto-update-checker`: config/JSONC/entry forms, prerelease skip,
   toast-only mode, once-per-instance, child ignore, local-dev warning.
 
 ## Known gaps (do not file as regressions)

@@ -12,7 +12,7 @@ vi.mock("./cache", () => ({
   invalidatePackage: vi.fn(),
 }))
 
-vi.mock("../../plugin/debug", () => ({
+vi.mock("../../../../plugin/debug.js", () => ({
   debugLogToFile: vi.fn(),
 }))
 
@@ -20,6 +20,7 @@ import { getCachedVersion, getLocalDevVersion, findPluginEntry, getLatestVersion
 import { invalidatePackage } from "./cache"
 import { createAutoUpdateCheckerHook } from "./index"
 
+/** Builds the minimal client needed by the update-checker hook. */
 function createMockClient() {
   return {
     tui: {
@@ -28,6 +29,7 @@ function createMockClient() {
   }
 }
 
+/** Builds a pinned plugin entry fixture with selective overrides. */
 function createPluginInfo(overrides: Partial<ReturnType<typeof findPluginEntry>> = {}) {
   return {
     configPath: "/test/.config/opencode/opencode.json",

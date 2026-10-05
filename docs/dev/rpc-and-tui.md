@@ -2,7 +2,8 @@
 
 ## Contract
 
-`AntigravityAccounts` (`src/rpc.ts`, handlers in `src/v2-plugin.ts`):
+`AntigravityAccounts` (`src/adapters/opencode/rpc.ts`, registered by
+`src/adapters/opencode/plugin.ts`):
 
 | Method      | Input                                                  | Output                                                                                                                                                              |
 | ----------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -22,7 +23,7 @@ Rules:
   tests). Absent optionals are **omitted**, never sent as explicit
   `undefined`.
 - Registration lives on the production server plugin (`ctx.rpc.register` in
-  `src/v2-plugin.ts`, disposed on cleanup). Only `.` and `./tui` auto-load —
+  `src/adapters/opencode/plugin.ts`, disposed on cleanup). Only `.` and `./tui` auto-load —
   there is no sidecar-entry contract, so a separate RPC module would never
   be reached.
 
@@ -90,8 +91,9 @@ the host log).
 
 ## Production status (not smoke)
 
-Earlier task notes called `src/tui.ts` / `src/rpc.ts` "smoke-only". That is
-stale: the `/antigravity` dialog and `AntigravityAccounts` RPC are the
+The package paths `./tui` and `./rpc` are production exports. Their
+implementations live under `src/adapters/opencode/`; the `/antigravity` dialog
+and `AntigravityAccounts` RPC are the
 production account-management surface (the legacy `antigravity_accounts`
 agent tool shares the same `account-service.ts` backend). The removed
 `/antigravity-smoke` command and `ANTIGRAVITY_RPC_SMOKE_OK` ping are the only

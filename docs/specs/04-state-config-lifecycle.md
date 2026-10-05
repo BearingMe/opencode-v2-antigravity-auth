@@ -87,8 +87,8 @@ MUST NOT initiate update checks and SHOULD have toasts suppressed when
 `toast_scope=root_only`. Detecting a child session MUST NOT consume the
 update-checker once-flag (a later root session MUST still check).
 
-**Project evidence:** `src/v2-plugin.ts` event handling +
-`hooks/auto-update-checker/index.ts`; `index.test.ts` ::
+**Project evidence:** `src/adapters/opencode/plugin.ts` event handling +
+`adapters/opencode/hooks/auto-update-checker/index.ts`; `index.test.ts` ::
 once-per-instance, child ignored.
 
 **Status:** Explicit.

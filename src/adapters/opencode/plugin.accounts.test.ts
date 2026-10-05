@@ -14,15 +14,15 @@ const { loadAccounts, updateAccounts, verifyAccountAccess, written, memory } = v
   memory: { store: null as unknown },
 }))
 
-vi.mock("./plugin/storage.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./plugin/storage.js")>()
+vi.mock("../../plugin/storage.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../plugin/storage.js")>()
   return { ...actual, loadAccounts, updateAccounts }
 })
-vi.mock("./plugin/verify.js", () => ({
+vi.mock("../../plugin/verify.js", () => ({
   verifyAccountAccess,
 }))
 
-import { manageAccounts } from "./v2-plugin.js"
+import { manageAccounts } from "./plugin.js"
 
 // Stateful in-memory storage: reads clone the committed store and the
 // updater commits its replacement, so a mutation is visible to subsequent

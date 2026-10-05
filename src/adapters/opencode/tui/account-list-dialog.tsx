@@ -1,7 +1,7 @@
-import { DialogShell } from "./tui-dialog-shell.js"
+import { DialogShell } from "./dialog-shell.js"
 import type { RGBA, ScrollBoxRenderable } from "@opentui/core"
 import { For, Show, createSignal } from "solid-js"
-import type { QuotaDialogLayer } from "./tui-quota-dialog.js"
+import type { QuotaDialogLayer } from "./quota-dialog.js"
 
 /**
  * Account entry displayed in the account selection modal.

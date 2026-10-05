@@ -2,7 +2,7 @@
   {
     "source": "src/app/composition.ts",
     "target": "src/app/legacy-bridges/accounts.ts",
-    "reason": "Application composition still adapts the legacy account manager to the account-pool port.",
+    "reason": "Application composition still selects the legacy account-administration and pool adapters.",
     "removeAfter": "Step 14: final architecture verification"
   },
   {
@@ -12,15 +12,9 @@
     "removeAfter": "Step 14: final architecture verification"
   },
   {
-    "source": "src/v2-plugin.ts",
-    "target": "src/app/legacy-bridges/accounts.ts",
-    "reason": "The legacy plugin entrypoint still delegates account administration to the Step 2 bridge.",
-    "removeAfter": "Step 13: OpenCode integration and packaging"
-  },
-  {
-    "source": "src/v2-plugin.ts",
+    "source": "src/app/composition.ts",
     "target": "src/app/legacy-bridges/session-recovery.ts",
-    "reason": "The legacy plugin entrypoint still delegates session recovery to the Step 2 bridge.",
-    "removeAfter": "Step 13: OpenCode integration and packaging"
+    "reason": "Application composition still selects the legacy session-recovery adapter.",
+    "removeAfter": "Step 14: final architecture verification"
   }
 ]

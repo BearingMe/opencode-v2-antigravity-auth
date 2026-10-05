@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest"
-import plugin, {
+import {
+  opencodePlugin as plugin,
   formatAuthInstructions,
   formatAuthSummary,
   getFetchDestination,
   isGenerativeLanguageModelPath,
   normalizeFetchBody,
   parseOAuthCallbackInput,
-} from "./v2-plugin.js"
+} from "./plugin.js"
 
 describe("OpenCode V2 plugin entrypoint", () => {
   it("exports a stable V2 plugin definition", () => {

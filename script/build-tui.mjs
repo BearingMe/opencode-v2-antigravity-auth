@@ -4,8 +4,8 @@ import { createSolidTransformPlugin } from "@opentui/solid/bun-plugin"
 // OpenTUI Solid transform: automatic JSX alone loses reactive prop getters.
 // Externalize every import so the host supplies the renderer/Solid singleton.
 const result = await Bun.build({
-  entrypoints: ["src/tui-quota-dialog.tsx", "src/tui-account-list-dialog.tsx"],
-  outdir: "dist/src",
+  entrypoints: ["src/adapters/opencode/tui/quota-dialog.tsx", "src/adapters/opencode/tui/account-list-dialog.tsx"],
+  outdir: "dist/src/adapters/opencode/tui",
   target: "bun",
   external: ["*"],
   plugins: [createSolidTransformPlugin()],

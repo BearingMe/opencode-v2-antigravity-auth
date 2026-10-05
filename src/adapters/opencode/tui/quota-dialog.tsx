@@ -1,9 +1,9 @@
 import type { RGBA, ScrollBoxRenderable } from "@opentui/core"
 import { useTerminalDimensions } from "@opentui/solid"
 import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js"
-import { formatQuotaPercentage, formatResetCountdown, quotaBarParts } from "./plugin/account-ui-format.js"
-import type { QuotaDialogController } from "./tui-quota-controller.js"
-import { DialogShell } from "./tui-dialog-shell.js"
+import { formatQuotaPercentage, formatResetCountdown, quotaBarParts } from "../../../plugin/account-ui-format.js"
+import type { QuotaDialogController } from "./quota-controller.js"
+import { DialogShell } from "./dialog-shell.js"
 
 export interface QuotaDialogKeymapCommand {
   id: string

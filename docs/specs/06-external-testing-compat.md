@@ -61,11 +61,11 @@ event` transforms. V2 API explicitly "may change before stable".
 - `constants.test.ts`: Gemini-CLI header pin; static CLI headers regardless
   of model; antigravity UA format / platform alignment / never-linux;
   `HeaderSet` optionality.
-- `v2-plugin.test.ts`: plugin id/setup; `normalizeFetchBody` behaviors;
+- `adapters/opencode/plugin.test.ts`: plugin id/setup; `normalizeFetchBody` behaviors;
   destination/path validation; callback-parsing behaviors.
-- `v2-plugin.accounts.test.ts`: delete-reselect, out-of-range no-write,
+- `adapters/opencode/plugin.accounts.test.ts`: delete-reselect, out-of-range no-write,
   list purity, blocked→disabled+URL, ok passthrough, error-without-disable.
-- `v2-plugin.setup.test.ts`: full mocked V2 setup (registration, label,
+- `adapters/opencode/plugin.setup.test.ts`: full mocked V2 setup (registration, label,
   API-key passthrough, unauthenticated throw, authorize→persist, SDK route
   - `apiKey="antigravity-oauth"`, loader-missing/reject errors, decoded
     JSON body to routed fetch, per-session child tracker with duplicate-safe
@@ -91,16 +91,17 @@ event` transforms. V2 API explicitly "may change before stable".
   verification-error helpers (URL normalization, error-detail extraction).
 - No search tool or search module remains; endpoint orderings are PROD→DAILY
   load, DAILY→PROD fallback.
-- `hooks/auto-update-checker`: `checker.test.ts` (config/JSONC/entry
+- `adapters/opencode/hooks/auto-update-checker`: `checker.test.ts` (config/JSONC/entry
   forms), `index.test.ts` (prerelease skip, toast-only mode,
   once-per-instance, child ignore, local-dev warning; fake timers).
 - Antigravity communication clients have isolated mocked-HTTP tests under
   `src/adapters/antigravity/`; the built-package smoke is
   `bun run test:antigravity:smoke`.
 - Gaps: `script/` E2E is excluded from
-  typecheck and live-endpoint E2E needs real quota. `src/tui.ts` pure gates
-  (`isInvalidRpcResponse`, `isStaleMutate`) and the `rpc.ts` transport codec
-  mirror are unit-covered (`tui-behavior.test.ts`,
+  typecheck and live-endpoint E2E needs real quota.
+  `adapters/opencode/tui/index.ts` pure gates (`isInvalidRpcResponse`,
+  `isStaleMutate`) and the `rpc.ts` transport codec mirror are unit-covered
+  (`adapters/opencode/tui/index.test.ts`,
   `rpc-transport.test.ts`); the full dialog/toast flow has no automated
   coverage by design. `src/plugin/account-service.ts`
   quota-presentation semantics are specified in `../dev/quota-contract.md`
@@ -132,7 +133,8 @@ event` transforms. V2 API explicitly "may change before stable".
    (skew, `invalid_grant` eviction, project-id preservation, cache store)
    is the single refresh implementation, called via
    `src/app/composition.ts :: refreshOAuthCredentialUnified` and the V2
-   authorize-callback path. `src/v2-plugin.ts :: refreshOAuthCredential`
+   authorize-callback path.
+   `src/adapters/opencode/plugin.ts :: refreshOAuthCredential`
    remains only as a thin compatibility wrapper. Edits MUST NOT widen the
    gap again.
 2. D-REFRESH-SEGMENTS: `oauth.exchangeAntigravity` writes 2-segment
@@ -154,7 +156,7 @@ event` transforms. V2 API explicitly "may change before stable".
 invalidateCache` remain exported. New code MUST use
    `getAntigravityHeaders() / getAntigravityVersion() / invalidatePackage()`.
 7. D-RETRY-GLOBAL (observed limitation): `ctx.session.hook("retry")` in
-   `src/v2-plugin.ts` is provider-agnostic — any session whose error
+   `src/adapters/opencode/plugin.ts` is provider-agnostic — any session whose error
    matches `detectErrorType` patterns (tool_result_missing / thinking
    errors) triggers abort + synthetic prompt + toast, including non-Google
    sessions (e.g. Codex). Auth and fetch paths are Google-scoped; only the
@@ -195,12 +197,12 @@ invalidateCache` remain exported. New code MUST use
 
 ## References (repository evidence)
 
-- Entries: `src/v2-plugin.ts`, `src/constants.ts`,
+- Entries: `src/adapters/opencode/plugin.ts`, `src/constants.ts`,
   `src/adapters/antigravity/constants.ts`,
-  `src/google-sdk.ts`, `src/shims.d.ts`
+  `src/adapters/opencode/google-sdk.ts`, `src/shims.d.ts`
 - OAuth/account communication: `src/antigravity/oauth.ts`,
   `src/adapters/antigravity/{oauth,token,project,quota,verification}-client.ts`
-- Update: `src/hooks/auto-update-checker/{index,checker,cache,constants,
+- Update: `src/adapters/opencode/hooks/auto-update-checker/{index,checker,cache,constants,
 types,logging}.ts` + `checker.test.ts`, `index.test.ts`
 - Core: `src/plugin/{auth,token,cache,request,request-helpers,accounts,
 account-service,rotation,quota,storage,fingerprint,project,refresh-queue,
@@ -208,8 +210,9 @@ recovery,thinking-recovery,errors,debug,logger,logging-utils,verify,
 verification,version,image-saver,types}.ts`
 - Subdirs: `src/plugin/{cache,config,core:streaming,recovery,stores,
 transform}/*`
-- Tests: `src/constants.test.ts`, `src/v2-plugin.test.ts`,
-  `src/v2-plugin.accounts.test.ts`, `src/v2-plugin.setup.test.ts` +
+- Tests: `src/constants.test.ts`, `src/adapters/opencode/plugin.test.ts`,
+  `src/adapters/opencode/plugin.accounts.test.ts`,
+  `src/adapters/opencode/plugin.setup.test.ts` +
   colocated `src/plugin/**/*.test.ts`
 - Docs in repo: `README.md`, `docs/README.md` (index), `docs/user/`,
   `docs/dev/` (architecture, storage, RPC/TUI, quota contract, API,

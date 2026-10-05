@@ -5,6 +5,7 @@ export const PACKAGE_NAME = "opencode-v2-antigravity-auth"
 export const NPM_REGISTRY_URL = `https://registry.npmjs.org/-/package/${PACKAGE_NAME}/dist-tags`
 export const NPM_FETCH_TIMEOUT = 5000
 
+/** Resolves the cache directory used by OpenCode's package installer. */
 function getCacheDir(): string {
   if (process.platform === "win32") {
     return path.join(process.env.LOCALAPPDATA ?? os.homedir(), "opencode")
@@ -15,6 +16,7 @@ function getCacheDir(): string {
 export const CACHE_DIR = getCacheDir()
 export const INSTALLED_PACKAGE_JSON = path.join(CACHE_DIR, "node_modules", PACKAGE_NAME, "package.json")
 
+/** Resolves the user-level OpenCode config directory for this platform. */
 function getUserConfigDir(): string {
   if (process.platform === "win32") {
     return process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming")

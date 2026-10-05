@@ -4,8 +4,8 @@ import * as os from "node:os"
 import { Schema } from "effect"
 import { Info as ConfigInfo } from "@opencode/schema/config"
 import { describe, test, expect, beforeEach, afterEach } from "vitest"
-import { updateOpencodeConfig } from "./updater"
-import { OPENCODE_MODEL_DEFINITIONS } from "./models"
+import { updateOpencodeConfig } from "./updater.js"
+import { OPENCODE_MODEL_DEFINITIONS } from "./models.js"
 
 /**
  * Creates a unique temporary directory with the given prefix.

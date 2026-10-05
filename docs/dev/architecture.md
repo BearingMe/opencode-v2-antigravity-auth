@@ -12,7 +12,7 @@ OpenCode ──▶ Plugin ──▶ Antigravity API ──▶ Claude/Gemini
                └─ THIS PLUGIN (auth, transform, recovery)
 ```
 
-1. **Routing in** (`src/v2-plugin.ts` + `src/app/composition.ts`)
+1. **Routing in** (`src/adapters/opencode/plugin.ts` + `src/app/composition.ts`)
    - `aisdk.hook("sdk")` matches `antigravity-*` / OAuth-routed `gemini-*`
      models on the Antigravity SDK URL and assigns the OAuth fetch bridge.
      Plain `gemini-*` models with a non-OAuth (API-key) connection keep
@@ -54,17 +54,19 @@ text-only.
 
 ```text
 src/
-├── v2-plugin.ts               # V2 entry: integration/provider/model/aisdk/tool/session/event wiring
-├── google-sdk.ts              # Isolated AI SDK module (hook routing key; models must use aisdk:<ANTIGRAVITY_SDK>)
-├── rpc.ts                     # AntigravityAccounts RPC contract (credential-free)
-├── tui.ts                     # /antigravity dialog UI (host-rendered dialogs only)
+├── adapters/opencode/
+│   ├── plugin.ts              # V2 server registration and host lifecycle wiring
+│   ├── google-sdk.ts          # Isolated AI SDK hook-routing module
+│   ├── rpc.ts                 # AntigravityAccounts RPC contract (credential-free)
+│   ├── tui/                   # /antigravity dialog UI and controller
+│   ├── config/                # OpenCode config/model registration details
+│   └── hooks/                 # Host event integrations, including update checks
 ├── constants.ts               # Compatibility exports for provider/model constants
 ├── antigravity/oauth.ts       # Compatibility facade for OAuth authorization and exchange
-├── hooks/auto-update-checker/ # Version check (root sessions only; never installs)
 ├── adapters/
 │   ├── antigravity/           # OAuth identity/endpoints/headers and account/inference clients
 │   ├── filesystem/            # Account/recovery/signature stores and debug-file destination
-│   └── opencode/              # Host logging destinations and session-recovery operations
+│   └── opencode/              # Host logging and session-recovery operations
 ├── modules/accounts/
 │   ├── account-pool.ts        # Membership, family cursors, cooldowns, and pool bookkeeping
 │   ├── account-admin.ts       # Credential-free administration use cases and mutations
@@ -92,14 +94,16 @@ src/
     ├── storage.ts               # Compatibility facade for the v4 account store
     ├── fingerprint.ts / project.ts  # Device fingerprints + project-context composition
     ├── refresh-queue.ts          # Proactive refresh compatibility façade
-    ├── config/                # Zod schema, loader, model definitions, opencode.json updater
+    ├── config/                # Compatibility exports during migration
     ├── cache/ / stores/       # Compatibility facades for signature caches/stores
 └── debug.ts / logger.ts / logging-utils.ts / version.ts / errors.ts / types.ts
 ```
 
-`src/plugin/engine.ts` remains a compatibility facade. The V2 bridge enters
-through `app/composition.ts`, which selects the existing account, inference,
-transport, and OpenCode adapters before calling the single executor.
+The package-root `src/v2-plugin.ts`, `src/tui.ts`, and `src/rpc.ts` files remain
+thin compatibility entrypoints. The server plugin and TUI implementation live
+under `adapters/opencode/`; the server adapter delegates account administration,
+session recovery, and model execution to application composition. The single
+request executor remains `app/execute-request.ts`.
 
 Logging is split by responsibility: `platform/logging/` owns neutral policy,
 events, and formatting; OpenCode host/console delivery is in

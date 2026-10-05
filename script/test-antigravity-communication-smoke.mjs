@@ -1,4 +1,10 @@
 import assert from "node:assert/strict"
+import rootPlugin, {
+  authorizeAntigravity as publicAuthorizeAntigravity,
+  exchangeAntigravity as publicExchangeAntigravity,
+} from "opencode-v2-antigravity-auth"
+import tuiPlugin from "opencode-v2-antigravity-auth/tui"
+import { AntigravityAccounts } from "opencode-v2-antigravity-auth/rpc"
 import { authorizeAntigravity, exchangeAntigravity } from "../dist/src/antigravity/oauth.js"
 import { extractVerificationErrorDetails } from "../dist/src/adapters/antigravity/verification-parser.js"
 import {
@@ -16,6 +22,14 @@ import { executeAntigravityRequest } from "../dist/src/app/composition.js"
 
 /** Exercises built Antigravity clients using synthetic OAuth data and mocked HTTP. */
 async function main() {
+  assert.equal(rootPlugin.id, "opencode-v2-antigravity-auth")
+  assert.equal(tuiPlugin.id, "antigravity-accounts-tui")
+  assert.equal(AntigravityAccounts.id, "antigravity-accounts")
+  assert.equal(typeof publicAuthorizeAntigravity, "function")
+  assert.equal(typeof publicExchangeAntigravity, "function")
+  const sdkUrl = new URL("./google-sdk.js", new URL("../dist/src/adapters/opencode/plugin.js", import.meta.url))
+  assert.equal(typeof (await import(sdkUrl.href)).createGoogle, "function")
+
   const originalFetch = globalThis.fetch
   const requests = []
   globalThis.fetch = async (input, init) => {

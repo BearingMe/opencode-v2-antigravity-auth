@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { homedir } from "node:os"
-import { OPENCODE_MODEL_DEFINITIONS } from "./models"
+import { OPENCODE_MODEL_DEFINITIONS } from "./models.js"
 
 // =============================================================================
 // Types
@@ -39,6 +39,7 @@ const SCHEMA_URL = "https://opencode.ai/config.json"
 const OPENCODE_JSON_FILENAME = "opencode.json"
 const OPENCODE_JSONC_FILENAME = "opencode.jsonc"
 
+/** Removes JSONC comments and trailing commas before config parsing. */
 function stripJsonCommentsAndTrailingCommas(json: string): string {
   return json
     .replace(/\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/)/g, (match: string, group: string | undefined) =>

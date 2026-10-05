@@ -2,7 +2,7 @@
 
 The plugin registers a fixed model catalog on the `antigravity` provider. It
 does not discover models from the API. The inventory below matches
-`src/plugin/config/models.ts`.
+`src/adapters/opencode/config/models.ts`.
 
 ## Migrate existing model references
 

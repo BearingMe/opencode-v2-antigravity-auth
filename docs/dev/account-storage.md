@@ -58,7 +58,7 @@ tombstoneMatchesAccount`): equal ids match only with a corroborating
 
 ## Credential source
 
-`getAuth()` in `src/v2-plugin.ts` resolves the active host `antigravity`
+`getAuth()` in `src/adapters/opencode/plugin.ts` resolves the active host `antigravity`
 connection first, then the in-memory `currentAuth`, then the selected saved
 account. It never reads OpenCode's `google` connection. This integration only
 registers the plugin's own OAuth method; a non-OAuth active Antigravity

@@ -18,7 +18,7 @@ describe("claude_prompt_auto_caching config", () => {
   })
 
   it("documents claude_prompt_auto_caching in the JSON schema", () => {
-    const schemaPath = new URL("../../../assets/antigravity.schema.json", import.meta.url)
+    const schemaPath = new URL("../../../../assets/antigravity.schema.json", import.meta.url)
     const schema = JSON.parse(readFileSync(schemaPath, "utf8")) as {
       properties?: Record<string, { type?: string; default?: unknown; description?: string }>
     }

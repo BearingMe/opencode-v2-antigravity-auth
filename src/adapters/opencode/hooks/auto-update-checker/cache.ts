@@ -11,10 +11,12 @@ interface BunLockfile {
   packages?: Record<string, unknown>
 }
 
+/** Normalizes trailing commas in Bun's lockfile before parsing it. */
 function stripTrailingCommas(json: string): string {
   return json.replace(/,(\s*[}\]])/g, "$1")
 }
 
+/** Removes one package's entries from the plugin installation lockfile. */
 function removeFromBunLock(packageName: string): boolean {
   const lockPath = path.join(CACHE_DIR, "bun.lock")
   if (!fs.existsSync(lockPath)) return false
@@ -45,6 +47,7 @@ function removeFromBunLock(packageName: string): boolean {
   }
 }
 
+/** Removes a cached plugin package and its matching manifest/lockfile entries. */
 export function invalidatePackage(packageName: string = PACKAGE_NAME): boolean {
   try {
     const pkgDir = path.join(CACHE_DIR, "node_modules", packageName)

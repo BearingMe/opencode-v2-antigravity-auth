@@ -133,6 +133,42 @@ login` adds an account that appears in the list. This confirms `./tui`
       temp dir (legacy fallback); on Linux/macOS point `XDG_CONFIG_HOME` at a
       temp dir. Delete the temp dirs afterwards.
 
+## Deferred Step 13 installed-host E2E gate
+
+Run this against the built plugin in the target OpenCode 2.0.18 host, using an
+isolated config/data directory and a disposable Antigravity test account. Keep
+the existing account store untouched. Record the OpenCode version, plugin
+revision, host logs, and final process exit status.
+
+- [ ] Start with no accounts and verify `/antigravity` opens the login alert;
+      Esc dismisses it. Then add the disposable account and verify the populated
+      list, row selection, actions, quota view, refresh, and Esc/back keymaps.
+- [ ] Exercise the installed `AntigravityAccounts` RPC against the disposable
+      account: list it, disable and re-enable it, select it, and verify the
+      returned state. Confirm responses contain no credential material. Remove
+      only the disposable account during cleanup.
+- [ ] Select an available Antigravity model and complete a normal prompt. Verify
+      the assistant response is persisted as complete, the session reaches its
+      normal terminal state, and there are no retry/error loops. Registration or
+      observing a native request URL alone is not a routing pass.
+- [ ] Trigger a real tool call, cancel the running turn with Esc, then continue
+      the same session. Capture the outgoing model context/request and verify
+      that the original call ID has exactly one result and that any plugin
+      recovery result uses `Operation cancelled by user (ESC pressed)`. Do not
+      use a pre-hook that edits `event.messages` to manufacture the missing
+      result; if the host supplies its own result, record that and find a
+      naturally dangling-call scenario before claiming plugin recovery.
+- [ ] Repeat with a fresh session if a request is interrupted. Confirm the
+      plugin unloads cleanly, the host exits with status 0, and the isolated
+      profile can be removed without touching normal OpenCode state.
+
+The earlier recovery probe asserted that the plugin inserted the canonical
+result only after a temporary pre-hook removed OpenCode's result. The routing
+probe captured OAuth refresh and native Antigravity dispatch with a synthetic
+account and mocked fetch, but generation timed out after retries. Both host
+processes exited nonzero; these are diagnostic observations, not passing E2E
+results. Step 13 remains pending until the checklist above passes.
+
 ## Known limitations (do not file as regressions)
 
 - Host credential-store sync: open decision, needs user approval — not

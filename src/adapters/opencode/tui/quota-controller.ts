@@ -1,4 +1,4 @@
-import type { QuotaDetailSnapshot, QuotaRefreshOutcome } from "./plugin/account-ui-format.js"
+import type { QuotaDetailSnapshot, QuotaRefreshOutcome } from "../../../plugin/account-ui-format.js"
 
 export interface QuotaDialogDeps {
   initial: QuotaDetailSnapshot
@@ -14,12 +14,14 @@ export interface QuotaDialogState {
   failed: boolean
 }
 
+/** Owns one quota dialog's refresh, stale-account, navigation, and disposal state. */
 export function createQuotaDialogController(deps: QuotaDialogDeps) {
   let entry = deps.initial
   let refreshing = false
   let failed = false
   let disposed = false
   const listeners = new Set<() => void>()
+  /** Notifies mounted views after controller state changes. */
   const emit = () => {
     for (const listener of [...listeners]) listener()
   }

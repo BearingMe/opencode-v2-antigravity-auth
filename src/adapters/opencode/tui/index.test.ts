@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from "vitest"
-import plugin, { isInvalidRpcResponse, isStaleMutate } from "./tui.js"
-import type { MissingAccountDialogProps, QuotaDialogProps } from "./tui-quota-dialog.js"
-import type { AccountListDialogProps } from "./tui-account-list-dialog.js"
+import { opencodeTuiPlugin as plugin, isInvalidRpcResponse, isStaleMutate } from "./index.js"
+import type { MissingAccountDialogProps, QuotaDialogProps } from "./quota-dialog.js"
+import type { AccountListDialogProps } from "./account-list-dialog.js"
 
 // Host-stack tests inspect view props; real pixels/reactivity are exercised
 // separately against the compiled artifact in the Bun renderer suite.
-vi.mock("./tui-quota-dialog.js", () => ({
+vi.mock("./quota-dialog.js", () => ({
   QuotaDialogView: (props: unknown) => props,
   MissingAccountDialogView: (props: unknown) => ({ missingProps: props }),
 }))
-vi.mock("./tui-account-list-dialog.js", () => ({ AccountListDialogView: (props: unknown) => ({ listProps: props }) }))
+vi.mock("./account-list-dialog.js", () => ({ AccountListDialogView: (props: unknown) => ({ listProps: props }) }))
 
 describe("isInvalidRpcResponse", () => {
   it("matches the host transport-codec rejection shape", () => {
@@ -56,6 +56,7 @@ const testAccount = {
   verificationRequired: false,
 }
 
+/** Builds a quota account fixture with optional presentation overrides. */
 function quotaEntry(overrides: Record<string, unknown> = {}) {
   return {
     id: "acc-one",
@@ -76,6 +77,7 @@ function quotaEntry(overrides: Record<string, unknown> = {}) {
   }
 }
 
+/** Builds the fake TUI and RPC surfaces used by the account-dialog tests. */
 function createHarness(options: {
   listResponses: Array<{ accounts: Array<typeof testAccount> }>
   quotaImpl: (input: { refresh?: boolean }) => Promise<{ accounts: Array<ReturnType<typeof quotaEntry>> }>

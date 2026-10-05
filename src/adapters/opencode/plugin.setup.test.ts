@@ -89,32 +89,33 @@ updateAccounts.mockImplementation(
   },
 )
 
-vi.mock("./plugin/verify.js", () => ({
+vi.mock("../../plugin/verify.js", () => ({
   verifyAccountAccess,
 }))
 
-vi.mock("./plugin/version.js", () => ({
+vi.mock("../../plugin/version.js", () => ({
   initAntigravityVersion: vi.fn(async () => undefined),
 }))
 
-vi.mock("./antigravity/oauth.js", () => ({ authorizeAntigravity, exchangeAntigravity }))
-vi.mock("./plugin/storage.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./plugin/storage.js")>()
+vi.mock("../../antigravity/oauth.js", () => ({ authorizeAntigravity, exchangeAntigravity }))
+vi.mock("../../plugin/storage.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../plugin/storage.js")>()
   return { ...actual, loadAccounts, updateAccounts }
 })
-vi.mock("./app/composition.js", () => ({
+vi.mock("../../app/composition.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../app/composition.js")>()),
   executeAntigravityRequest: mockNativeFetch,
   disposeAntigravityRuntimeResources: mockDisposeResources,
   refreshOAuthCredentialUnified: mockUnifiedRefresh,
 }))
-vi.mock("./plugin/accounts.js", () => ({
+vi.mock("../../plugin/accounts.js", () => ({
   AccountManager: { loadFromDisk: mockLoadManager },
 }))
-vi.mock("./plugin/refresh-queue.js", () => ({
+vi.mock("../../plugin/refresh-queue.js", () => ({
   createProactiveRefreshQueue: mockCreateRefreshQueue,
 }))
 
-import plugin, { createChildSessionTracker, refreshOAuthCredential } from "./v2-plugin.js"
+import { opencodePlugin as plugin, createChildSessionTracker, refreshOAuthCredential } from "./plugin.js"
 const sdkPackage = new URL("./google-sdk.js", import.meta.url).href
 
 describe("V2 Antigravity runtime bridge", () => {

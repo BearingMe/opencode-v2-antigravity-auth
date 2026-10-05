@@ -72,9 +72,9 @@ Git hooks managed via Husky + lint-staged (pre-commit: eslint --fix + prettier) 
 
 ### Exports
 
-- Named exports only in src/ — no default exports (sole exceptions:
-  `src/v2-plugin.ts` and `src/tui.ts` default-export `Plugin.define`, as
-  required by the OpenCode V2 server / TUI plugin contracts)
+- Named exports only in src/ — no default exports (sole runtime entrypoint
+  exceptions are `src/v2-plugin.ts` and `src/tui.ts`, which re-export the
+  adapter's `Plugin.define` values for the OpenCode V2 contracts)
 
 ### Naming
 
@@ -142,10 +142,7 @@ Git hooks managed via Husky + lint-staged (pre-commit: eslint --fix + prettier) 
 
 ```
 src/
-├── v2-plugin.ts               # V2 entry: integration/provider/model/aisdk/tool/session/event wiring
-├── google-sdk.ts              # Isolated AISDK module (hook routing key)
-├── rpc.ts                     # AntigravityAccounts RPC contract (credential-free)
-├── tui.ts                     # /antigravity dialog UI (host-rendered dialogs only)
+├── v2-plugin.ts / tui.ts / rpc.ts / google-sdk.ts # Compatibility entrypoints
 ├── constants.ts               # Endpoints, headers, OAuth identity, model routing
 ├── antigravity/oauth.ts       # PKCE authorize URL + code exchange + project discovery
 ├── app/
@@ -153,9 +150,13 @@ src/
 │   └── execute-request.ts      # Single request execution and retry orchestration
 ├── adapters/
 │   ├── filesystem/            # Account and recovery stores
-│   └── opencode/              # Host session, logging, and TUI adapters
+│   └── opencode/
+│       ├── plugin.ts          # V2 server registration and host lifecycle wiring
+│       ├── rpc.ts             # Credential-free AntigravityAccounts contract
+│       ├── tui/               # /antigravity host dialogs and controller
+│       ├── config/            # OpenCode config, model registration, and settings
+│       └── hooks/             # Host event integrations, including update checks
 ├── modules/session-recovery/  # Error policy, session repair, and request-time turn repair
-├── hooks/auto-update-checker/ # Version check (root sessions only; never installs)
 └── plugin/
     ├── engine.ts              # Compatibility exports for app execution
     ├── account-service.ts     # Shared account store service (tool + RPC backend)
@@ -170,7 +171,7 @@ src/
     ├── accounts.ts / storage.ts  # Pool manager + v4 persistent store (tombstones)
     ├── fingerprint.ts / project.ts  # Device fingerprints + managed project context
     ├── refresh-queue.ts / rotation.ts  # Proactive refresh + health/token-bucket scoring
-    ├── config/                # Zod schema, loader, model definitions, opencode.json updater
+    ├── config/                # Temporary compatibility exports; removed in Step 14
     ├── cache/ / stores/       # Signature caches (memory + disk)
     └── debug.ts / logger.ts / logging-utils.ts / version.ts / errors.ts / types.ts
 ```

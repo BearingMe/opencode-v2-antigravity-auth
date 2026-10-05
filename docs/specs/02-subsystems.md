@@ -53,7 +53,7 @@ statusText}` on `!ok`; `invalid_grant` invalidates project cache and clears
 - Refresh is unified: `src/app/composition.ts ::
 refreshOAuthCredentialUnified` and the V2 authorize-callback path both go
   through `src/plugin/token.ts :: refreshAccessToken` (skew handling,
-  `invalid_grant` eviction). `src/v2-plugin.ts ::
+  `invalid_grant` eviction). `src/adapters/opencode/plugin.ts ::
 refreshOAuthCredential` is a thin wrapper that delegates to the unified
   path and persists refresh rotation; new code MUST NOT add a parallel
   refresh implementation.

@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest"
-import { createQuotaDialogController, type QuotaDialogDeps } from "./tui-quota-controller.js"
-import type { QuotaDetailSnapshot, QuotaRefreshOutcome } from "./plugin/account-ui-format.js"
+import { createQuotaDialogController, type QuotaDialogDeps } from "./quota-controller.js"
+import type { QuotaDetailSnapshot, QuotaRefreshOutcome } from "../../../plugin/account-ui-format.js"
 
+/** Builds a stale quota snapshot with the requested Claude fraction. */
 function snapshot(claudeFraction: number | null = 0.7): QuotaDetailSnapshot {
   return {
     groups: {
@@ -15,6 +16,7 @@ function snapshot(claudeFraction: number | null = 0.7): QuotaDetailSnapshot {
   }
 }
 
+/** Supplies controller dependencies with optional behavior overrides. */
 function createDeps(overrides: Partial<QuotaDialogDeps> = {}) {
   const deps: QuotaDialogDeps = {
     initial: snapshot(),

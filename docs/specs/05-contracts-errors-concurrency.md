@@ -5,7 +5,7 @@
 - Plugin entrypoints: V2 default plugin +
   `normalizeFetchBody`, `getFetchDestination`,
   `isGenerativeLanguageModelPath`, `parseOAuthCallbackInput`,
-  `manageAccounts` (`src/v2-plugin.ts`); `executeAntigravityRequest`,
+  `manageAccounts` (`src/adapters/opencode/plugin.ts`); `executeAntigravityRequest`,
   `refreshOAuthCredentialUnified`, `disposeAntigravityRuntimeResources`
   (`src/app/composition.ts`); `executeAntigravityRequest` is the composition
   entry and delegates to `src/app/execute-request.ts`; `verifyAccountAccess`
@@ -16,7 +16,8 @@
 countTokens)$`. Non-model GL paths throw
   `Unsupported Google Generative Language endpoint`; external origins are
   direct-fetched with `x-goog-api-key` and `authorization` removed.
-  Evidence: `v2-plugin.ts :: antigravityFetch`; `v2-plugin.test.ts` ::
+  Evidence: `adapters/opencode/plugin.ts :: antigravityFetch`;
+  `adapters/opencode/plugin.test.ts` ::
   validates destinations, rejects `/upload/v1beta/files`, requires absolute
   URL.
 - OAuth callback rule: input is either a full localhost redirect URL
@@ -29,10 +30,10 @@ countTokens)$`. Non-model GL paths throw
   integrity/keepalive/mode/redirect/referrer/policy, MUST decode JSON bytes
   (honoring typed-array byteOffset/length) to string when content-type is
   JSON, and MUST pass binary/empty bodies through. Evidence:
-  `v2-plugin.test.ts` (4 normalize cases incl. abort-signal liveness).
+  `adapters/opencode/plugin.test.ts` (4 normalize cases incl. abort-signal liveness).
 - Tools: `antigravity_accounts{action, index?}` with `list|check_quota|verify|
 enable|disable|select|delete|delete_all` (see F3; out-of-range index is a
-  message, not a write — `v2-plugin.accounts.test.ts`).
+  message, not a write — `adapters/opencode/plugin.accounts.test.ts`).
   No search tool is registered. Model-declared `web_search` /
   `google_search` names are still recognized and sanitized by the
   D-SEARCH-MUTEX guard in `modules/inference/transforms/gemini.ts`.
@@ -46,7 +47,7 @@ enable|disable|select|delete|delete_all` (see F3; out-of-range index is a
 - Token refresh is unified: `src/plugin/token.ts :: refreshAccessToken` is
   the single implementation, reached via
   `src/app/composition.ts :: refreshOAuthCredentialUnified` and via
-  `src/v2-plugin.ts :: refreshOAuthCredential` (thin wrapper preserving the
+  `src/adapters/opencode/plugin.ts :: refreshOAuthCredential` (thin wrapper preserving the
   credential shape). `invalid_grant` → evict account + clear project/auth
   caches + rotate; all-invalid → login error. Do not reintroduce a parallel
   refresh path (see D-REFRESH-DUAL).

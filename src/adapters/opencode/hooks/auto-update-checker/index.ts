@@ -28,6 +28,7 @@ interface SessionCreatedEvent {
 
 type PluginEvent = SessionCreatedEvent | { type: string; properties?: unknown }
 
+/** Creates the root-session-only version check and toast event handler. */
 export function createAutoUpdateCheckerHook(
   client: PluginClient,
   directory: string,
@@ -66,6 +67,7 @@ export function createAutoUpdateCheckerHook(
   }
 }
 
+/** Checks the configured version and reports or applies an available update. */
 async function runBackgroundUpdateCheck(client: PluginClient, directory: string, autoUpdate: boolean): Promise<void> {
   const pluginInfo = findPluginEntry(directory)
   if (!pluginInfo) {
@@ -119,6 +121,7 @@ async function runBackgroundUpdateCheck(client: PluginClient, directory: string,
   }
 }
 
+/** Notifies the user that a restart can pick up the published version. */
 async function showUpdateAvailableToast(client: PluginClient, latestVersion: string): Promise<void> {
   await client.tui
     .showToast({
@@ -133,6 +136,7 @@ async function showUpdateAvailableToast(client: PluginClient, latestVersion: str
   logAutoUpdate(`Update available toast shown: v${latestVersion}`)
 }
 
+/** Reports a successful pinned-version rewrite and required restart. */
 async function showAutoUpdatedToast(client: PluginClient, oldVersion: string, newVersion: string): Promise<void> {
   await client.tui
     .showToast({
@@ -147,6 +151,7 @@ async function showAutoUpdatedToast(client: PluginClient, oldVersion: string, ne
   logAutoUpdate(`Auto-updated toast shown: v${oldVersion} → v${newVersion}`)
 }
 
+/** Identifies a local checkout to the user without starting an update check. */
 async function showLocalDevToast(client: PluginClient, version: string): Promise<void> {
   await client.tui
     .showToast({

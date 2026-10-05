@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import { RGBA } from "@opentui/core"
 import { createElement, insert, setProp, testRender } from "@opentui/solid"
-import { MissingAccountDialogView, QuotaDialogView } from "../dist/src/tui-quota-dialog.js"
-import { createQuotaDialogController } from "../dist/src/tui-quota-controller.js"
-import { AccountListDialogView } from "../dist/src/tui-account-list-dialog.js"
+import { MissingAccountDialogView, QuotaDialogView } from "../dist/src/adapters/opencode/tui/quota-dialog.js"
+import { createQuotaDialogController } from "../dist/src/adapters/opencode/tui/quota-controller.js"
+import { AccountListDialogView } from "../dist/src/adapters/opencode/tui/account-list-dialog.js"
 import type { QuotaRefreshOutcome } from "../src/plugin/account-ui-format.js"
-import type { QuotaDialogKeymapCommand } from "../src/tui-quota-dialog.js"
+import type { QuotaDialogKeymapCommand } from "../src/adapters/opencode/tui/quota-dialog.js"
 
 const snapshot = (fraction: number) => ({
   groups: { claude: { remainingFraction: fraction, resetTime: null } },

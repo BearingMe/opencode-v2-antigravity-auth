@@ -1,13 +1,18 @@
 import { createAntigravityInferenceClient } from "../adapters/antigravity/inference-client.js"
+import { ANTIGRAVITY_PROVIDER_ID } from "../constants.js"
 import { accessTokenExpired } from "../plugin/auth.js"
 import { disposeDiskSignatureCache } from "../plugin/cache.js"
-import { createLegacyAccountPool } from "./legacy-bridges/accounts.js"
+import { createLegacyAccountAdministration, createLegacyAccountPool } from "./legacy-bridges/accounts.js"
+import { createLegacySessionRecovery } from "./legacy-bridges/session-recovery.js"
 import { legacyInference } from "./legacy-bridges/inference.js"
 import { ensureProjectContext } from "../plugin/project.js"
 import { refreshAccessToken } from "../plugin/token.js"
 import type { OAuthAuthDetails, PluginClient } from "../plugin/types.js"
 import { executeRequest, type EngineRequestOptions, type EngineToastVariant } from "./execute-request.js"
 import type { AccountOAuthCredential } from "../modules/accounts/index.js"
+import type { AccountAdminService } from "../modules/accounts/index.js"
+import type { SessionRecoveryApi } from "../modules/session-recovery/index.js"
+import type { AntigravityConfig } from "../plugin/config/index.js"
 
 /** OAuth credential shape accepted by the V2 auth refresh hook. */
 export type UnifiedOAuthCredential = {
@@ -24,6 +29,23 @@ export interface AntigravityApplicationOptions extends EngineRequestOptions {
   client: PluginClient
   providerId: string
   fetchImpl?: typeof fetch
+}
+
+/** Composes account administration with the existing persistence and verification adapters. */
+export function createAccountAdministration(
+  client?: PluginClient,
+  providerId = ANTIGRAVITY_PROVIDER_ID,
+): AccountAdminService {
+  return createLegacyAccountAdministration(client, providerId)
+}
+
+/** Composes session-recovery policy with the selected host and filesystem adapters. */
+export function createSessionRecovery(
+  client: PluginClient,
+  directory: string,
+  config: AntigravityConfig,
+): SessionRecoveryApi | null {
+  return createLegacySessionRecovery(client, directory, config)
 }
 
 /** Releases process-wide inference resources when the plugin is disposed. */

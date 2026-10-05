@@ -12,16 +12,19 @@ import {
 } from "./constants"
 import { logAutoUpdate } from "./logging"
 
+/** Reports whether the config points at this package's local development checkout. */
 export function isLocalDevMode(directory: string): boolean {
   return getLocalDevPath(directory) !== null
 }
 
+/** Removes comments and trailing commas from supported OpenCode JSONC files. */
 function stripJsonComments(json: string): string {
   return json
     .replace(/\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/)/g, (m: string, g: string | undefined) => (g ? "" : m))
     .replace(/,(\s*[}\]])/g, "$1")
 }
 
+/** Returns project and user OpenCode config candidates in lookup precedence. */
 function getConfigPaths(directory: string): string[] {
   return [
     path.join(directory, ".opencode", "opencode.json"),
@@ -32,6 +35,7 @@ function getConfigPaths(directory: string): string[] {
   ]
 }
 
+/** Finds a configured file URL for this package, if present. */
 export function getLocalDevPath(directory: string): string | null {
   for (const configPath of getConfigPaths(directory)) {
     try {
@@ -57,6 +61,7 @@ export function getLocalDevPath(directory: string): string | null {
   return null
 }
 
+/** Finds this package's manifest by walking up from a local plugin path. */
 function findPackageJsonUp(startPath: string): string | null {
   try {
     const stat = fs.statSync(startPath)
@@ -83,6 +88,7 @@ function findPackageJsonUp(startPath: string): string | null {
   return null
 }
 
+/** Reads the version of the configured local checkout without network access. */
 export function getLocalDevVersion(directory: string): string | null {
   const localPath = getLocalDevPath(directory)
   if (!localPath) return null
@@ -105,6 +111,7 @@ export interface PluginEntryInfo {
   configPath: string
 }
 
+/** Locates this plugin's package entry and its pinned version, if any. */
 export function findPluginEntry(directory: string): PluginEntryInfo | null {
   for (const configPath of getConfigPaths(directory)) {
     try {
@@ -134,6 +141,7 @@ export function findPluginEntry(directory: string): PluginEntryInfo | null {
   return null
 }
 
+/** Reads the installed package version, falling back to the current checkout. */
 export function getCachedVersion(): string | null {
   try {
     if (fs.existsSync(INSTALLED_PACKAGE_JSON)) {
@@ -160,6 +168,7 @@ export function getCachedVersion(): string | null {
   return null
 }
 
+/** Replaces one exact plugin entry in the configured OpenCode plugin list. */
 export function updatePinnedVersion(configPath: string, oldEntry: string, newVersion: string): boolean {
   try {
     const content = fs.readFileSync(configPath, "utf-8")
@@ -210,6 +219,7 @@ export function updatePinnedVersion(configPath: string, oldEntry: string, newVer
   }
 }
 
+/** Fetches the npm latest dist-tag with a bounded network timeout. */
 export async function getLatestVersion(): Promise<string | null> {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), NPM_FETCH_TIMEOUT)
@@ -231,6 +241,7 @@ export async function getLatestVersion(): Promise<string | null> {
   }
 }
 
+/** Compares installed and registry versions without changing OpenCode config. */
 export async function checkForUpdate(directory: string): Promise<UpdateCheckResult> {
   if (isLocalDevMode(directory)) {
     logAutoUpdate("Local dev mode detected, skipping update check")

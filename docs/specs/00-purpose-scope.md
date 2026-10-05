@@ -2,7 +2,7 @@
 
 ## What the project is
 
-`opencode-v2-antigravity-auth` (`src/v2-plugin.ts :: PLUGIN_ID`,
+`opencode-v2-antigravity-auth` (`src/adapters/opencode/plugin.ts :: PLUGIN_ID`,
 package `opencode-v2-antigravity-auth`) is an OpenCode V2 plugin that provides Google
 Antigravity (Cloud Code Assist) OAuth authentication and request routing for
 Gemini and Claude models. It intercepts `fetch()` calls aimed at
@@ -14,7 +14,7 @@ It registers a dedicated `antigravity` provider and OAuth integration; the
 OpenCode `google` provider, integration, and credentials remain outside the
 plugin's ownership.
 
-Evidence: `src/v2-plugin.ts :: setup` (V2 bridge),
+Evidence: `src/adapters/opencode/plugin.ts :: setup` (V2 bridge),
 `src/app/composition.ts :: executeAntigravityRequest` and
 `src/app/execute-request.ts :: executeRequest` (single native request path),
 `src/constants.ts` (identity/endpoints/headers),
@@ -38,7 +38,8 @@ Evidence: `src/v2-plugin.ts :: setup` (V2 bridge),
 In scope:
 
 - OAuth PKCE authorize + code exchange + refresh (`src/antigravity/oauth.ts`,
-  `src/plugin/token.ts`, `src/v2-plugin.ts :: refreshOAuthCredential`).
+  `src/plugin/token.ts`,
+  `src/adapters/opencode/plugin.ts :: refreshOAuthCredential`).
 - Dedicated provider/integration registration without reading or mutating
   OpenCode's Google provider or sign-in connection.
 - Request interception, model resolution, payload transforms, and streaming
@@ -56,7 +57,8 @@ In scope:
 - Recovery (in-flight turn repair + session-error hook), debug file/TUI
   logging split (`debug` vs `debug_tui`), version pinning,
   auto-update checker, `antigravity_accounts` tool, `/antigravity` dialog
-  over the `AntigravityAccounts` RPC (`src/tui.ts`, `src/rpc.ts`).
+  over the `AntigravityAccounts` RPC
+  (`src/adapters/opencode/tui/index.ts`, `src/adapters/opencode/rpc.ts`).
   Removed surfaces stay removed: OAuth localhost server, CLI prompts,
   terminal UI, dedicated `google_search` tool — model-declared web search
   is still sanitized via the D-SEARCH-MUTEX guard.
@@ -76,12 +78,14 @@ Non-goals:
 ## Entry points (normative)
 
 - V2 bridge (current product path):
-  `src/v2-plugin.ts` default export `Plugin.define({id:
-"opencode-v2-antigravity-auth"})`. Routing lives in
+  `src/adapters/opencode/plugin.ts` default export
+  `Plugin.define({id: "opencode-v2-antigravity-auth"})`.
+  `src/v2-plugin.ts` remains a compatibility re-export. Routing lives in
   `src/app/composition.ts :: executeAntigravityRequest`, with the execution
   loop in `src/app/execute-request.ts`;
   `verifyAccountAccess` lives in `src/plugin/verify.ts`.
-- AI-SDK shim: `src/google-sdk.ts :: createGoogle` re-export. Models MUST
+- AI-SDK shim: `src/adapters/opencode/google-sdk.ts :: createGoogle` re-export.
+  `src/google-sdk.ts` remains a compatibility re-export. Models MUST
   point at `aisdk:<ANTIGRAVITY_SDK>` (the `./google-sdk.js` URL), never
   directly at `@ai-sdk/google`, so the `aisdk.hook("sdk")` bridge cannot be
   bypassed.

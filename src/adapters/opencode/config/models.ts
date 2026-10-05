@@ -1,4 +1,4 @@
-import type { ProviderModel } from "../types"
+import type { ProviderModel } from "../../../plugin/types.js"
 
 export type ModelThinkingLevel = "minimal" | "low" | "medium" | "high"
 

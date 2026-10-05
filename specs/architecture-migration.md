@@ -127,22 +127,22 @@ concise: commands/results, Oracle and review outcomes, smoke scenario/results,
 documentation audit, and any blockers. Update evidence in the same scoped commit;
 the tracker may identify that commit by subject to avoid self-referential hashes.
 
-| Step | Title                                 | Status  | Evidence / commit                                                       |
-| ---- | ------------------------------------- | ------- | ----------------------------------------------------------------------- |
-| 1    | Baseline and ownership map            | done    | `test: isolate suite state and map architecture baseline`               |
-| 2    | Public APIs and ports                 | done    | `refactor: define module contracts and legacy bridges`                  |
-| 3    | Mechanical boundary checks            | done    | `build: enforce architecture boundaries and required test suites`       |
-| 4    | Logging separation                    | done    | `refactor: separate logging facilities from destinations`               |
-| 5    | Account persistence                   | done    | `refactor: separate account persistence policy from filesystem storage` |
-| 6    | Account pool and selection            | done    | `refactor: migrate account pool and selection policies`                 |
-| 7    | Antigravity account communication     | done    | `2cd7ef3`                                                               |
-| 8    | Account administration and lifecycle  | done    | `98da1fb`, `8c70e45`                                                    |
-| 9    | Session recovery                      | done    | `refactor: migrate session recovery policies`                           |
-| 10   | Inference transforms and signatures   | done    | `8e77da0`                                                               |
-| 11   | Inference pipelines and client        | done    | `refactor: migrate inference request and response pipelines`            |
-| 12   | Application execution and composition | done    | `refactor: extract application request execution and composition`       |
-| 13   | OpenCode integration and packaging    | pending | —                                                                       |
-| 14   | Final architecture verification       | pending | —                                                                       |
+| Step | Title                                 | Status  | Evidence / commit                                                                            |
+| ---- | ------------------------------------- | ------- | -------------------------------------------------------------------------------------------- |
+| 1    | Baseline and ownership map            | done    | `test: isolate suite state and map architecture baseline`                                    |
+| 2    | Public APIs and ports                 | done    | `refactor: define module contracts and legacy bridges`                                       |
+| 3    | Mechanical boundary checks            | done    | `build: enforce architecture boundaries and required test suites`                            |
+| 4    | Logging separation                    | done    | `refactor: separate logging facilities from destinations`                                    |
+| 5    | Account persistence                   | done    | `refactor: separate account persistence policy from filesystem storage`                      |
+| 6    | Account pool and selection            | done    | `refactor: migrate account pool and selection policies`                                      |
+| 7    | Antigravity account communication     | done    | `2cd7ef3`                                                                                    |
+| 8    | Account administration and lifecycle  | done    | `98da1fb`, `8c70e45`                                                                         |
+| 9    | Session recovery                      | done    | `refactor: migrate session recovery policies`                                                |
+| 10   | Inference transforms and signatures   | done    | `8e77da0`                                                                                    |
+| 11   | Inference pipelines and client        | done    | `refactor: migrate inference request and response pipelines`                                 |
+| 12   | Application execution and composition | done    | `refactor: extract application request execution and composition`                            |
+| 13   | OpenCode integration and packaging    | pending | Partial snapshot: `refactor: consolidate OpenCode integration under adapter`; blockers below |
+| 14   | Final architecture verification       | pending | —                                                                                            |
 
 ## 1. Establish the migration baseline and ownership map
 
@@ -836,6 +836,34 @@ integration into `adapters/opencode/`.
 - [ ] Root, `./tui`, `./rpc`, and public OAuth exports remain usable.
 - [ ] SDK URL and Solid/OpenTUI compilation resolve from the built package.
 - [ ] Installed-host smoke covers routing, dialogs, mutations, and recovery.
+
+### Step 13 partial verification and blockers
+
+- Full suite passed (76 files / 1,212 tests) with:
+  `bun run test -- --maxWorkers=1 --minWorkers=1 --testTimeout=15000`.
+  `bun run test:tui` also passed (clean build / 13 tests / 164 expectations),
+  as did typecheck, lint, both boundary checks, changed-file Prettier,
+  `git diff --check`, and the clean-build Antigravity package smoke. The default
+  parallel run was load-sensitive; the complete single-worker run passed.
+- The earlier OpenCode 2.0.18 smoke verified registration, SDK resolution, RPC,
+  and safe mutations. The visible `/antigravity` empty-account alert opened and
+  Esc closed it; populated-account navigation and keymaps remain unverified in
+  the installed host.
+- A synthetic interrupted-call fixture confirmed that the built plugin's V2
+  context hook inserts the canonical cancelled tool result into a localhost
+  model request. The fixture used a temporary pre-hook to remove OpenCode's
+  own error result; the host process then exited nonzero, so this is targeted
+  adapter evidence, not a passing end-to-end recovery smoke.
+- A synthetic account and mocked fetch confirmed that the installed model route
+  dispatched the expected project and prompt to Antigravity's native streaming
+  endpoint without contacting Google. The session timed out after repeated
+  requests and the smoke process exited nonzero; generation completion remains
+  unverified.
+- Oracle and independent review agree Step 13 remains blocked. Do not mark it
+  complete or begin Step 14 until an installed-host smoke exits successfully
+  and covers the outstanding dialog and normal recovery behavior. The repeatable
+  follow-up checklist is in
+  [manual testing](../docs/dev/manual-testing.md#deferred-step-13-installed-host-e2e-gate).
 
 ## 14. Remove scaffolding and verify the final architecture
 

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest"
 
-import { OPENCODE_MODEL_DEFINITIONS } from "./models"
+import { OPENCODE_MODEL_DEFINITIONS } from "./models.js"
 
+/** Returns a configured model or fails with the missing model id. */
 const getModel = (name: string) => {
   const model = OPENCODE_MODEL_DEFINITIONS[name]
   if (!model) {

@@ -2,22 +2,24 @@
 
 ## Major parts
 
-| Part            | Paths                                                                                              | Responsibility                                                                                                                                                                    |
-| --------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shared identity | `src/adapters/antigravity/constants.ts`, `src/constants.ts`, `src/shims.d.ts`, `src/google-sdk.ts` | OAuth client id/secret/scopes/redirect, endpoint orders, Antigravity headers, version pinning, hardening prompts, search tuning; `src/constants.ts` is a compatibility facade     |
-| Application     | `src/app/composition.ts`, `src/app/execute-request.ts`                                             | Selects adapters and runs the single request execution + rotation loop                                                                                                            |
-| V2 bridge       | `src/v2-plugin.ts`                                                                                 | V2 `integration/provider/model/aisdk/tool/session/event` transforms; routes via application composition                                                                           |
-| OAuth facade    | `src/antigravity/oauth.ts`                                                                         | Compatibility API for authorize/exchange; delegates endpoint communication to Antigravity adapters                                                                                |
-| Vendor clients  | `src/adapters/antigravity/*`                                                                       | OAuth/token/project/quota/verification HTTP, headers, endpoint order, timeouts, and response wire parsing                                                                         |
-| Auto-update     | `src/hooks/auto-update-checker/*`                                                                  | Root-session npm check, toast or pinned rewrite + cache invalidate                                                                                                                |
-| Core domains    | `src/modules/*` + `src/plugin/*` + `cache/config/core/stores/transform`                            | Account policy, request transforms, schema/thinking utils, quota/storage adapters, fingerprint/project/refresh, session-recovery policy, streaming, debug/logger, version, images |
+| Part            | Paths                                                                                                                | Responsibility                                                                                                                                                                    |
+| --------------- | -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shared identity | `src/adapters/antigravity/constants.ts`, `src/constants.ts`, `src/shims.d.ts`, `src/adapters/opencode/google-sdk.ts` | OAuth client id/secret/scopes/redirect, endpoint orders, Antigravity headers, version pinning, hardening prompts, search tuning; `src/constants.ts` is a compatibility facade     |
+| Application     | `src/app/composition.ts`, `src/app/execute-request.ts`                                                               | Selects adapters and runs the single request execution + rotation loop                                                                                                            |
+| OpenCode V2     | `src/adapters/opencode/plugin.ts`, `src/adapters/opencode/{rpc,tui,config,hooks}/`                                   | V2 registration, host lifecycle, RPC/TUI, config, update hook, and SDK routing integration                                                                                        |
+| Compatibility   | `src/v2-plugin.ts`, `src/tui.ts`, `src/rpc.ts`, `src/google-sdk.ts`                                                  | Thin package/source entrypoint re-exports; implementation remains under `adapters/opencode/`                                                                                      |
+| OAuth facade    | `src/antigravity/oauth.ts`                                                                                           | Compatibility API for authorize/exchange; delegates endpoint communication to Antigravity adapters                                                                                |
+| Vendor clients  | `src/adapters/antigravity/*`                                                                                         | OAuth/token/project/quota/verification HTTP, headers, endpoint order, timeouts, and response wire parsing                                                                         |
+| Auto-update     | `src/adapters/opencode/hooks/auto-update-checker/*`                                                                  | Root-session npm check, toast or pinned rewrite + cache invalidate                                                                                                                |
+| Core domains    | `src/modules/*` + `src/plugin/*` + `cache/config/core/stores/transform`                                              | Account policy, request transforms, schema/thinking utils, quota/storage adapters, fingerprint/project/refresh, session-recovery policy, streaming, debug/logger, version, images |
 
 ## Dependency direction (normative)
 
 ```text
-v2-plugin.ts ──uses──> app/composition.ts :: executeAntigravityRequest
-                       ──calls──> app/execute-request.ts :: executeRequest
-                       (sole request path)
+adapters/opencode/plugin.ts ──uses──> app/composition.ts
+                                      ──calls──> app/execute-request.ts
+                                      (sole request path)
+adapters/opencode/tui ──RPC──> adapters/opencode/rpc
 app/composition.ts ──selects──> account, inference, Antigravity transport,
                                 OpenCode host, and filesystem adapters
 app/execute-request.ts ──coordinates──> account pool + inference policies
@@ -47,9 +49,9 @@ No parallel router, no legacy fallback.
 - `src/app/composition.ts :: executeAntigravityRequest`,
   `:: refreshOAuthCredentialUnified`
 - `src/app/execute-request.ts :: isNativeEngineEnabled`
-- `src/v2-plugin.ts :: loadRoutedFetch`, `:: antigravityFetch`
+- `src/adapters/opencode/plugin.ts :: antigravityFetch`
 - `src/app/execute-request.test.ts`,
-  `src/v2-plugin.setup.test.ts` :: routes SDK JSON through native engine
+  `src/adapters/opencode/plugin.setup.test.ts` :: routes SDK JSON through native engine
 
 **Status:** Explicit.
 
@@ -63,8 +65,9 @@ connection.
 **Rationale:** Antigravity account selection and OAuth credentials are isolated
 from ordinary Google API-key and OAuth connections.
 
-**Project evidence:** `src/v2-plugin.ts` integration/provider transforms and
-`src/v2-plugin.setup.test.ts` standalone registration coverage.
+**Project evidence:** `src/adapters/opencode/plugin.ts` integration/provider
+transforms and `src/adapters/opencode/plugin.setup.test.ts` standalone
+registration coverage.
 
 **Status:** Explicit.
 
@@ -77,8 +80,9 @@ outside this plugin's routing scope and MUST retain its configured route.
 
 **Project evidence:**
 
-- `src/v2-plugin.ts` provider/model transforms; `src/google-sdk.ts`
-- `src/v2-plugin.setup.test.ts` :: Google SDK route untouched; unauthenticated
+- `src/adapters/opencode/plugin.ts` provider/model transforms;
+  `src/adapters/opencode/google-sdk.ts`
+- `src/adapters/opencode/plugin.setup.test.ts` :: Google SDK route untouched; unauthenticated
   Antigravity throws
 
 **Status:** Explicit.
@@ -98,7 +102,7 @@ diagnostics are supplied or handled by the request boundary.
 - Dedicated `antigravity` provider and OAuth integration; the OpenCode `google`
   provider and integration are not modified. Antigravity traffic uses the
   application request path (`src/app/composition.ts`,
-  `src/app/execute-request.ts`, `src/v2-plugin.ts`).
+  `src/app/execute-request.ts`, `src/adapters/opencode/plugin.ts`).
 - `account_selection_strategy = sticky | round-robin | hybrid` (default
   `hybrid`) + pool policy in `src/modules/accounts/account-pool.ts` and health,
   token-bucket, and backoff policy in `src/modules/accounts/selection/`.
@@ -107,14 +111,14 @@ diagnostics are supplied or handled by the request boundary.
 - `TransformContext/Result`, request/response pipelines, signature policy, and
   `StreamingCallbacks` live in `src/modules/inference/`; plugin request and
   streaming paths are compatibility adapters.
-- `antigravity_accounts` tool (`src/v2-plugin.ts :: manageAccounts`,
+- `antigravity_accounts` tool (`src/adapters/opencode/plugin.ts :: manageAccounts`,
   backed by `src/modules/accounts/account-admin.ts` through the compatibility
   facade in `src/plugin/account-service.ts`).
   No search tool is registered; the D-SEARCH-MUTEX guard in
   `src/modules/inference/transforms/gemini.ts` keeps the D-SEARCH-MUTEX guard
   for SDK-supplied search tools.
-- Production account UI (`src/tui.ts :: /antigravity` dialog,
-  `src/rpc.ts :: AntigravityAccounts` with `list/quota/verify/mutate/
+- Production account UI (`src/adapters/opencode/tui/index.ts :: /antigravity` dialog,
+  `src/adapters/opencode/rpc.ts :: AntigravityAccounts` with `list/quota/verify/mutate/
 deleteAll/ping`) — the interactive management surface sharing the
   account-admin use cases with the legacy tool. `ping` returns
   `ANTIGRAVITY_RPC_ACCOUNTS_OK`.
