@@ -5,34 +5,33 @@ import {
   transformAntigravityResponse,
   getPluginSessionId,
   isGenerativeLanguageRequest,
-  __testExports,
 } from "./request"
+import {
+  buildSignatureSessionKey,
+  ensureThoughtSignature,
+  extractConversationSeedFromContents,
+  extractConversationSeedFromMessages,
+  extractTextFromContent,
+  hasSignedThinkingInContents,
+  hasSignedThinkingInMessages,
+  hasSignedThinkingPart,
+  hasToolUseInContents,
+  hasToolUseInMessages,
+  isGeminiThinkingPart,
+  isGeminiToolUsePart,
+  cacheSignature,
+  clearSignatureCache,
+  resolveAntigravityModel,
+  resolveConversationKey,
+  resolveConversationKeyFromRequests,
+  resolveProjectKey,
+  MIN_SIGNATURE_LENGTH,
+} from "../modules/inference/index.js"
+import { createStreamingTransformer, transformSseLine, transformStreamingPayload } from "./core/streaming"
 import { DEFAULT_CONFIG } from "./config"
 import { initializeDebug } from "./debug"
 import * as config from "./config"
 import type { SignatureStore, ThoughtBuffer, StreamingCallbacks, StreamingOptions } from "./core/streaming/types"
-
-const {
-  buildSignatureSessionKey,
-  hashConversationSeed,
-  extractTextFromContent,
-  extractConversationSeedFromMessages,
-  extractConversationSeedFromContents,
-  resolveProjectKey,
-  isGeminiToolUsePart,
-  isGeminiThinkingPart,
-  ensureThoughtSignature,
-  hasSignedThinkingPart,
-  hasToolUseInContents,
-  hasSignedThinkingInContents,
-  hasToolUseInMessages,
-  hasSignedThinkingInMessages,
-  generateSyntheticProjectId,
-  MIN_SIGNATURE_LENGTH,
-  transformStreamingPayload,
-  createStreamingTransformer,
-  transformSseLine,
-} = __testExports
 
 /**
  * Creates an in-memory mock signature store for testing.
@@ -93,6 +92,7 @@ const defaultCallbacks: StreamingCallbacks = {}
 const defaultOptions: StreamingOptions = {}
 const defaultDebugState = { injected: false }
 
+/** Runs one test with the requested keep_thinking configuration. */
 function withKeepThinking<T>(enabled: boolean, fn: () => T): T {
   const keepThinkingSpy = vi.spyOn(config, "getKeepThinking").mockReturnValue(enabled)
   try {
@@ -131,38 +131,42 @@ describe("request.ts", () => {
     })
   })
 
-  describe("buildSignatureSessionKey", () => {
-    it("builds key from sessionId, model, project, and conversation", () => {
-      const key = buildSignatureSessionKey("session-1", "claude-3", "conv-456", "proj-123")
-      expect(key).toBe("session-1:claude-3:proj-123:conv-456")
-    })
+  describe("signature cache scope", () => {
+    it("keeps model, project, and conversation scopes distinct", () => {
+      const base = buildSignatureSessionKey("s1", "claude-3", "conv-a", "project-a")
 
-    it("uses defaults for missing optional params", () => {
-      expect(buildSignatureSessionKey("s1", undefined, undefined, undefined)).toBe("s1:unknown:default:default")
-      expect(buildSignatureSessionKey("s1", "model", undefined, undefined)).toBe("s1:model:default:default")
-    })
-
-    it("handles empty strings as defaults", () => {
-      expect(buildSignatureSessionKey("s1", "", "", "")).toBe("s1:unknown:default:default")
+      expect(buildSignatureSessionKey("s1", "claude-4", "conv-a", "project-a")).not.toBe(base)
+      expect(buildSignatureSessionKey("s1", "claude-3", "conv-b", "project-a")).not.toBe(base)
+      expect(buildSignatureSessionKey("s1", "claude-3", "conv-a", "project-b")).not.toBe(base)
     })
   })
 
-  describe("hashConversationSeed", () => {
-    it("returns consistent hash for same input", () => {
-      const hash1 = hashConversationSeed("test-seed")
-      const hash2 = hashConversationSeed("test-seed")
-      expect(hash1).toBe(hash2)
+  describe("conversation cache identity", () => {
+    const hashSeed = (seed: string) => `hash:${seed}`
+
+    it("prefers a supplied conversation id", () => {
+      expect(resolveConversationKey({ conversationId: "  thread-7  " }, hashSeed)).toBe("thread-7")
     })
 
-    it("returns different hash for different inputs", () => {
-      const hash1 = hashConversationSeed("seed-1")
-      const hash2 = hashConversationSeed("seed-2")
-      expect(hash1).not.toBe(hash2)
+    it("derives an identity from system and first user content", () => {
+      const key = resolveConversationKey(
+        {
+          systemInstruction: { parts: [{ text: "system" }] },
+          contents: [{ role: "user", parts: [{ text: "first turn" }] }],
+        },
+        hashSeed,
+      )
+
+      expect(key).toBe("seed-hash:system|first turn")
     })
 
-    it("handles empty string", () => {
-      const hash = hashConversationSeed("")
-      expect(hash).toBeTruthy()
+    it("uses the first wrapped request with a usable identity", () => {
+      expect(
+        resolveConversationKeyFromRequests(
+          [{ contents: [{ role: "model", parts: [{ text: "no user seed" }] }] }, { conversation_id: "thread-9" }],
+          hashSeed,
+        ),
+      ).toBe("thread-9")
     })
   })
 
@@ -287,11 +291,11 @@ describe("request.ts", () => {
       expect(result.thoughtSignature).toBe("skip_thought_signature_validator")
     })
 
-    it("replaces untrusted thoughtSignature with sentinel", () => {
+    it("preserves an existing provider signature on cache miss", () => {
       const existingSignature = "a".repeat(MIN_SIGNATURE_LENGTH + 10)
       const part = { thought: true, text: "thinking...", thoughtSignature: existingSignature }
       const result = ensureThoughtSignature(part, "session-key")
-      expect(result.thoughtSignature).toBe("skip_thought_signature_validator")
+      expect(result.thoughtSignature).toBe(existingSignature)
     })
 
     it("does not modify non-thinking parts", () => {
@@ -402,28 +406,8 @@ describe("request.ts", () => {
     })
   })
 
-  describe("generateSyntheticProjectId", () => {
-    it("generates a string in expected format", () => {
-      const id = generateSyntheticProjectId()
-      expect(id).toMatch(/^[a-z]+-[a-z]+-[a-z0-9]{5}$/)
-    })
-
-    it("generates unique IDs on each call", () => {
-      const ids = new Set<string>()
-      for (let i = 0; i < 10; i++) {
-        ids.add(generateSyntheticProjectId())
-      }
-      expect(ids.size).toBe(10)
-    })
-  })
-
-  describe("MIN_SIGNATURE_LENGTH", () => {
-    it("is 50", () => {
-      expect(MIN_SIGNATURE_LENGTH).toBe(50)
-    })
-  })
-
   describe("transformSseLine", () => {
+    /** Transforms a single SSE line with isolated streaming state. */
     const callTransformSseLine = (line: string) => {
       const store = createMockSignatureStore()
       const buffer = createMockThoughtBuffer()
@@ -950,6 +934,92 @@ describe("request.ts", () => {
       expect(thinkingBlock?.signature).toBe(SKIP_THOUGHT_SIGNATURE)
       expect(JSON.stringify(content)).not.toContain(foreignSignature)
       expect(result.needsSignedThinkingWarmup).toBe(false)
+    })
+
+    it("preserves cached Claude thinking when keep_thinking is enabled", () => {
+      const effectiveModel = resolveAntigravityModel("claude-opus-4-6-thinking").actualModel
+      const signatureSessionKey = buildSignatureSessionKey(
+        getPluginSessionId(),
+        effectiveModel,
+        "thread-with-cached-claude-thinking",
+        mockProjectId,
+      )
+      const signature = "cached-claude-signature".padEnd(64, "x")
+      clearSignatureCache(signatureSessionKey)
+      cacheSignature(signatureSessionKey, "cached Claude reasoning", signature)
+
+      try {
+        const result = withKeepThinking(true, () =>
+          prepareAntigravityRequest(
+            "https://generativelanguage.googleapis.com/v1beta/models/claude-opus-4-6-thinking:generateContent",
+            {
+              method: "POST",
+              body: JSON.stringify({
+                conversationId: "thread-with-cached-claude-thinking",
+                messages: [
+                  {
+                    role: "assistant",
+                    content: [
+                      { type: "thinking", thinking: "cached Claude reasoning", signature },
+                      { type: "tool_use", id: "tool-call-1", name: "weather", input: {} },
+                    ],
+                  },
+                ],
+              }),
+            },
+            mockAccessToken,
+            mockProjectId,
+          ),
+        )
+
+        const wrapped = JSON.parse(result.init.body as string)
+        const thinking = wrapped.request.messages[0].content[0]
+        expect(thinking.signature).toBe(signature)
+        expect(result.needsSignedThinkingWarmup).toBe(false)
+      } finally {
+        clearSignatureCache(signatureSessionKey)
+      }
+    })
+
+    it("restores a cached thought signature onto the first Gemini function call", () => {
+      const effectiveModel = resolveAntigravityModel("gemini-3-flash").actualModel
+      const signatureSessionKey = buildSignatureSessionKey(
+        getPluginSessionId(),
+        effectiveModel,
+        "thread-with-cached-signature",
+        mockProjectId,
+      )
+      const signature = "cached-provider-signature".padEnd(64, "x")
+      clearSignatureCache(signatureSessionKey)
+      cacheSignature(signatureSessionKey, "cached reasoning", signature)
+
+      try {
+        const result = prepareAntigravityRequest(
+          "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              conversationId: "thread-with-cached-signature",
+              contents: [
+                { role: "user", parts: [{ text: "check the weather" }] },
+                {
+                  role: "model",
+                  parts: [{ thought: true, text: "cached reasoning" }, { functionCall: { name: "weather" } }],
+                },
+              ],
+            }),
+          },
+          mockAccessToken,
+          mockProjectId,
+        )
+
+        const wrapped = JSON.parse(result.init.body as string)
+        const functionCall = wrapped.request.contents[1].parts[1]
+        expect(functionCall.thoughtSignature).toBe(signature)
+        expect(functionCall.thought_signature).toBe(signature)
+      } finally {
+        clearSignatureCache(signatureSessionKey)
+      }
     })
 
     it("returns requestedModel matching URL model", () => {

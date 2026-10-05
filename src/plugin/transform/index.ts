@@ -1,63 +1,52 @@
-// Types
-export type {
-  ModelFamily,
-  ThinkingTier,
-  TransformContext,
-  TransformResult,
-  TransformDebugInfo,
-  RequestPayload,
-  ThinkingConfig,
-  ResolvedModel,
-  GoogleSearchConfig,
-} from "./types"
-
-// Model resolution
+/** Compatibility exports for callers of the previous transform module path. */
 export {
-  resolveModelWithTier,
-  resolveModelWithVariant,
-  resolveAntigravityModel,
+  applyClaudeTransforms,
+  applyGeminiTransforms,
+  appendClaudeThinkingHint,
+  buildClaudeThinkingConfig,
+  buildGemini25ThinkingConfig,
+  buildGemini3ThinkingConfig,
+  buildImageGenerationConfig,
+  configureClaudeToolConfig,
+  ensureClaudeMaxOutputTokens,
+  getCrossModelFamily,
   getModelFamily,
-  MODEL_ALIASES,
-  THINKING_TIER_BUDGETS,
-  GEMINI_3_THINKING_LEVELS,
-} from "./model-resolver"
-export type { VariantConfig } from "./model-resolver"
-
-// Claude transforms
-export {
   isClaudeModel,
   isClaudeThinkingModel,
-  configureClaudeToolConfig,
-  buildClaudeThinkingConfig,
-  ensureClaudeMaxOutputTokens,
-  appendClaudeThinkingHint,
-  normalizeClaudeTools,
-  applyClaudeTransforms,
-  CLAUDE_THINKING_MAX_OUTPUT_TOKENS,
-  CLAUDE_INTERLEAVED_THINKING_HINT,
-} from "./claude"
-export type { ClaudeTransformOptions, ClaudeTransformResult } from "./claude"
-
-// Gemini transforms
-export {
-  isGeminiModel,
-  isGemini3Model,
   isGemini25Model,
+  isGemini3Model,
+  isGeminiModel,
   isImageGenerationModel,
-  buildGemini3ThinkingConfig,
-  buildGemini25ThinkingConfig,
-  buildImageGenerationConfig,
+  normalizeClaudeTools,
   normalizeGeminiTools,
-  applyGeminiTransforms,
-} from "./gemini"
-export type { GeminiTransformOptions, GeminiTransformResult, ImageConfig } from "./gemini"
-
-// Cross-model sanitization
-export {
+  resolveAntigravityModel,
+  resolveModelWithTier,
+  resolveModelWithVariant,
   sanitizeCrossModelPayload,
   sanitizeCrossModelPayloadInPlace,
-  getModelFamily as getCrossModelFamily,
-  stripGeminiThinkingMetadata,
   stripClaudeThinkingFields,
-} from "./cross-model-sanitizer"
-export type { SanitizerOptions } from "./cross-model-sanitizer"
+  stripGeminiThinkingMetadata,
+  CLAUDE_INTERLEAVED_THINKING_HINT,
+  CLAUDE_THINKING_MAX_OUTPUT_TOKENS,
+  GEMINI_3_THINKING_LEVELS,
+  MODEL_ALIASES,
+  THINKING_TIER_BUDGETS,
+} from "../../modules/inference/index.js"
+export type {
+  ClaudeTransformOptions,
+  ClaudeTransformResult,
+  GeminiTransformOptions,
+  GeminiTransformResult,
+  GoogleSearchConfig,
+  ImageConfig,
+  ModelFamily,
+  RequestPayload,
+  ResolvedModel,
+  SanitizerOptions,
+  ThinkingConfig,
+  ThinkingTier,
+  TransformContext,
+  TransformDebugInfo,
+  TransformResult,
+  VariantConfig,
+} from "../../modules/inference/index.js"

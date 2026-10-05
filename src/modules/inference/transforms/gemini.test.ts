@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
+import { describe, it, expect } from "vitest"
 import {
   isGeminiModel,
   isGemini3Model,
@@ -11,8 +11,8 @@ import {
   applyGeminiTransforms,
   toGeminiSchema,
   wrapToolsAsFunctionDeclarations,
-} from "./gemini"
-import type { RequestPayload } from "./types"
+} from "./gemini.js"
+import type { RequestPayload } from "./types.js"
 
 /**
  * Builds a Gemini tool payload containing function definitions.
@@ -547,18 +547,18 @@ describe("transform/gemini", () => {
         expect(tools).toHaveLength(0)
       })
 
-      it("appends search tool to existing tools array", () => {
+      it("drops search when function tools are present", () => {
         const payload = createGeminiPayload({
           tools: [createFunctionTool("existing_tool", undefined, { type: "object" })],
         })
-        applyGeminiTransforms(payload, {
+        const result = applyGeminiTransforms(payload, {
           model: "gemini-3-pro",
           googleSearch: { mode: "auto" },
         })
         const tools = payload.tools as unknown[]
-        expect(tools).toHaveLength(2)
-        const lastTool = tools[1] as Record<string, unknown>
-        expect(lastTool).toHaveProperty("googleSearch")
+        expect(tools).toHaveLength(1)
+        expect(tools[0]).toHaveProperty("functionDeclarations")
+        expect(result.webSearchSkipped).toBe(true)
       })
 
       it("search tool is not normalized (skipped by normalizeGeminiTools)", () => {
@@ -611,48 +611,31 @@ describe("transform/gemini", () => {
   })
 
   describe("buildImageGenerationConfig", () => {
-    const originalEnv = process.env
-
-    beforeEach(() => {
-      // Reset environment before each test
-      vi.resetModules()
-      process.env = { ...originalEnv }
-    })
-
-    afterEach(() => {
-      process.env = originalEnv
-    })
-
-    it("returns default 1:1 aspect ratio when no env var set", () => {
-      delete process.env.OPENCODE_IMAGE_ASPECT_RATIO
+    it("returns default 1:1 aspect ratio when none is supplied", () => {
       const config = buildImageGenerationConfig()
       expect(config).toEqual({ aspectRatio: "1:1" })
     })
 
-    it("uses OPENCODE_IMAGE_ASPECT_RATIO env var when set to valid value", () => {
-      process.env.OPENCODE_IMAGE_ASPECT_RATIO = "16:9"
-      const config = buildImageGenerationConfig()
+    it("uses a supported aspect ratio", () => {
+      const config = buildImageGenerationConfig("16:9")
       expect(config).toEqual({ aspectRatio: "16:9" })
     })
 
     it("accepts all valid aspect ratios", () => {
       const validRatios = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"]
       for (const ratio of validRatios) {
-        process.env.OPENCODE_IMAGE_ASPECT_RATIO = ratio
-        const config = buildImageGenerationConfig()
+        const config = buildImageGenerationConfig(ratio)
         expect(config.aspectRatio).toBe(ratio)
       }
     })
 
     it("falls back to 1:1 for invalid aspect ratio", () => {
-      process.env.OPENCODE_IMAGE_ASPECT_RATIO = "invalid"
-      const config = buildImageGenerationConfig()
+      const config = buildImageGenerationConfig("invalid")
       expect(config).toEqual({ aspectRatio: "1:1" })
     })
 
     it("falls back to 1:1 for unsupported aspect ratio", () => {
-      process.env.OPENCODE_IMAGE_ASPECT_RATIO = "5:3"
-      const config = buildImageGenerationConfig()
+      const config = buildImageGenerationConfig("5:3")
       expect(config).toEqual({ aspectRatio: "1:1" })
     })
   })
@@ -1071,19 +1054,19 @@ describe("transform/gemini", () => {
       expect(decls[0]!.parameters).toEqual({ type: "OBJECT", properties: { x: { type: "NUMBER" } } })
     })
 
-    it("preserves googleSearch tools as passthrough (new API)", () => {
+    it("drops googleSearch when function declarations are present (new API)", () => {
       const payload = createGeminiPayload({
         tools: [{ name: "tool1", parameters: { type: "OBJECT", properties: {} } }, { googleSearch: {} }],
       })
-      wrapToolsAsFunctionDeclarations(payload)
+      const result = wrapToolsAsFunctionDeclarations(payload)
 
       const tools = payload.tools as Array<Record<string, unknown>>
-      expect(tools).toHaveLength(2)
+      expect(tools).toHaveLength(1)
       expect(tools[0]).toHaveProperty("functionDeclarations")
-      expect(tools[1]).toHaveProperty("googleSearch")
+      expect(result.webSearchSkipped).toBe(true)
     })
 
-    it("preserves googleSearchRetrieval tools as passthrough (legacy API)", () => {
+    it("drops googleSearchRetrieval when function declarations are present (legacy API)", () => {
       const payload = createGeminiPayload({
         tools: [
           { name: "tool1", parameters: { type: "OBJECT", properties: {} } },
@@ -1094,12 +1077,12 @@ describe("transform/gemini", () => {
           },
         ],
       })
-      wrapToolsAsFunctionDeclarations(payload)
+      const result = wrapToolsAsFunctionDeclarations(payload)
 
       const tools = payload.tools as Array<Record<string, unknown>>
-      expect(tools).toHaveLength(2)
+      expect(tools).toHaveLength(1)
       expect(tools[0]).toHaveProperty("functionDeclarations")
-      expect(tools[1]).toHaveProperty("googleSearchRetrieval")
+      expect(result.webSearchSkipped).toBe(true)
     })
 
     it("preserves codeExecution tools as passthrough", () => {
@@ -1407,20 +1390,18 @@ describe("transform/gemini", () => {
       expect(props["x"]!.type).toBe("STRING")
     })
 
-    it("handles mixed tools and googleSearch", () => {
+    it("drops a model-declared googleSearch when function declarations are present", () => {
       const payload = createGeminiPayload({
-        tools: [{ name: "my_tool", parameters: { type: "object" } }],
+        tools: [{ name: "my_tool", parameters: { type: "object" } }, { googleSearch: {} }],
       })
 
-      applyGeminiTransforms(payload, {
-        model: "gemini-3-pro",
-        googleSearch: { mode: "auto" },
-      })
+      const result = applyGeminiTransforms(payload, { model: "gemini-3-pro" })
 
       const tools = payload.tools as Array<Record<string, unknown>>
-      expect(tools).toHaveLength(2)
+      expect(tools).toHaveLength(1)
       expect(tools[0]).toHaveProperty("functionDeclarations")
-      expect(tools[1]).toHaveProperty("googleSearch")
+      expect(tools.some((tool) => "googleSearch" in tool)).toBe(false)
+      expect(result.webSearchSkipped).toBe(true)
     })
   })
 })

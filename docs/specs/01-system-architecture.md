@@ -82,10 +82,11 @@ outside this plugin's routing scope and MUST retain its configured route.
 
 ### Rule: R-ARCH-PURE-TRANSFORM
 
-**Requirement:** `src/plugin/transform/*` SHOULD be pure functions of
+**Requirement:** `src/modules/inference/transforms/*` SHOULD be pure functions of
 `(payload, model, config)`. Network and filesystem work belong in adapters;
 account policy belongs in `src/modules/accounts/`, with plugin files retained
-only as compatibility boundaries during migration.
+only as compatibility boundaries during migration. Environment reads and
+diagnostics are supplied or handled by the request boundary.
 
 **Status:** Strong (consistent implementation; cross-module report).
 
@@ -99,13 +100,15 @@ only as compatibility boundaries during migration.
   token-bucket, and backoff policy in `src/modules/accounts/selection/`.
   `src/plugin/accounts.ts` and `src/plugin/rotation.ts` remain compatibility
   facades for existing callers.
-- `TransformContext/Result`, `StreamingCallbacks/SignatureStore`
-  (`src/plugin/transform/types.ts`, `src/plugin/core/streaming/types.ts`).
+- `TransformContext/Result` and signature policy/types live in
+  `src/modules/inference/`; `StreamingCallbacks` remain in
+  `src/plugin/core/streaming/types.ts`.
 - `antigravity_accounts` tool (`src/v2-plugin.ts :: manageAccounts`,
   backed by `src/modules/accounts/account-admin.ts` through the compatibility
   facade in `src/plugin/account-service.ts`).
   No search tool is registered; the D-SEARCH-MUTEX guard in
-  `transform/gemini.ts` stays for SDK-supplied search tools.
+  `src/modules/inference/transforms/gemini.ts` keeps the D-SEARCH-MUTEX guard
+  for SDK-supplied search tools.
 - Production account UI (`src/tui.ts :: /antigravity` dialog,
   `src/rpc.ts :: AntigravityAccounts` with `list/quota/verify/mutate/
 deleteAll/ping`) — the interactive management surface sharing the

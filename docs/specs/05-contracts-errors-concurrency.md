@@ -33,7 +33,7 @@ enable|disable|select|delete|delete_all` (see F3; out-of-range index is a
   message, not a write — `v2-plugin.accounts.test.ts`).
   No search tool is registered. Model-declared `web_search` /
   `google_search` names are still recognized and sanitized by the
-  D-SEARCH-MUTEX guard in `transform/gemini.ts`.
+  D-SEARCH-MUTEX guard in `modules/inference/transforms/gemini.ts`.
 - Events consumed: `session.created` (child tracking + update check),
   `session.error` (recovery), V2 `session.retry` (forward). V2 `aisdk.hook
 ("sdk")` is beta and MAY change upstream (see §06).

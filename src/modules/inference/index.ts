@@ -92,4 +92,54 @@ export type {
   InferenceRecoveryPort,
   InferenceRequestPolicyPort,
   InferenceSignatureCachePort,
+  InferenceSignaturePersistencePort,
 } from "./ports.js"
+
+export {
+  EMPTY_SCHEMA_PLACEHOLDER_DESCRIPTION,
+  EMPTY_SCHEMA_PLACEHOLDER_NAME,
+  MIN_SIGNATURE_LENGTH,
+  SKIP_THOUGHT_SIGNATURE,
+} from "./constants.js"
+export * from "./transforms/index.js"
+export { cleanJSONSchemaForAntigravity } from "./schema-cleaner.js"
+export {
+  cacheSignature,
+  clearSignatureCache,
+  configureSignaturePersistence,
+  configureSignatureTextHash,
+  getCachedSignature,
+} from "./signature-cache.js"
+export {
+  buildSignatureSessionKey,
+  extractConversationSeedFromContents,
+  extractConversationSeedFromMessages,
+  extractTextFromContent,
+  resolveConversationKey,
+  resolveConversationKeyFromRequests,
+  resolveProjectKey,
+  shouldCacheThinkingSignatures,
+} from "./signature-context.js"
+export { createSignatureStore, defaultSignatureStore } from "./signature-store.js"
+export type { SignatureStore, SignedThinking } from "./signature-store.js"
+export {
+  ensureThoughtSignature,
+  ensureThinkingBeforeToolUseInContents,
+  ensureThinkingBeforeToolUseInMessages,
+  hasSignedThinkingInContents,
+  hasSignedThinkingInMessages,
+  hasSignedThinkingPart,
+  hasToolUseInContents,
+  hasToolUseInMessages,
+  isGeminiThinkingPart,
+  isGeminiToolUsePart,
+  sanitizeRequestPayloadForAntigravity,
+} from "./signature-policy.js"
+export type { SignatureRepairOptions } from "./signature-policy.js"
+export type { RequestSanitizationOptions } from "./signature-policy.js"
+export {
+  deepFilterThinkingBlocks,
+  filterMessagesThinkingBlocks,
+  filterUnsignedThinkingBlocks,
+} from "./thinking-filter.js"
+export type { ThinkingFilterOptions } from "./thinking-filter.js"

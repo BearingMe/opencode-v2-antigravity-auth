@@ -6,6 +6,12 @@ export interface InferenceSignatureCachePort {
   getCachedSignature(sessionId: string, text: string): string | undefined
 }
 
+/** Optional persistence tier used by the in-memory thinking-signature policy. */
+export interface InferenceSignaturePersistencePort {
+  get(sessionId: string, text: string): string | undefined
+  set(sessionId: string, text: string, signature: string): void
+}
+
 /** Runtime policy values required by inference without a host configuration type. */
 export interface InferenceRequestPolicyPort {
   keepThinking(): boolean

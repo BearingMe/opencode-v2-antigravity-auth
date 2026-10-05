@@ -1,30 +1,18 @@
-import type { SignatureStore, SignedThinking, ThoughtBuffer } from "../core/streaming/types"
+import type { ThoughtBuffer } from "../core/streaming/types"
 
-export function createSignatureStore(): SignatureStore {
-  const store = new Map<string, SignedThinking>()
+/** Compatibility exports for the inference-owned signed-thinking store. */
+export { createSignatureStore, defaultSignatureStore } from "../../modules/inference/index.js"
+export type { SignatureStore, SignedThinking } from "../../modules/inference/index.js"
 
-  return {
-    get: (key: string) => store.get(key),
-    set: (key: string, value: SignedThinking) => {
-      store.set(key, value)
-    },
-    has: (key: string) => store.has(key),
-    delete: (key: string) => {
-      store.delete(key)
-    },
-  }
-}
-
+/** Creates an isolated numeric-index buffer used while assembling streamed thoughts. */
 export function createThoughtBuffer(): ThoughtBuffer {
   const buffer = new Map<number, string>()
 
   return {
-    get: (index: number) => buffer.get(index),
-    set: (index: number, text: string) => {
+    get: (index) => buffer.get(index),
+    set: (index, text) => {
       buffer.set(index, text)
     },
     clear: () => buffer.clear(),
   }
 }
-
-export const defaultSignatureStore = createSignatureStore()

@@ -53,24 +53,11 @@ If you are unsure about a tool's parameters, YOU MUST read the schema definition
  */
 export const CLAUDE_DESCRIPTION_PROMPT = "\n\n⚠️ STRICT PARAMETERS: {params}."
 
-export const EMPTY_SCHEMA_PLACEHOLDER_NAME = "_placeholder"
-export const EMPTY_SCHEMA_PLACEHOLDER_DESCRIPTION = "Placeholder. Always pass true."
-
-/**
- * Sentinel value to bypass thought signature validation.
- *
- * When a thinking block has an invalid or missing signature (e.g., cache miss,
- * session mismatch, plugin restart), this sentinel can be injected to skip
- * validation instead of failing with "Invalid signature in thinking block".
- *
- * This is an officially supported Google API feature used by Google's SDKs.
- *
- */
-export const SKIP_THOUGHT_SIGNATURE = "skip_thought_signature_validator"
-
-// ============================================================================
-// ANTIGRAVITY SYSTEM INSTRUCTION (Ported from CLIProxyAPI v6.6.89)
-// ============================================================================
+export {
+  EMPTY_SCHEMA_PLACEHOLDER_NAME,
+  EMPTY_SCHEMA_PLACEHOLDER_DESCRIPTION,
+  SKIP_THOUGHT_SIGNATURE,
+} from "./modules/inference/index.js"
 
 /**
  * System instruction for Antigravity requests.

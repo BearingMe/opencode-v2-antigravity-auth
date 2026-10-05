@@ -145,8 +145,8 @@ event` transforms. V2 API explicitly "may change before stable".
    integration and saved account pool. Changes to OpenCode's Google
    integration or connection MUST NOT affect Antigravity routing.
 4. D-SEARCH-MUTEX: `googleSearch + functionDeclarations` are mutually
-   exclusive on Gemini — `web_search` is dropped with `console.warn` when
-   functions exist. Reviewers MUST NOT "fix" this by sending both.
+   exclusive on Gemini — `web_search` is dropped with a request-boundary warning
+   when functions exist. Reviewers MUST NOT "fix" this by sending both.
 5. D-QUOTA-FAIL-OPEN: soft-quota gates fail OPEN on stale/missing cache
    (fail-closed only when all-over with valid resetTime). Deliberate
    availability bias; changing to fail-closed needs product decision.

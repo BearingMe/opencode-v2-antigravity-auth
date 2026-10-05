@@ -6,7 +6,7 @@ import {
   sanitizeCrossModelPayload,
   deepSanitizeCrossModelMetadata,
   sanitizeCrossModelPayloadInPlace,
-} from "./cross-model-sanitizer"
+} from "./cross-model-sanitizer.js"
 
 /**
  * Builds a Gemini content part with optional thinking and metadata.

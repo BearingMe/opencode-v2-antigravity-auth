@@ -10,8 +10,8 @@ import {
   applyClaudeTransforms,
   CLAUDE_THINKING_MAX_OUTPUT_TOKENS,
   CLAUDE_INTERLEAVED_THINKING_HINT,
-} from "./claude"
-import type { RequestPayload } from "./types"
+} from "./claude.js"
+import type { RequestPayload } from "./types.js"
 
 /**
  * Builds an Anthropic / Claude function tool definition.

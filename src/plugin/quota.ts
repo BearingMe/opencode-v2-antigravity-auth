@@ -17,7 +17,7 @@ import { accessTokenExpired, formatRefreshParts, parseRefreshParts } from "./aut
 import { logQuotaFetch, logQuotaStatus } from "./debug"
 import { ensureProjectContext } from "./project"
 import { refreshAccessToken } from "./token"
-import { getModelFamily } from "./transform/model-resolver"
+import { getModelFamily } from "../modules/inference/index.js"
 import type { PluginClient, OAuthAuthDetails } from "./types"
 import type { AccountMetadataV3, QuotaSummaryGroup } from "./storage"
 

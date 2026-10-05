@@ -3,14 +3,11 @@ import {
   ANTIGRAVITY_ENDPOINT,
   EMPTY_SCHEMA_PLACEHOLDER_NAME,
   EMPTY_SCHEMA_PLACEHOLDER_DESCRIPTION,
-  SKIP_THOUGHT_SIGNATURE,
   getRandomizedHeaders,
 } from "../constants"
 import { CLAUDE_TOOL_SYSTEM_INSTRUCTION, CLAUDE_DESCRIPTION_PROMPT, ANTIGRAVITY_SYSTEM_INSTRUCTION } from "../constants"
-import { cacheSignature, getCachedSignature } from "./cache"
 import { getKeepThinking } from "./config"
 import { createStreamingTransformer, transformSseLine, transformStreamingPayload } from "./core/streaming"
-import { defaultSignatureStore } from "./stores/signature-store"
 import {
   DEBUG_MESSAGE_PREFIX,
   isDebugEnabled,
@@ -21,7 +18,6 @@ import {
 } from "./debug"
 import { createLogger } from "./logger"
 import {
-  cleanJSONSchemaForAntigravity,
   DEFAULT_THINKING_BUDGET,
   deepFilterThinkingBlocks,
   extractThinkingConfig,
@@ -47,8 +43,38 @@ import {
   detectRecoveryErrorType,
   needsThinkingRecovery,
 } from "../modules/session-recovery/index.js"
-import { sanitizeCrossModelPayloadInPlace } from "./transform/cross-model-sanitizer"
-import { isGemini3Model, isImageGenerationModel, buildImageGenerationConfig, applyGeminiTransforms } from "./transform"
+import {
+  sanitizeCrossModelPayloadInPlace,
+  buildSignatureSessionKey,
+  cacheSignature,
+  defaultSignatureStore,
+  ensureThoughtSignature,
+  ensureThinkingBeforeToolUseInContents,
+  ensureThinkingBeforeToolUseInMessages,
+  extractConversationSeedFromContents,
+  extractConversationSeedFromMessages,
+  extractTextFromContent,
+  getCachedSignature,
+  hasSignedThinkingInContents,
+  hasSignedThinkingInMessages,
+  hasSignedThinkingPart,
+  hasToolUseInContents,
+  hasToolUseInMessages,
+  isGeminiThinkingPart,
+  isGeminiToolUsePart,
+  resolveConversationKey,
+  resolveConversationKeyFromRequests,
+  resolveProjectKey,
+  sanitizeRequestPayloadForAntigravity,
+  shouldCacheThinkingSignatures,
+  isGemini3Model,
+  isImageGenerationModel,
+  buildImageGenerationConfig,
+  isValidImageAspectRatio,
+  VALID_IMAGE_ASPECT_RATIOS,
+  applyGeminiTransforms,
+  cleanJSONSchemaForAntigravity,
+} from "../modules/inference/index.js"
 import {
   resolveModelWithTier,
   resolveModelWithVariant,
@@ -57,149 +83,22 @@ import {
   isClaudeThinkingModel,
   CLAUDE_THINKING_MAX_OUTPUT_TOKENS,
   type ThinkingTier,
-} from "./transform"
+} from "../modules/inference/index.js"
 import { getSessionFingerprint, buildFingerprintHeaders, type Fingerprint } from "./fingerprint"
-import type { GoogleSearchConfig } from "./transform/types"
+import type { GoogleSearchConfig } from "../modules/inference/index.js"
 
 const log = createLogger("request")
+
+/** Routes signature-policy diagnostics through the request logger. */
+const debugSignaturePolicy = (message: string, fields?: Record<string, unknown>): void => log.debug(message, fields)
 
 const PLUGIN_SESSION_ID = `-${crypto.randomUUID()}`
 
 const sessionDisplayedThinkingHashes = new Set<string>()
 
-const MIN_SIGNATURE_LENGTH = 50
-
-function buildSignatureSessionKey(
-  sessionId: string,
-  model?: string,
-  conversationKey?: string,
-  projectKey?: string,
-): string {
-  const modelKey = typeof model === "string" && model.trim() ? model.toLowerCase() : "unknown"
-  const projectPart = typeof projectKey === "string" && projectKey.trim() ? projectKey.trim() : "default"
-  const conversationPart =
-    typeof conversationKey === "string" && conversationKey.trim() ? conversationKey.trim() : "default"
-  return `${sessionId}:${modelKey}:${projectPart}:${conversationPart}`
-}
-
-function shouldCacheThinkingSignatures(model?: string): boolean {
-  if (typeof model !== "string") return false
-  const lower = model.toLowerCase()
-  // Both Claude and Gemini 3 models require thought signature caching
-  // for multi-turn conversations with function calling
-  return lower.includes("claude") || lower.includes("gemini-3")
-}
-
+/** Produces a stable short key for the initial system/user conversation seed. */
 function hashConversationSeed(seed: string): string {
   return crypto.createHash("sha256").update(seed, "utf8").digest("hex").slice(0, 16)
-}
-
-function extractTextFromContent(content: unknown): string {
-  if (typeof content === "string") {
-    return content
-  }
-  if (!Array.isArray(content)) {
-    return ""
-  }
-  for (const block of content) {
-    if (!block || typeof block !== "object") {
-      continue
-    }
-    const anyBlock = block as any
-    if (typeof anyBlock.text === "string") {
-      return anyBlock.text
-    }
-    if (anyBlock.text && typeof anyBlock.text === "object" && typeof anyBlock.text.text === "string") {
-      return anyBlock.text.text
-    }
-  }
-  return ""
-}
-
-function extractConversationSeedFromMessages(messages: any[]): string {
-  const system = messages.find((message) => message?.role === "system")
-  const users = messages.filter((message) => message?.role === "user")
-  const firstUser = users[0]
-  const lastUser = users.length > 0 ? users[users.length - 1] : undefined
-  const systemText = system ? extractTextFromContent(system.content) : ""
-  const userText = firstUser ? extractTextFromContent(firstUser.content) : ""
-  const fallbackUserText = !userText && lastUser ? extractTextFromContent(lastUser.content) : ""
-  return [systemText, userText || fallbackUserText].filter(Boolean).join("|")
-}
-
-function extractConversationSeedFromContents(contents: any[]): string {
-  const users = contents.filter((content) => content?.role === "user")
-  const firstUser = users[0]
-  const lastUser = users.length > 0 ? users[users.length - 1] : undefined
-  const primaryUser = firstUser && Array.isArray(firstUser.parts) ? extractTextFromContent(firstUser.parts) : ""
-  if (primaryUser) {
-    return primaryUser
-  }
-  if (lastUser && Array.isArray(lastUser.parts)) {
-    return extractTextFromContent(lastUser.parts)
-  }
-  return ""
-}
-
-function resolveConversationKey(requestPayload: Record<string, unknown>): string | undefined {
-  const anyPayload = requestPayload as any
-  const candidates = [
-    anyPayload.conversationId,
-    anyPayload.conversation_id,
-    anyPayload.thread_id,
-    anyPayload.threadId,
-    anyPayload.chat_id,
-    anyPayload.chatId,
-    anyPayload.sessionId,
-    anyPayload.session_id,
-    anyPayload.metadata?.conversation_id,
-    anyPayload.metadata?.conversationId,
-    anyPayload.metadata?.thread_id,
-    anyPayload.metadata?.threadId,
-  ]
-
-  for (const candidate of candidates) {
-    if (typeof candidate === "string" && candidate.trim()) {
-      return candidate.trim()
-    }
-  }
-
-  const systemSeed = extractTextFromContent(
-    (anyPayload.systemInstruction as any)?.parts ??
-      anyPayload.systemInstruction ??
-      anyPayload.system ??
-      anyPayload.system_instruction,
-  )
-  const messageSeed = Array.isArray(anyPayload.messages)
-    ? extractConversationSeedFromMessages(anyPayload.messages)
-    : Array.isArray(anyPayload.contents)
-      ? extractConversationSeedFromContents(anyPayload.contents)
-      : ""
-  const seed = [systemSeed, messageSeed].filter(Boolean).join("|")
-  if (!seed) {
-    return undefined
-  }
-  return `seed-${hashConversationSeed(seed)}`
-}
-
-function resolveConversationKeyFromRequests(requestObjects: Array<Record<string, unknown>>): string | undefined {
-  for (const req of requestObjects) {
-    const key = resolveConversationKey(req)
-    if (key) {
-      return key
-    }
-  }
-  return undefined
-}
-
-function resolveProjectKey(candidate?: unknown, fallback?: string): string | undefined {
-  if (typeof candidate === "string" && candidate.trim()) {
-    return candidate.trim()
-  }
-  if (typeof fallback === "string" && fallback.trim()) {
-    return fallback.trim()
-  }
-  return undefined
 }
 
 function formatDebugLinesForThinking(lines: string[]): string {
@@ -315,374 +214,6 @@ function stripInjectedDebugFromRequestPayload(payload: Record<string, unknown>):
   }
 }
 
-function isValidRequestPart(part: unknown): boolean {
-  if (!part || typeof part !== "object") {
-    return false
-  }
-
-  const record = part as Record<string, unknown>
-
-  return (
-    Object.prototype.hasOwnProperty.call(record, "text") ||
-    Object.prototype.hasOwnProperty.call(record, "functionCall") ||
-    Object.prototype.hasOwnProperty.call(record, "functionResponse") ||
-    Object.prototype.hasOwnProperty.call(record, "inlineData") ||
-    Object.prototype.hasOwnProperty.call(record, "fileData") ||
-    Object.prototype.hasOwnProperty.call(record, "executableCode") ||
-    Object.prototype.hasOwnProperty.call(record, "codeExecutionResult") ||
-    Object.prototype.hasOwnProperty.call(record, "thought")
-  )
-}
-
-function sanitizeRequestPayloadForAntigravity(payload: Record<string, unknown>): void {
-  const anyPayload = payload as any
-
-  if (Array.isArray(anyPayload.contents)) {
-    anyPayload.contents = anyPayload.contents
-      .map((content: unknown) => {
-        if (!content || typeof content !== "object") {
-          return null
-        }
-
-        const contentRecord = content as Record<string, unknown>
-        const rawParts = Array.isArray(contentRecord.parts) ? contentRecord.parts : []
-        let foundFirstFunctionCall = false
-
-        const sanitizedParts = rawParts.filter(isValidRequestPart).map((part: any) => {
-          if (part && typeof part === "object" && part.functionCall) {
-            let sig = part.thoughtSignature || part.thought_signature
-
-            // Only the first functionCall part in a block should have the signature.
-            // If it's the first one and missing a valid signature, inject the sentinel
-            // to prevent the API from rejecting the request with a 400 error.
-            if (!foundFirstFunctionCall) {
-              foundFirstFunctionCall = true
-              if (!sig || sig.length < MIN_SIGNATURE_LENGTH) {
-                sig = SKIP_THOUGHT_SIGNATURE
-              }
-            } else {
-              // Parallel function calls MUST NOT have a signature
-              sig = undefined
-            }
-
-            if (sig) {
-              return { ...part, thought_signature: sig, thoughtSignature: sig }
-            }
-
-            // If not the first part, just return the part without adding any signature keys
-            const newPart = { ...part }
-            delete newPart.thoughtSignature
-            delete newPart.thought_signature
-            return newPart
-          }
-          return part
-        })
-
-        if (sanitizedParts.length === 0) {
-          return null
-        }
-
-        return {
-          ...contentRecord,
-          parts: sanitizedParts,
-        }
-      })
-      .filter((content: unknown): content is Record<string, unknown> => content !== null)
-  }
-
-  const systemInstruction = anyPayload.systemInstruction
-  if (systemInstruction && typeof systemInstruction === "object" && !Array.isArray(systemInstruction)) {
-    const sys = systemInstruction as Record<string, unknown>
-    if (Array.isArray(sys.parts)) {
-      const sanitizedSystemParts = sys.parts.filter(isValidRequestPart)
-      if (sanitizedSystemParts.length > 0) {
-        sys.parts = sanitizedSystemParts
-      } else {
-        delete anyPayload.systemInstruction
-      }
-    }
-  }
-}
-
-function isGeminiToolUsePart(part: any): boolean {
-  return !!(part && typeof part === "object" && (part.functionCall || part.tool_use || part.toolUse))
-}
-
-function isGeminiThinkingPart(part: any): boolean {
-  return !!(
-    part &&
-    typeof part === "object" &&
-    (part.thought === true || part.type === "thinking" || part.type === "reasoning")
-  )
-}
-
-// Sentinel value used when signature recovery fails - allows Claude to handle gracefully
-// by redacting the thinking block instead of rejecting the request entirely.
-// Reference: LLM-API-Key-Proxy uses this pattern for Gemini 3 tool calls.
-const SENTINEL_SIGNATURE = "skip_thought_signature_validator"
-
-function getThinkingPartText(part: any): string {
-  if (!part || typeof part !== "object") {
-    return ""
-  }
-
-  if (typeof part.text === "string") {
-    return part.text
-  }
-
-  if (typeof part.thinking === "string") {
-    return part.thinking
-  }
-
-  return ""
-}
-
-function hasCachedMatchingSignature(part: any, sessionId: string): boolean {
-  if (!part || typeof part !== "object") {
-    return false
-  }
-
-  const text = getThinkingPartText(part)
-  if (!text) {
-    return false
-  }
-
-  const expectedSignature = getCachedSignature(sessionId, text)
-  if (!expectedSignature) {
-    return false
-  }
-
-  if (part.thought === true) {
-    return part.thoughtSignature === expectedSignature
-  }
-
-  return part.signature === expectedSignature
-}
-
-function ensureThoughtSignature(part: any, sessionId: string): any {
-  if (!part || typeof part !== "object") {
-    return part
-  }
-
-  if (!sessionId) {
-    return part
-  }
-
-  const text = getThinkingPartText(part)
-  if (!text) {
-    return part
-  }
-
-  if (part.thought === true) {
-    return { ...part, thoughtSignature: SENTINEL_SIGNATURE }
-  }
-
-  if (part.type === "thinking" || part.type === "reasoning" || part.type === "redacted_thinking") {
-    return { ...part, signature: SENTINEL_SIGNATURE }
-  }
-
-  return part
-}
-
-function hasSignedThinkingPart(part: any, sessionId?: string): boolean {
-  if (!part || typeof part !== "object") {
-    return false
-  }
-
-  if (part.thought === true) {
-    if (part.thoughtSignature === SENTINEL_SIGNATURE || part.thoughtSignature === SKIP_THOUGHT_SIGNATURE) {
-      return true
-    }
-
-    if (typeof part.thoughtSignature !== "string" || part.thoughtSignature.length < MIN_SIGNATURE_LENGTH) {
-      return false
-    }
-
-    if (!sessionId) {
-      return true
-    }
-
-    return hasCachedMatchingSignature(part, sessionId)
-  }
-
-  if (part.type === "thinking" || part.type === "reasoning" || part.type === "redacted_thinking") {
-    if (part.signature === SENTINEL_SIGNATURE || part.signature === SKIP_THOUGHT_SIGNATURE) {
-      return true
-    }
-
-    if (typeof part.signature !== "string" || part.signature.length < MIN_SIGNATURE_LENGTH) {
-      return false
-    }
-
-    if (!sessionId) {
-      return true
-    }
-
-    return hasCachedMatchingSignature(part, sessionId)
-  }
-
-  return false
-}
-
-function ensureThinkingBeforeToolUseInContents(contents: any[], signatureSessionKey: string): any[] {
-  return contents.map((content: any) => {
-    if (!content || typeof content !== "object" || !Array.isArray(content.parts)) {
-      return content
-    }
-
-    const role = content.role
-    if (role !== "model" && role !== "assistant") {
-      return content
-    }
-
-    const parts = content.parts as any[]
-    const hasToolUse = parts.some(isGeminiToolUsePart)
-    if (!hasToolUse) {
-      return content
-    }
-
-    const thinkingParts = parts.filter(isGeminiThinkingPart).map((p) => ensureThoughtSignature(p, signatureSessionKey))
-    const otherParts = parts.filter((p) => !isGeminiThinkingPart(p))
-    const hasSignedThinking = thinkingParts.some((part) => hasSignedThinkingPart(part, signatureSessionKey))
-
-    if (hasSignedThinking) {
-      return { ...content, parts: [...thinkingParts, ...otherParts] }
-    }
-
-    const lastThinking = defaultSignatureStore.get(signatureSessionKey)
-    if (!lastThinking) {
-      // No cached signature available - strip thinking blocks entirely
-      // Claude requires valid signatures, and we can't fake them
-      // Return only tool_use parts without any thinking to avoid signature validation errors
-      log.debug("Stripping thinking from tool_use content (no valid cached signature)", { signatureSessionKey })
-      return { ...content, parts: otherParts }
-    }
-
-    const injected = {
-      thought: true,
-      text: lastThinking.text,
-      thoughtSignature: SENTINEL_SIGNATURE,
-    }
-
-    return { ...content, parts: [injected, ...otherParts] }
-  })
-}
-
-function ensureMessageThinkingSignature(block: any, sessionId: string): any {
-  if (!block || typeof block !== "object") {
-    return block
-  }
-
-  if (block.type !== "thinking" && block.type !== "redacted_thinking") {
-    return block
-  }
-
-  const text = getThinkingPartText(block)
-  if (!text) {
-    return block
-  }
-
-  if (!sessionId) {
-    return block
-  }
-
-  return { ...block, signature: SKIP_THOUGHT_SIGNATURE }
-}
-
-function hasToolUseInContents(contents: any[]): boolean {
-  return contents.some((content: any) => {
-    if (!content || typeof content !== "object" || !Array.isArray(content.parts)) {
-      return false
-    }
-    return (content.parts as any[]).some(isGeminiToolUsePart)
-  })
-}
-
-function hasSignedThinkingInContents(contents: any[], sessionId?: string): boolean {
-  return contents.some((content: any) => {
-    if (!content || typeof content !== "object" || !Array.isArray(content.parts)) {
-      return false
-    }
-    return (content.parts as any[]).some((part) => hasSignedThinkingPart(part, sessionId))
-  })
-}
-
-function hasToolUseInMessages(messages: any[]): boolean {
-  return messages.some((message: any) => {
-    if (!message || typeof message !== "object" || !Array.isArray(message.content)) {
-      return false
-    }
-    return (message.content as any[]).some(
-      (block) => block && typeof block === "object" && (block.type === "tool_use" || block.type === "tool_result"),
-    )
-  })
-}
-
-function hasSignedThinkingInMessages(messages: any[], sessionId?: string): boolean {
-  return messages.some((message: any) => {
-    if (!message || typeof message !== "object" || !Array.isArray(message.content)) {
-      return false
-    }
-    return (message.content as any[]).some((block) => hasSignedThinkingPart(block, sessionId))
-  })
-}
-
-function ensureThinkingBeforeToolUseInMessages(messages: any[], signatureSessionKey: string): any[] {
-  return messages.map((message: any) => {
-    if (!message || typeof message !== "object" || !Array.isArray(message.content)) {
-      return message
-    }
-
-    if (message.role !== "assistant") {
-      return message
-    }
-
-    const blocks = message.content as any[]
-    const hasToolUse = blocks.some(
-      (b) => b && typeof b === "object" && (b.type === "tool_use" || b.type === "tool_result"),
-    )
-    if (!hasToolUse) {
-      return message
-    }
-
-    const thinkingBlocks = blocks
-      .filter((b) => b && typeof b === "object" && (b.type === "thinking" || b.type === "redacted_thinking"))
-      .map((b) => ensureMessageThinkingSignature(b, signatureSessionKey))
-
-    const otherBlocks = blocks.filter(
-      (b) => !(b && typeof b === "object" && (b.type === "thinking" || b.type === "redacted_thinking")),
-    )
-    const hasSignedThinking = thinkingBlocks.some((block) => hasSignedThinkingPart(block, signatureSessionKey))
-
-    if (hasSignedThinking) {
-      return { ...message, content: [...thinkingBlocks, ...otherBlocks] }
-    }
-
-    const lastThinking = defaultSignatureStore.get(signatureSessionKey)
-    if (!lastThinking) {
-      // No cached signature available - use sentinel to bypass validation
-      // This handles cache miss scenarios (restart, session mismatch, expiry)
-      const existingThinking = thinkingBlocks[0]
-      const thinkingText = existingThinking?.thinking || existingThinking?.text || ""
-      log.debug("Injecting sentinel signature (cache miss)", { signatureSessionKey })
-      const sentinelBlock = {
-        type: "thinking",
-        thinking: thinkingText,
-        signature: SKIP_THOUGHT_SIGNATURE,
-      }
-      return { ...message, content: [sentinelBlock, ...otherBlocks] }
-    }
-
-    const injected = {
-      type: "thinking",
-      thinking: lastThinking.text,
-      signature: SKIP_THOUGHT_SIGNATURE,
-    }
-
-    return { ...message, content: [injected, ...otherBlocks] }
-  })
-}
-
 /**
  * Gets the stable session ID for this plugin instance.
  */
@@ -690,6 +221,7 @@ export function getPluginSessionId(): string {
   return PLUGIN_SESSION_ID
 }
 
+/** Creates a request-local project identifier when Antigravity has none. */
 function generateSyntheticProjectId(): string {
   const adjectives = ["useful", "bright", "swift", "calm", "bold"]
   const nouns = ["fuze", "wave", "spark", "flow", "core"]
@@ -857,7 +389,7 @@ export function prepareAntigravityRequest(
           }
         }
 
-        const conversationKey = resolveConversationKeyFromRequests(requestObjects)
+        const conversationKey = resolveConversationKeyFromRequests(requestObjects, hashConversationSeed)
         // Strip tier suffix from model for cache key to prevent cache misses on tier change
         // e.g., "claude-opus-4-6-thinking-high" -> "claude-opus-4-6-thinking"
         const modelForCacheKey = effectiveModel.replace(/-(minimal|low|medium|high)$/i, "")
@@ -890,10 +422,18 @@ export function prepareAntigravityRequest(
 
             // Step 2: THEN inject signed thinking from cache (after stripping)
             if (isClaudeThinking && keepThinkingEnabled && Array.isArray((req as any).contents)) {
-              ;(req as any).contents = ensureThinkingBeforeToolUseInContents((req as any).contents, signatureSessionKey)
+              ;(req as any).contents = ensureThinkingBeforeToolUseInContents(
+                (req as any).contents,
+                signatureSessionKey,
+                { onDebug: debugSignaturePolicy },
+              )
             }
             if (isClaudeThinking && keepThinkingEnabled && Array.isArray((req as any).messages)) {
-              ;(req as any).messages = ensureThinkingBeforeToolUseInMessages((req as any).messages, signatureSessionKey)
+              ;(req as any).messages = ensureThinkingBeforeToolUseInMessages(
+                (req as any).messages,
+                signatureSessionKey,
+                { onDebug: debugSignaturePolicy },
+              )
             }
 
             // Step 3: Apply tool pairing fixes (ID assignment, response matching, orphan recovery)
@@ -986,7 +526,13 @@ export function prepareAntigravityRequest(
 
         // For image models, add imageConfig instead of thinkingConfig
         if (isImageModel) {
-          const imageConfig = buildImageGenerationConfig()
+          const imageAspectRatio = process.env.OPENCODE_IMAGE_ASPECT_RATIO
+          if (imageAspectRatio && !isValidImageAspectRatio(imageAspectRatio)) {
+            log.warn(`Invalid aspect ratio "${imageAspectRatio}". Using default "1:1".`, {
+              validAspectRatios: VALID_IMAGE_ASPECT_RATIOS,
+            })
+          }
+          const imageConfig = buildImageGenerationConfig(imageAspectRatio)
           const generationConfig = (rawGenerationConfig ?? {}) as Record<string, unknown>
           generationConfig.imageConfig = imageConfig
           // Remove any thinkingConfig that might have been set
@@ -1295,6 +841,10 @@ export function prepareAntigravityRequest(
               tierThinkingLevel: tierThinkingLevel as ThinkingTier | undefined,
             })
 
+            if (geminiResult.webSearchSkipped) {
+              log.warn("web_search was skipped because Gemini cannot combine it with function declarations")
+            }
+
             toolDebugMissing = geminiResult.toolDebugMissing
             toolDebugSummaries.push(...geminiResult.toolDebugSummaries)
           }
@@ -1323,7 +873,7 @@ export function prepareAntigravityRequest(
           }
         }
 
-        const conversationKey = resolveConversationKey(requestPayload)
+        const conversationKey = resolveConversationKey(requestPayload, hashConversationSeed)
         signatureSessionKey = buildSignatureSessionKey(
           PLUGIN_SESSION_ID,
           effectiveModel,
@@ -1350,12 +900,14 @@ export function prepareAntigravityRequest(
             requestPayload.contents = ensureThinkingBeforeToolUseInContents(
               requestPayload.contents,
               signatureSessionKey,
+              { onDebug: debugSignaturePolicy },
             )
           }
           if (isClaudeThinking && keepThinkingEnabled && Array.isArray(requestPayload.messages)) {
             requestPayload.messages = ensureThinkingBeforeToolUseInMessages(
               requestPayload.messages,
               signatureSessionKey,
+              { onDebug: debugSignaturePolicy },
             )
           }
 
@@ -1482,7 +1034,7 @@ export function prepareAntigravityRequest(
         }
 
         stripInjectedDebugFromRequestPayload(requestPayload)
-        sanitizeRequestPayloadForAntigravity(requestPayload)
+        sanitizeRequestPayloadForAntigravity(requestPayload, { signatureSessionKey })
 
         const effectiveProjectId = projectId?.trim() || generateSyntheticProjectId()
         resolvedProjectId = effectiveProjectId
@@ -1859,29 +1411,4 @@ export async function transformAntigravityResponse(
     })
     return responseFallback
   }
-}
-
-export const __testExports = {
-  buildSignatureSessionKey,
-  hashConversationSeed,
-  extractTextFromContent,
-  extractConversationSeedFromMessages,
-  extractConversationSeedFromContents,
-  resolveConversationKey,
-  resolveProjectKey,
-  isGeminiToolUsePart,
-  isGeminiThinkingPart,
-  ensureThoughtSignature,
-  hasSignedThinkingPart,
-  hasSignedThinkingInContents,
-  hasSignedThinkingInMessages,
-  hasToolUseInContents,
-  hasToolUseInMessages,
-  ensureThinkingBeforeToolUseInContents,
-  ensureThinkingBeforeToolUseInMessages,
-  generateSyntheticProjectId,
-  MIN_SIGNATURE_LENGTH,
-  transformSseLine,
-  transformStreamingPayload,
-  createStreamingTransformer,
 }

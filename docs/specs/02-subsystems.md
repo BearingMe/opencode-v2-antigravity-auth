@@ -87,19 +87,26 @@ x-goog-user-project` from OAuth requests.
 conversation + seed-hash fallback)`, `deepFilterThinkingBlocks`,
    `ensureThinkingBeforeToolUseInContents/Messages` (sentinel
    `skip_thought_signature_validator` / `SKIP_THOUGHT_SIGNATURE`),
-   `sanitizeRequestPayloadForAntigravity` (first functionCall keeps the
-   signature; parallels stripped), debug/synthetic thinking inject + strip.
+   `sanitizeRequestPayloadForAntigravity` (first functionCall keeps or restores
+   the preceding cached signature; parallels stripped; sentinel only after
+   signature recovery misses), debug/synthetic thinking inject + strip.
 7. Returns `{request, init, streaming, requestedModel, effectiveModel,
 projectId, endpoint, sessionId, toolDebug*, needsSignedThinkingWarmup,
 thinkingRecoveryMessage}`.
 
-## 2.4 Schema + thinking utilities — `src/plugin/request-helpers.ts`
+## 2.4 Schema + thinking utilities — inference module and compatibility helpers
 
-- `cleanJSONSchemaForAntigravity` 4-phase: (1) `$ref`→hint, `const`→enum,
+- `src/modules/inference/schema-cleaner.ts :: cleanJSONSchemaForAntigravity`
+  retains the 4-phase schema cleaning: (1) `$ref`→hint, `const`→enum,
   `enum`→Allowed hint, `additionalProperties`/constraints→description;
   (2) merge `allOf`, flatten `anyOf/oneOf` (enum-merge or object>array>typed
   scoring + Accepts hint), flatten `type[]`+nullable; (3) remove unsupported
   keywords + `required` cleanup; (4) empty-object placeholder.
+- `src/modules/inference/signature-policy.ts` owns tool-turn ordering and
+  preserves received provider signatures, then restores a session-cached
+  signature or uses the sentinel when no reusable signature remains.
+  `thinking-filter.ts` owns pure thinking-block filtering; legacy
+  `request-helpers.ts` supplies `keep_thinking` and logging policy.
 - Thinking: `DEFAULT_THINKING_BUDGET=16000`; `resolveThinkingConfig`
   default-on for thinking models; `stripAllThinkingBlocks` is the Claude
   default unless `keep_thinking`; unsigned-block filters consult
@@ -242,8 +249,8 @@ thinking_disabled_violation`; gated by `session_recovery` and deduplicates
 
 - No search tool is registered. The
   D-SEARCH-MUTEX guard (drop `web_search` with warn when function
-  declarations exist) stays in `transform/gemini.ts` + `request-helpers.ts`
-  for SDK-supplied search tools.
+  declarations exist) lives in `modules/inference/transforms/gemini.ts`; the
+  request boundary emits the warning for SDK-supplied search tools.
 - `image-saver.ts`: `saveImageToDisk`
   (`~/.opencode/generated-images/image-{ts}-{rand}.{ext}`, `""` on fail) →
   markdown `![...](path)` else data URL.
@@ -291,8 +298,10 @@ thinking_disabled_violation`; gated by `session_recovery` and deduplicates
   (`config/schema.ts`), user-then-project load with signature_cache
   deep-merge (`loader.ts`), `OPENCODE_MODEL_DEFINITIONS`
   (`config/models.ts`), opencode.json injector (`updater.ts`).
-- `cache/signature-cache.ts`: disk cache key `sessionId:modelId`,
-  mem TTL 3600 s / disk 172800 s / write 60 s, thinking variants for
-  compaction, atomic merge, background write + 30 m cleanup.
-- `stores/signature-store.ts`: in-memory Map store + thought buffer +
-  `defaultSignatureStore` singleton.
+- `modules/inference/signature-cache.ts` owns the 1 h in-memory cache, 100-entry
+  per-scope cap, expiry-then-oldest-quarter eviction, and disk-port promotion.
+  `modules/inference/signature-store.ts` owns the signed-thinking store;
+  streaming thought buffers remain with streaming compatibility code.
+- `adapters/filesystem/signature-cache-store.ts` owns the version-1 disk file,
+  48 h TTL, 60 s batched writes, atomic merge/write, and 30 min memory cleanup.
+  Disk keys retain the composite signature scope plus the 16-hex SHA-256 text key.

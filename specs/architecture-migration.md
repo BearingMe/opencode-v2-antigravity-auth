@@ -675,12 +675,44 @@ signature policy into inference; separate disk signature persistence.
 
 **Acceptance criteria:**
 
-- [ ] Pure transforms remain pure.
-- [ ] Inference owns signature policy/memory; filesystem owns disk access.
-- [ ] Claude stripping/reinjection and Gemini signature/order rules remain.
-- [ ] Cache-miss behavior, schema cleaning, and search/tool mutex remain.
-- [ ] Inference accesses recovery only through its public API.
-- [ ] Tests use cohesive public behavior, not `__testExports` access.
+- [x] Pure transforms remain pure.
+- [x] Inference owns signature policy/memory; filesystem owns disk access.
+- [x] Claude stripping/reinjection and Gemini signature/order rules remain.
+- [x] Cache-miss behavior, schema cleaning, and search/tool mutex remain.
+- [x] Inference accesses recovery only through its public API.
+- [x] Tests use cohesive public behavior, not `__testExports` access.
+
+### Step 10 completion evidence
+
+- Moved model-family transforms, resolution, cross-model sanitization, and
+  schema cleaning under `modules/inference/`; retained explicit exports from
+  the previous `plugin/transform/` paths. Transform policy has no environment,
+  filesystem, logging, or provider-client dependency.
+- Moved signature context/policy/store and bounded memory cache into inference.
+  The filesystem adapter owns the existing version-1 disk format and SHA-256
+  text-key encoding; a legacy-format fixture and isolated built-package
+  roundtrip verify old-entry reads and persistence/reload behavior.
+- Preserved received or session-cached signatures for tool turns; Claude
+  `keep_thinking` uses the config-aware filter, restores cached signatures, and
+  retains default stripping. Gemini sanitation recovers the first tool call's
+  preceding reusable signature before sentinel fallback and removes signatures
+  from parallel calls. Schema cleaning and D-SEARCH-MUTEX behavior remain
+  covered by inference-owned transform tests.
+- Removed all `__testExports` references and relocated transform tests. Added
+  focused public-behavior coverage for signature expiry/eviction, cache-miss
+  recovery, Claude filtering, Gemini ordering, persisted-key compatibility,
+  and request-boundary signature recovery. Updated the developer architecture
+  and subsystem/lifecycle references.
+- Validation passed: `bun run test` (74 files / 1,201 tests), `bun run test:tui`
+  (clean build / 13 tests / 164 expectations), typecheck, lint, boundary check,
+  boundary fixtures (7 tests / 22 expectations), changed-file Prettier, and
+  `git diff --check`. A built-package signature-cache smoke used synthetic
+  data under isolated `APPDATA`; no live provider request was run.
+- Oracle found no remaining Step 10 code blocker after the signature/filter/
+  sanitizer fixes. Independent review found no actionable findings. JSDoc and
+  updated documentation were reviewed; no live Antigravity compatibility claim
+  is made.
+- Completion commit: `refactor: migrate inference transforms and signature ownership`.
 
 ## 11. Migrate inference request, response, and streaming pipelines
 

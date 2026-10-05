@@ -1,5 +1,5 @@
 import type { InferenceApi } from "../../modules/inference/index.js"
-import { getModelFamily } from "../../plugin/transform/model-resolver.js"
+import { getModelFamily } from "../../modules/inference/index.js"
 import type { Fingerprint } from "../../plugin/fingerprint.js"
 import { prepareAntigravityRequest, transformAntigravityResponse } from "../../plugin/request.js"
 import type { AntigravityDebugContext } from "../../plugin/debug.js"

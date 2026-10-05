@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { resolveAntigravityModel, resolveModelWithTier, resolveModelWithVariant } from "./model-resolver"
+import { resolveAntigravityModel, resolveModelWithTier, resolveModelWithVariant } from "./model-resolver.js"
 
 describe("resolveModelWithTier", () => {
   it("resolves Gemini 3 Pro to Antigravity's default low tier", () => {

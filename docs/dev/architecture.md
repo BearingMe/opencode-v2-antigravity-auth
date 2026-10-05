@@ -27,12 +27,14 @@ OpenCode ──▶ Plugin ──▶ Antigravity API ──▶ Claude/Gemini
      endpoint fallback (daily → prod), optional thinking warmup,
      Antigravity fetch, streaming transform, success/failure bookkeeping,
      rotation and retry.
-3. **Transformation** (`src/plugin/request.ts`, `transform/*`,
+3. **Transformation** (`modules/inference/transforms/*`,
+   `modules/inference/signature-*.ts`, `src/plugin/request.ts`,
    `request-helpers.ts`, `core/streaming/*`)
-   - Model detection, thinking config, Claude thinking-strip, tool
-     normalization to `functionDeclarations[]`, schema sanitization, tool-id
-     assignment, `{ project, model, request }` wrapping; SSE streaming with
-     signature caching and `thought` → `reasoning` conversion.
+
+- Model detection, thinking config, Claude thinking-strip, tool
+  normalization to `functionDeclarations[]`, schema sanitization, tool-id
+  assignment, `{ project, model, request }` wrapping; SSE streaming with
+  signature caching and `thought` → `reasoning` conversion.
 
 Session recovery policy lives in `modules/session-recovery/`: pure in-request
 turn repair is separate from session-error recovery. The filesystem store and
@@ -58,7 +60,7 @@ src/
 ├── hooks/auto-update-checker/ # Version check (root sessions only; never installs)
 ├── adapters/
 │   ├── antigravity/           # OAuth identity/endpoints/headers and account communication clients
-│   ├── filesystem/            # Account/recovery stores, config ignores, and debug-file destination
+│   ├── filesystem/            # Account/recovery/signature stores and debug-file destination
 │   └── opencode/              # Host logging destinations and session-recovery operations
 ├── modules/accounts/
 │   ├── account-pool.ts        # Membership, family cursors, cooldowns, and pool bookkeeping
@@ -70,6 +72,7 @@ src/
 │   ├── persistence/           # Stored schema, migrations, dedupe, and tombstone policy
 │   └── selection/             # Health/token-bucket scoring, hybrid selection, and backoff
 ├── modules/session-recovery/  # Error detection, session repair, and request-time turn repair
+├── modules/inference/         # Pure model transforms, schema cleaning, signature policy/cache, and ports
 ├── platform/logging/          # Neutral events, policy, and safe log formatting
 └── plugin/
     ├── engine.ts              # Native request/rotation engine (sole router)
@@ -77,8 +80,8 @@ src/
     ├── account-ui-format.ts   # Quota bars, countdowns, one-liners (pure)
     ├── auth.ts / token.ts     # Refresh-part packing and provider/cache composition
     ├── verify.ts / verification.ts  # Access verification policy + compatibility exports
-    ├── request.ts / request-helpers.ts  # Transform core + schema/thinking utils
-    ├── transform/             # Pure per-family transforms (claude/gemini/sanitizer/resolver)
+    ├── request.ts / request-helpers.ts  # Legacy request pipeline + response/protocol helpers
+    ├── transform/             # Compatibility exports for inference transforms
     ├── core/streaming/        # SSE transformer
     ├── thinking-recovery.ts / recovery.ts # Compatibility facades for recovery policy
     ├── quota.ts               # Antigravity quota refresh/probe adapter composition
@@ -87,7 +90,7 @@ src/
     ├── fingerprint.ts / project.ts  # Device fingerprints + project-context composition
     ├── refresh-queue.ts          # Proactive refresh compatibility façade
     ├── config/                # Zod schema, loader, model definitions, opencode.json updater
-    ├── cache/ / stores/       # Signature caches (memory + disk)
+    ├── cache/ / stores/       # Compatibility facades for signature caches/stores
     └── debug.ts / logger.ts / logging-utils.ts / version.ts / errors.ts / types.ts
 ```
 

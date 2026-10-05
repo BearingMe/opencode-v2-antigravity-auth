@@ -1,14 +1,4 @@
-export interface SignedThinking {
-  text: string
-  signature: string
-}
-
-export interface SignatureStore {
-  get(sessionKey: string): SignedThinking | undefined
-  set(sessionKey: string, value: SignedThinking): void
-  has(sessionKey: string): boolean
-  delete(sessionKey: string): void
-}
+export type { SignatureStore, SignedThinking } from "../../../modules/inference/index.js"
 
 export interface StreamingCallbacks {
   onCacheSignature?: (sessionKey: string, text: string, signature: string) => void
