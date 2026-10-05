@@ -220,18 +220,23 @@ non-streaming variant.
 
 ## 2.11 Recovery (two layers)
 
-- In-request turn repair (`thinking-recovery.ts`):
+- In-request turn repair (`modules/session-recovery/turn-repair.ts`):
   `analyzeConversationState`, `closeToolLoopForThinking` (strip thinking,
   append synthetic model `[Processing|completed|N]` + user `[Continue]`),
   `needsThinkingRecovery = inToolLoop && !turnHasThinking`, compacted-turn
   detectors.
-- Session-error hook (`recovery.ts` + `recovery/storage.ts`): message scan
-  → `tool_result_missing | thinking_block_order | disabled_violation`;
-  gated by `session_recovery` flag with `processingErrors` dedup; injects
-  cancelled `tool_result` via `session.prompt`, prepends synthetic thinking
-  (`prt_0000000000_thinking`) or strips thinking via filesystem ops
-  (tolerant sorted reads, `±2` index skew handling); optional `auto_resume`
-  continue with `RECOVERY_RESUME_TEXT`.
+- Session-error policy (`modules/session-recovery/detection.ts` and
+  `repair.ts`): classifies `tool_result_missing | thinking_block_order |
+thinking_disabled_violation`; gated by `session_recovery` and deduplicates
+  in-flight session-error repairs. Dangling tool calls are repaired by the
+  provider-agnostic V2 `context` hook, which adds canonical cancelled
+  `Message.tool` results to outgoing model history; it does not rewrite stored
+  history because V2's public prompt API accepts text only. Thinking-order
+  repair prepends synthetic thinking (`prt_0000000000_thinking`) or strips
+  thinking through the filesystem storage port. Optional `auto_resume`
+  continues a successful thinking repair. The application bridge composes
+  filesystem storage and OpenCode session ports; the `session.retry` hook stays
+  provider-agnostic.
 
 ## 2.12 Images, accounts service, RPC/TUI, version, logging
 

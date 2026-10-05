@@ -74,8 +74,9 @@ FR2` — interleaving is a 400) (Strong + External).
 - Session recovery gated by `session_recovery`; dedup in-flight errors;
   toasts never throw; recovery-success toast honors `quiet_mode` and
   `toast_scope=root_only` with explicit session ID (Explicit).
-  The `session.retry` hook is provider-agnostic: recoverable-pattern
-  errors in NON-Google sessions also trigger recovery (D-RETRY-GLOBAL) —
+  Dangling tool calls are repaired in outgoing model context by an unscoped
+  hook, so the repair applies to non-Google providers too. The `session.retry`
+  hook remains provider-agnostic for session-error repairs (D-RETRY-GLOBAL) —
   do not assume Google-only.
 - Child tracker is duplicate-safe: re-remembering a tracked id at
   capacity MUST NOT evict a different child (Explicit).

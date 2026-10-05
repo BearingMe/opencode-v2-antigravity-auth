@@ -164,6 +164,11 @@ describe("V2 Antigravity runtime bridge", () => {
           sdk?: unknown
         }) => Promise<void> | void)
       | undefined
+    type ContextMessage = {
+      role: string
+      content: Array<{ type: string; id?: string; name?: string; result?: unknown }>
+    }
+    let contextHook: ((event: { sessionID: string; messages: ContextMessage[] }) => Promise<void> | void) | undefined
     let cleanup: (() => void) | void
 
     const connection = { id: "antigravity-connection" }
@@ -233,7 +238,17 @@ describe("V2 Antigravity runtime bridge", () => {
           sdkHook = callback
         }),
       },
-      session: { hook: vi.fn(async () => ({ dispose: vi.fn() })) },
+      session: {
+        hook: vi.fn(
+          async (
+            name: string,
+            callback: (event: { sessionID: string; messages: ContextMessage[] }) => Promise<void> | void,
+          ) => {
+            if (name === "context") contextHook = callback
+            return { dispose: vi.fn() }
+          },
+        ),
+      },
       tool: { transform: async (callback: (editor: unknown) => void) => callback({ add: vi.fn() }) },
       rpc: {
         register: vi.fn(async () => ({ dispose: accountsDispose })),
@@ -242,6 +257,31 @@ describe("V2 Antigravity runtime bridge", () => {
     }
 
     cleanup = await plugin.setup(ctx as never)
+    expect(ctx.session.hook).toHaveBeenCalledWith("context", expect.any(Function))
+    expect(ctx.session.hook).toHaveBeenCalledWith("retry", expect.any(Function))
+
+    const contextEvent = {
+      sessionID: "ses-recovery-test",
+      messages: [
+        {
+          role: "assistant",
+          content: [{ type: "tool-call", id: "call-1", name: "search" }],
+        },
+      ],
+    }
+    await contextHook?.(contextEvent)
+    expect(contextEvent.messages).toHaveLength(2)
+    expect(contextEvent.messages[1]).toMatchObject({
+      role: "tool",
+      content: [
+        {
+          type: "tool-result",
+          id: "call-1",
+          name: "search",
+          result: { type: "text", value: "Operation cancelled by user (ESC pressed)" },
+        },
+      ],
+    })
 
     expect(modelDefinitions.map((model) => String(model.id)).sort()).toEqual([
       "antigravity-claude-opus-4-6-thinking",

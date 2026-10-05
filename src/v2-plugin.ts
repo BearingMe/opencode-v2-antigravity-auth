@@ -7,6 +7,7 @@ import { IntegrationMethodID } from "@opencode/schema/integration-id"
 import { authorizeAntigravity, exchangeAntigravity } from "./antigravity/oauth.js"
 import { createLegacyAccountAdministration } from "./app/legacy-bridges/accounts.js"
 import { createLegacySessionRecovery } from "./app/legacy-bridges/session-recovery.js"
+import { applyOpenCodeToolResultBatches } from "./adapters/opencode/session-recovery.js"
 import { ANTIGRAVITY_PROVIDER_ID } from "./constants.js"
 import { AntigravityAccounts } from "./rpc.js"
 import { formatRefreshParts, isOAuthAuth, parseRefreshParts } from "./plugin/auth.js"
@@ -27,7 +28,7 @@ import {
   executeAntigravityRequest,
   refreshOAuthCredentialUnified,
 } from "./plugin/engine.js"
-import { getRecoverySuccessToast } from "./plugin/recovery.js"
+import { getRecoverySuccessToast } from "./modules/session-recovery/index.js"
 import { initDiskSignatureCache } from "./plugin/cache.js"
 import { createProactiveRefreshQueue, type ProactiveRefreshQueue } from "./plugin/refresh-queue.js"
 import { initHealthTracker, initTokenTracker } from "./plugin/rotation.js"
@@ -259,8 +260,6 @@ export default Plugin.define({
           })
 
           if (recovered && sessionID && nativeConfig.auto_resume) {
-            await ctx.session.prompt({ sessionID, text: nativeConfig.resume_text }).catch(() => {})
-
             const successToast = getRecoverySuccessToast()
             bridgeLog.debug("recovery-toast", { ...successToast })
             if (
@@ -572,6 +571,16 @@ export default Plugin.define({
           return result
         },
       })
+    })
+
+    await ctx.session.hook("context", async (event) => {
+      if (!sessionRecovery) return
+
+      const batches = sessionRecovery.findMissingToolResultBatches(event.messages)
+      if (batches.length === 0) return
+
+      const resultCount = applyOpenCodeToolResultBatches(event.messages, batches)
+      await sessionRecovery.notifyToolResultRepair(event.sessionID, resultCount)
     })
 
     await ctx.session.hook("retry", async (event) => {

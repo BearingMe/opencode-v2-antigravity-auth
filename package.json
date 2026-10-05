@@ -66,6 +66,7 @@
     "test:logging:smoke": "bun run script/test-logging-smoke.mjs",
     "test:account-store:smoke": "bun run script/test-account-store-smoke.mjs",
     "test:account-admin:smoke": "bun run build && bun run script/test-account-admin-smoke.mjs",
+    "test:session-recovery:smoke": "bun run build && bun run script/test-session-recovery-smoke.mjs",
     "test:antigravity:smoke": "bun run build && bun run script/test-antigravity-communication-smoke.mjs",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
@@ -102,6 +103,7 @@
     "zod-to-json-schema": "^3.25.1"
   },
   "dependencies": {
+    "@opencode/ai": "^2.0.18",
     "@ai-sdk/google": "^4.0.82",
     "@opencode/plugin": "^2.0.18",
     "@opencode/schema": "^2.0.18",

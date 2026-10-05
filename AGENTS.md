@@ -148,6 +148,10 @@ src/
 ├── tui.ts                     # /antigravity dialog UI (host-rendered dialogs only)
 ├── constants.ts               # Endpoints, headers, OAuth identity, model routing
 ├── antigravity/oauth.ts       # PKCE authorize URL + code exchange + project discovery
+├── adapters/
+│   ├── filesystem/            # Account and recovery stores
+│   └── opencode/              # Host session, logging, and TUI adapters
+├── modules/session-recovery/  # Error policy, session repair, and request-time turn repair
 ├── hooks/auto-update-checker/ # Version check (root sessions only; never installs)
 └── plugin/
     ├── engine.ts              # Native request/rotation engine (sole router)
@@ -158,7 +162,7 @@ src/
     ├── request.ts / request-helpers.ts  # Transform core + schema/thinking utils
     ├── transform/             # Pure per-family transforms (claude/gemini/sanitizer/resolver)
     ├── core/streaming/        # SSE transformer
-    ├── thinking-recovery.ts / recovery/  # Turn repair + session-error hook
+    ├── thinking-recovery.ts / recovery.ts # Compatibility recovery facades
     ├── quota.ts               # Antigravity per-model + grouped quota probing
     ├── accounts.ts / storage.ts  # Pool manager + v4 persistent store (tombstones)
     ├── fingerprint.ts / project.ts  # Device fingerprints + managed project context
@@ -190,9 +194,12 @@ message of a turn only).
 
 ### 3. Session Recovery
 
-Two layers: in-request turn repair plus the session-error hook, which injects
-synthetic `tool_result` blocks after interrupted tool execution. Gated by
-`session_recovery`; optional `auto_resume`.
+Two layers: in-request turn repair plus session recovery. The provider-agnostic
+V2 `context` hook inserts canonical cancelled tool-result messages into
+outgoing model history for dangling calls; this does not rewrite persisted
+history. Session-error recovery repairs thinking blocks through the filesystem
+adapter. Gated by `session_recovery`; optional `auto_resume` for thinking
+repairs.
 
 ### 4. Schema Sanitization
 

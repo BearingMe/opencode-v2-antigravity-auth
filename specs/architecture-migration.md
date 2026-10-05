@@ -135,9 +135,9 @@ the tracker may identify that commit by subject to avoid self-referential hashes
 | 4    | Logging separation                    | done    | `refactor: separate logging facilities from destinations`               |
 | 5    | Account persistence                   | done    | `refactor: separate account persistence policy from filesystem storage` |
 | 6    | Account pool and selection            | done    | `refactor: migrate account pool and selection policies`                 |
-| 7    | Antigravity account communication     | pending | —                                                                       |
-| 8    | Account administration and lifecycle  | pending | —                                                                       |
-| 9    | Session recovery                      | pending | —                                                                       |
+| 7    | Antigravity account communication     | done    | `2cd7ef3`                                                               |
+| 8    | Account administration and lifecycle  | done    | `98da1fb`, `8c70e45`                                                    |
+| 9    | Session recovery                      | done    | `refactor: migrate session recovery policies`                           |
 | 10   | Inference transforms and signatures   | pending | —                                                                       |
 | 11   | Inference pipelines and client        | pending | —                                                                       |
 | 12   | Application execution and composition | pending | —                                                                       |
@@ -635,12 +635,38 @@ storage needs rather than filesystem implementation.
 
 **Acceptance criteria:**
 
-- [ ] Recovery knows neither host clients nor host message-file layouts.
-- [ ] Adapters provide message access/execution through explicit contracts.
-- [ ] In-request repair and session-error recovery remain distinct and work.
-- [ ] Gates, auto-resume, deduplication, tool results, and toast rules remain.
-- [ ] Provider-agnostic `session.retry` remains provider-agnostic.
-- [ ] Smoke covers interrupted tools and disabled recovery.
+- [x] Recovery knows neither host clients nor host message-file layouts.
+- [x] Adapters provide message access/execution through explicit contracts.
+- [x] In-request repair and session-error recovery remain distinct and work.
+- [x] Gates, auto-resume, deduplication, tool results, and toast rules remain.
+- [x] Provider-agnostic `session.retry` remains provider-agnostic.
+- [x] Smoke covers interrupted tools and disabled recovery.
+
+### Step 9 completion evidence
+
+- Moved detection, session-error repair policy, and request-time turn repair to
+  `modules/session-recovery/`; filesystem layout and V2 message construction
+  are owned by filesystem/OpenCode adapters. Legacy paths remain compatibility
+  facades.
+- Interrupted tool calls are repaired in the unscoped V2 `context` hook by
+  adding canonical `Message.tool` results to outgoing history. Provider-executed
+  calls are excluded and tool namespaces are preserved. This does not rewrite
+  persisted session history: V2's public prompt API accepts text only.
+- Thinking repair remains session-error-driven, with in-flight deduplication,
+  the configured `resume_text` sent once by the recovery policy, and the
+  success-toast `quiet_mode` / `toast_scope` gates retained. Warning behavior
+  remains as before; toast failures are best effort.
+- Validation passed: `bun run test` (69 files / 1,215 tests), `bun run test:tui`
+  (13 tests / 164 expectations), `bun run test:session-recovery:smoke`,
+  `bun run typecheck`, `bun run lint`, `bun run check:boundaries`,
+  `bun run check:boundaries:test`, changed-file Prettier, and `git diff --check`.
+  The smoke builds the package and covers a synthetic interrupted tool plus
+  disabled recovery; no live OpenCode/provider interruption was run.
+- Oracle confirmed the public V2 context/message contracts and no remaining
+  acceptance blocker. Independent review found no actionable findings; earlier
+  findings for provider-executed calls and duplicate auto-resume were resolved.
+  JSDoc and updated developer/spec documentation were reviewed.
+- Completion commit: `refactor: migrate session recovery policies`.
 
 ## 10. Migrate inference transforms and signature ownership
 

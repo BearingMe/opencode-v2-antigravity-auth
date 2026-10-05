@@ -1,23 +1,14 @@
-import { join } from "node:path"
-import { homedir } from "node:os"
+/** Message storage directory retained for callers of the former constants path. */
+export { MESSAGE_STORAGE } from "../../adapters/filesystem/session-recovery-store.js"
 
-/**
- * Get the XDG data directory for OpenCode storage.
- * Falls back to ~/.local/share on Linux/Mac, or APPDATA on Windows.
- */
-function getXdgData(): string {
-  const platform = process.platform
+/** Metadata-part labels retained for callers of the former constants path. */
+export { META_TYPES } from "../../adapters/filesystem/session-recovery-store.js"
 
-  if (platform === "win32") {
-    return process.env.APPDATA || join(homedir(), "AppData", "Roaming")
-  }
+/** OpenCode storage directory retained for callers of the former constants path. */
+export { OPENCODE_STORAGE } from "../../adapters/filesystem/session-recovery-store.js"
 
-  return process.env.XDG_DATA_HOME || join(homedir(), ".local", "share")
-}
+/** Part storage directory retained for callers of the former constants path. */
+export { PART_STORAGE } from "../../adapters/filesystem/session-recovery-store.js"
 
-export const OPENCODE_STORAGE = join(getXdgData(), "opencode", "storage")
-export const MESSAGE_STORAGE = join(OPENCODE_STORAGE, "message")
-export const PART_STORAGE = join(OPENCODE_STORAGE, "part")
-
-export const THINKING_TYPES = new Set(["thinking", "redacted_thinking", "reasoning"])
-export const META_TYPES = new Set(["step-start", "step-finish"])
+/** Thinking-part labels retained for callers of the former constants path. */
+export { THINKING_TYPES } from "../../adapters/filesystem/session-recovery-store.js"

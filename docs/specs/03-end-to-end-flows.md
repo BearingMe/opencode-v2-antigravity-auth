@@ -78,9 +78,13 @@ records without disabling; always persists + invalidates fetch.
 (a) In-request: `needsThinkingRecovery` → `closeToolLoopForThinking`
 → synthetic model + user turns → request proceeds without
 `Invalid signature` 400s.
-(b) Session-error: `session.error` → `detectErrorType` →
-`handleSessionRecovery` (tool_result inject / thinking prepend/strip) →
-optional `auto_resume` continue + success toast.
+(b) Tool-result preflight: the provider-agnostic V2 `context` hook finds
+dangling assistant tool calls and inserts cancelled `Message.tool` results in
+the outgoing model history. (c) Session-error: `session.error` →
+`detectErrorType` → `handleSessionRecovery` (thinking prepend/strip) → optional
+`auto_resume` continue + success toast. The context repair does not persist
+those synthetic tool results because V2 exposes no structured prompt-input
+API.
 
 ## F5 — Auto-update check
 

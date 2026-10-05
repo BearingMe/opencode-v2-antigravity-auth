@@ -34,9 +34,16 @@ OpenCode ──▶ Plugin ──▶ Antigravity API ──▶ Claude/Gemini
      assignment, `{ project, model, request }` wrapping; SSE streaming with
      signature caching and `thought` → `reasoning` conversion.
 
-Session recovery runs on two layers: in-request turn repair
-(`thinking-recovery.ts`) and the session-error hook (`recovery.ts`,
-gated by `session_recovery`, optional `auto_resume`).
+Session recovery policy lives in `modules/session-recovery/`: pure in-request
+turn repair is separate from session-error recovery. The filesystem store and
+OpenCode session operations are composed by the application bridge through
+`adapters/filesystem/session-recovery-store.ts` and
+`adapters/opencode/session-recovery.ts`.
+
+Interrupted tool calls are repaired at the provider-agnostic V2 `context` hook:
+the hook adds canonical tool-result messages to the outgoing model history.
+This does not rewrite persisted session history; the supported V2 prompt API is
+text-only.
 
 ## Module map
 
@@ -51,8 +58,8 @@ src/
 ├── hooks/auto-update-checker/ # Version check (root sessions only; never installs)
 ├── adapters/
 │   ├── antigravity/           # OAuth identity/endpoints/headers and account communication clients
-│   ├── filesystem/            # Account store, config ignores, and debug-file destination
-│   └── opencode/              # Host logging destinations
+│   ├── filesystem/            # Account/recovery stores, config ignores, and debug-file destination
+│   └── opencode/              # Host logging destinations and session-recovery operations
 ├── modules/accounts/
 │   ├── account-pool.ts        # Membership, family cursors, cooldowns, and pool bookkeeping
 │   ├── account-admin.ts       # Credential-free administration use cases and mutations
@@ -62,6 +69,7 @@ src/
 │   ├── refresh/               # Unified credential refresh and proactive queue policy
 │   ├── persistence/           # Stored schema, migrations, dedupe, and tombstone policy
 │   └── selection/             # Health/token-bucket scoring, hybrid selection, and backoff
+├── modules/session-recovery/  # Error detection, session repair, and request-time turn repair
 ├── platform/logging/          # Neutral events, policy, and safe log formatting
 └── plugin/
     ├── engine.ts              # Native request/rotation engine (sole router)
@@ -72,7 +80,7 @@ src/
     ├── request.ts / request-helpers.ts  # Transform core + schema/thinking utils
     ├── transform/             # Pure per-family transforms (claude/gemini/sanitizer/resolver)
     ├── core/streaming/        # SSE transformer
-    ├── thinking-recovery.ts / recovery/  # Turn repair + session-error hook
+    ├── thinking-recovery.ts / recovery.ts # Compatibility facades for recovery policy
     ├── quota.ts               # Antigravity quota refresh/probe adapter composition
     ├── accounts.ts / rotation.ts # Compatibility facades for the accounts module
     ├── storage.ts               # Compatibility facade for the v4 account store
@@ -98,6 +106,11 @@ Account membership and selection policy now live in
 `modules/accounts/account-pool.ts` and `modules/accounts/selection/`.
 `plugin/accounts.ts` and `plugin/rotation.ts` preserve existing callers while
 the request engine and administration service migrate in later steps.
+
+Session-recovery policy and request-time turn repair now live in
+`modules/session-recovery/`. The application bridge composes the policy with
+filesystem and OpenCode adapters; plugin recovery files remain compatibility
+facades only.
 
 Antigravity OAuth/token/project/quota/verification HTTP and response parsing
 live in `adapters/antigravity/`. Plugin-facing refresh, project-context,

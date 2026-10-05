@@ -1,23 +1,25 @@
-// =============================================================================
-// Storage Types (for reading from OpenCode's filesystem)
-// =============================================================================
+import type { RecoveryErrorType as SessionRecoveryErrorType } from "../../modules/session-recovery/index.js"
 
+/** Thinking-part labels retained for callers of the former recovery types path. */
 export type ThinkingPartType = "thinking" | "redacted_thinking" | "reasoning"
+
+/** Metadata-part labels retained for callers of the former recovery types path. */
 export type MetaPartType = "step-start" | "step-finish"
+
+/** Content-part labels retained for callers of the former recovery types path. */
 export type ContentPartType = "text" | "tool" | "tool_use" | "tool_result"
 
+/** Persisted message metadata used by the former filesystem recovery adapter. */
 export interface StoredMessageMeta {
   id: string
   sessionID: string
   role: "user" | "assistant"
   parentID?: string
-  time?: {
-    created: number
-    completed?: number
-  }
+  time?: { created: number; completed?: number }
   error?: unknown
 }
 
+/** Persisted text part shape retained for compatibility. */
 export interface StoredTextPart {
   id: string
   sessionID: string
@@ -28,6 +30,7 @@ export interface StoredTextPart {
   ignored?: boolean
 }
 
+/** Persisted tool part shape retained for compatibility. */
 export interface StoredToolPart {
   id: string
   sessionID: string
@@ -43,6 +46,7 @@ export interface StoredToolPart {
   }
 }
 
+/** Persisted reasoning part shape retained for compatibility. */
 export interface StoredReasoningPart {
   id: string
   sessionID: string
@@ -51,6 +55,7 @@ export interface StoredReasoningPart {
   text: string
 }
 
+/** Persisted step part shape retained for compatibility. */
 export interface StoredStepPart {
   id: string
   sessionID: string
@@ -58,6 +63,7 @@ export interface StoredStepPart {
   type: "step-start" | "step-finish"
 }
 
+/** Persisted part union retained for compatibility with prior storage imports. */
 export type StoredPart =
   | StoredTextPart
   | StoredToolPart
@@ -71,10 +77,7 @@ export type StoredPart =
       [key: string]: unknown
     }
 
-// =============================================================================
-// API Types (for working with OpenCode SDK responses)
-// =============================================================================
-
+/** Message part shape used by the former session API adapter. */
 export interface MessagePart {
   type: string
   id?: string
@@ -85,6 +88,7 @@ export interface MessagePart {
   callID?: string
 }
 
+/** Session message response shape retained for existing callers. */
 export interface MessageData {
   info?: {
     id?: string
@@ -93,16 +97,14 @@ export interface MessageData {
     parentID?: string
     error?: unknown
     agent?: string
-    model?: {
-      providerID: string
-      modelID: string
-    }
+    model?: { providerID: string; modelID: string }
     system?: string
     tools?: Record<string, boolean>
   }
   parts?: MessagePart[]
 }
 
+/** Error event shape retained for callers of the legacy recovery hook. */
 export interface MessageInfo {
   id?: string
   role?: string
@@ -111,21 +113,17 @@ export interface MessageInfo {
   error?: unknown
 }
 
+/** Resume options retained for callers of the former recovery helper. */
 export interface ResumeConfig {
   sessionID: string
   agent?: string
-  model?: {
-    providerID: string
-    modelID: string
-  }
+  model?: { providerID: string; modelID: string }
 }
 
-// =============================================================================
-// Hook Types
-// =============================================================================
+/** Recoverable error categories retained for legacy imports. */
+export type RecoveryErrorType = SessionRecoveryErrorType | null
 
-export type RecoveryErrorType = "tool_result_missing" | "thinking_block_order" | "thinking_disabled_violation" | null
-
+/** Tool-call part shape retained for callers of the former repair helper. */
 export interface ToolUsePart {
   type: "tool_use"
   id: string
@@ -133,6 +131,7 @@ export interface ToolUsePart {
   input: Record<string, unknown>
 }
 
+/** Tool-result part shape retained for callers of the former repair helper. */
 export interface ToolResultPart {
   type: "tool_result"
   tool_use_id: string

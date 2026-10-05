@@ -41,7 +41,12 @@ import {
   transformThinkingParts,
   type AntigravityApiBody,
 } from "./request-helpers"
-import { analyzeConversationState, closeToolLoopForThinking, needsThinkingRecovery } from "./thinking-recovery"
+import {
+  analyzeConversationState,
+  closeToolLoopForThinking,
+  detectRecoveryErrorType,
+  needsThinkingRecovery,
+} from "../modules/session-recovery/index.js"
 import { sanitizeCrossModelPayloadInPlace } from "./transform/cross-model-sanitizer"
 import { isGemini3Model, isImageGenerationModel, buildImageGenerationConfig, applyGeminiTransforms } from "./transform"
 import {
@@ -53,7 +58,6 @@ import {
   CLAUDE_THINKING_MAX_OUTPUT_TOKENS,
   type ThinkingTier,
 } from "./transform"
-import { detectErrorType } from "./recovery"
 import { getSessionFingerprint, buildFingerprintHeaders, type Fingerprint } from "./fingerprint"
 import type { GoogleSearchConfig } from "./transform/types"
 
@@ -1717,7 +1721,7 @@ export async function transformAntigravityResponse(
           typeof errorBody.error.message === "string" && errorBody.error.message.length > 0
             ? errorBody.error.message
             : "Unknown error"
-        const errorType = detectErrorType(rawErrorMessage)
+        const errorType = detectRecoveryErrorType(rawErrorMessage)
         const debugInfo = `\n\n[Debug Info]\nRequested Model: ${requestedModel || "Unknown"}\nEffective Model: ${effectiveModel || "Unknown"}\nProject: ${projectId || "Unknown"}\nEndpoint: ${endpoint || "Unknown"}\nStatus: ${response.status}\nRequest ID: ${headers.get("x-request-id") || "N/A"}${toolDebugMissing !== undefined ? `\nTool Debug Missing: ${toolDebugMissing}` : ""}${toolDebugSummary ? `\nTool Debug Summary: ${toolDebugSummary}` : ""}${toolDebugPayload ? `\nTool Debug Payload: ${toolDebugPayload}` : ""}`
         const injectedDebug = debugText ? `\n\n${debugText}` : ""
         errorBody.error.message = rawErrorMessage + debugInfo + injectedDebug

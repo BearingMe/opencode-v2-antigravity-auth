@@ -56,10 +56,12 @@ enable|disable|select|delete|delete_all` (see F3; out-of-range index is a
   without disabling.
 - Empty responses: per-key attempts → `EmptyResponseError` → synthetic
   error response or retry per config.
-- Recovery: `tool_result_missing` → inject cancelled result + continue;
-  `thinking_block_order` → prepend synthetic thinking; `disabled_violation`
-  → strip thinking. All toast failures swallowed (`.catch(()=>{})`) by
-  design; debug log is the record.
+- Recovery: dangling `tool_result_missing` calls receive cancelled V2 tool
+  results in the outgoing context before the provider request;
+  `thinking_block_order` → prepend synthetic thinking;
+  `thinking_disabled_violation` → strip thinking. Context tool results are not
+  written to persisted session history because V2 exposes only text prompts.
+  All toast failures are swallowed by design; debug log is the record.
 - Update checker: ALL failures → `null`/`false`/no-throw; npm fetch has a
   5 s abort; config parse errors `continue`.
 - `manageAccounts` unknown actions and bad indices return message strings;
