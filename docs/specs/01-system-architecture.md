@@ -5,8 +5,8 @@
 | Part            | Paths                                                                                              | Responsibility                                                                                                                                                                    |
 | --------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Shared identity | `src/adapters/antigravity/constants.ts`, `src/constants.ts`, `src/shims.d.ts`, `src/google-sdk.ts` | OAuth client id/secret/scopes/redirect, endpoint orders, Antigravity headers, version pinning, hardening prompts, search tuning; `src/constants.ts` is a compatibility facade     |
-| Native engine   | `src/plugin/engine.ts`                                                                             | Request execution + rotation loop (sole router), unified OAuth refresh, thinking warmup                                                                                           |
-| V2 bridge       | `src/v2-plugin.ts`                                                                                 | V2 `integration/provider/model/aisdk/tool/session/event` transforms; routes via the native engine                                                                                 |
+| Application     | `src/app/composition.ts`, `src/app/execute-request.ts`                                             | Selects adapters and runs the single request execution + rotation loop                                                                                                            |
+| V2 bridge       | `src/v2-plugin.ts`                                                                                 | V2 `integration/provider/model/aisdk/tool/session/event` transforms; routes via application composition                                                                           |
 | OAuth facade    | `src/antigravity/oauth.ts`                                                                         | Compatibility API for authorize/exchange; delegates endpoint communication to Antigravity adapters                                                                                |
 | Vendor clients  | `src/adapters/antigravity/*`                                                                       | OAuth/token/project/quota/verification HTTP, headers, endpoint order, timeouts, and response wire parsing                                                                         |
 | Auto-update     | `src/hooks/auto-update-checker/*`                                                                  | Root-session npm check, toast or pinned rewrite + cache invalidate                                                                                                                |
@@ -15,12 +15,14 @@
 ## Dependency direction (normative)
 
 ```text
-v2-plugin.ts ──uses──> plugin/engine.ts :: executeAntigravityRequest
-                       (sole router) + plugin/{request,accounts,token,
-                       project,quota,config,cache,recovery,refresh-queue,
-                       logger,rotation,version,debug,request-helpers,
-                       verify,verification,account-service}
-                     + antigravity/oauth + hooks/auto-update-checker
+v2-plugin.ts ──uses──> app/composition.ts :: executeAntigravityRequest
+                       ──calls──> app/execute-request.ts :: executeRequest
+                       (sole request path)
+app/composition.ts ──selects──> account, inference, Antigravity transport,
+                                OpenCode host, and filesystem adapters
+app/execute-request.ts ──coordinates──> account pool + inference policies
+                                        and plugin compatibility facades
+plugin/engine.ts ──compatibility exports──> app/composition.ts + execute-request.ts
 plugin account callers ──ports──> adapters/antigravity/*
 plugin/* ──uses──> constants.ts (identity/endpoints/headers)
                    + plugin/{auth,storage,logger,debug} kernels
@@ -32,20 +34,21 @@ transform/*, request-helpers ──should stay──> pure re: I/O
 ### Rule: R-ARCH-V2-DELEGATES-V1
 
 **Requirement:** V2 MUST route ALL Antigravity model traffic through the
-native engine: `aisdk.hook("sdk") → antigravityFetch →
-executeAntigravityRequest` (`src/plugin/engine.ts`: rotation,
-soft-quota gate, Retry-After/RetryInfo, thinking
-warmup, toasts, and `invalid_grant` eviction).
+single application execution path: `aisdk.hook("sdk") → antigravityFetch →
+app/composition.ts :: executeAntigravityRequest →
+app/execute-request.ts :: executeRequest` (rotation, soft-quota gate,
+Retry-After/RetryInfo, thinking warmup, toasts, and `invalid_grant` eviction).
 No parallel router, no legacy fallback.
 
 **Rationale:** Single routing implementation; prevents quota/signature drift.
 
 **Project evidence:**
 
-- `src/plugin/engine.ts :: executeAntigravityRequest`,
-  `:: refreshOAuthCredentialUnified`, `:: isNativeEngineEnabled`
+- `src/app/composition.ts :: executeAntigravityRequest`,
+  `:: refreshOAuthCredentialUnified`
+- `src/app/execute-request.ts :: isNativeEngineEnabled`
 - `src/v2-plugin.ts :: loadRoutedFetch`, `:: antigravityFetch`
-- `src/plugin/engine.test.ts`,
+- `src/app/execute-request.test.ts`,
   `src/v2-plugin.setup.test.ts` :: routes SDK JSON through native engine
 
 **Status:** Explicit.
@@ -94,7 +97,8 @@ diagnostics are supplied or handled by the request boundary.
 
 - Dedicated `antigravity` provider and OAuth integration; the OpenCode `google`
   provider and integration are not modified. Antigravity traffic uses the
-  native engine (`src/plugin/engine.ts`, `src/v2-plugin.ts`).
+  application request path (`src/app/composition.ts`,
+  `src/app/execute-request.ts`, `src/v2-plugin.ts`).
 - `account_selection_strategy = sticky | round-robin | hybrid` (default
   `hybrid`) + pool policy in `src/modules/accounts/account-pool.ts` and health,
   token-bucket, and backoff policy in `src/modules/accounts/selection/`.

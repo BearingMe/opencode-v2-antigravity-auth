@@ -82,8 +82,15 @@ export interface TransformInferenceResponse<DebugContext = unknown> {
 
 /** Public operations currently required by the native request execution loop. */
 export interface InferenceApi<Fingerprint = InferenceFingerprint, DebugContext = unknown> {
+  /** Classifies a public model ID for downstream account selection. */
   classifyModel(model: string): InferenceModelClassification
+  /** Rejects a model ID that is not supported by this inference provider. */
+  assertModelSupported(model: string): void
+  /** Creates the request body used to acquire a signed Claude thinking block. */
+  buildThinkingWarmupBody(bodyText: string | undefined, isClaudeThinking: boolean): string | null
+  /** Prepares the provider request after account and project context are known. */
   prepareRequest(input: PrepareInferenceRequest<Fingerprint>): PreparedInferenceRequest
+  /** Normalizes a provider response, preserving incremental SSE behavior. */
   transformResponse(input: TransformInferenceResponse<DebugContext>): Promise<Response>
 }
 

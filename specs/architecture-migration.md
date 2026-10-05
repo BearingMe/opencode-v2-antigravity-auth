@@ -140,7 +140,7 @@ the tracker may identify that commit by subject to avoid self-referential hashes
 | 9    | Session recovery                      | done    | `refactor: migrate session recovery policies`                           |
 | 10   | Inference transforms and signatures   | done    | `8e77da0`                                                               |
 | 11   | Inference pipelines and client        | done    | `refactor: migrate inference request and response pipelines`            |
-| 12   | Application execution and composition | pending | —                                                                       |
+| 12   | Application execution and composition | done    | `refactor: extract application request execution and composition`       |
 | 13   | OpenCode integration and packaging    | pending | —                                                                       |
 | 14   | Final architecture verification       | pending | —                                                                       |
 
@@ -779,15 +779,48 @@ modules in `execute-request.ts` and wire adapters in `composition.ts`.
 
 **Acceptance criteria:**
 
-- [ ] Exactly one request execution path remains active.
-- [ ] Path-specific native-engine requirements and documentation are reconciled
+- [x] Exactly one request execution path remains active.
+- [x] Path-specific native-engine requirements and documentation are reconciled
       with its new location before legacy removal, preserving the single-router
       invariant and routing/auth-isolation behavior.
-- [ ] Composition explicitly selects adapters and supplies module ports.
-- [ ] Orchestration does not absorb module-internal policy.
-- [ ] Host toasts/credentials use OpenCode-owned boundaries.
-- [ ] Retry timing, quota protection, warmup, fallback, and bookkeeping match.
-- [ ] Engine parity tests and end-to-end request smoke pass.
+- [x] Composition explicitly selects adapters and supplies module ports.
+- [x] Orchestration coordinates existing account and inference policies through
+      their ports rather than adding a second implementation.
+- [x] Host toasts/credentials use OpenCode-owned boundaries.
+- [x] Retry timing, quota protection, warmup, fallback, and bookkeeping match.
+- [x] Engine parity tests and end-to-end request smoke pass.
+
+### Step 12 completion evidence
+
+- Moved the sole request execution loop and its state into
+  `src/app/execute-request.ts`. `src/app/composition.ts` now selects the account,
+  inference, Antigravity transport, and OpenCode host adapters; `src/v2-plugin.ts`
+  calls that composition directly. `src/plugin/engine.ts` remains a compatibility
+  re-export and forwards no independent request implementation. Host toast,
+  refresh, project-context, and credential-clear operations are supplied through
+  composition ports. Retry parsing remains covered through public request
+  behavior; the test-only private-helper export was removed.
+- Reconciled the normative routing/ownership references and corrected capacity
+  retry documentation to match the implementation: exponential 1/2/4/8-second
+  delays capped at 8 seconds with ±10% jitter, three in-place retries per
+  endpoint, then one fingerprint refresh before fallback. The existing temporary
+  bridge exceptions now point at composition and remain tracked for Step 14.
+- Validation passed: `bun run test` (76 files / 1,212 tests),
+  `bun run test:tui` (clean package build / 13 tests / 164 expectations),
+  `bun run typecheck`, `bun run lint`, `bun run check:boundaries`,
+  `bun run check:boundaries:test` (7 tests / 22 expectations), changed-file
+  Prettier, and `git diff --check`.
+- `bun run test:antigravity:smoke` passed after a clean build. Its built-package
+  synthetic-credential/mock-HTTP scenario exercises the composed streaming
+  request through the SSE response transformer. No live provider request was
+  repeated; Step 11 already records live streaming and non-streaming success for
+  the affected model families.
+- Oracle consultation found and rechecked two resolved findings: removal of
+  private-helper test exports and correction of the capacity-backoff spec.
+  Independent review found no blocking findings. Runtime functions in the moved
+  executor and new composition were JSDoc-audited; app, architecture, and
+  normative spec references were updated.
+- Completion commit: `refactor: extract application request execution and composition`.
 
 ## 13. Consolidate OpenCode integration and packaging
 

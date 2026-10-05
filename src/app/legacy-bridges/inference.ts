@@ -1,7 +1,12 @@
 import type { InferenceApi } from "../../modules/inference/index.js"
 import { getModelFamily } from "../../modules/inference/index.js"
 import type { Fingerprint } from "../../plugin/fingerprint.js"
-import { prepareAntigravityRequest, transformAntigravityResponse } from "../../plugin/request.js"
+import {
+  assertAntigravityModelSupported,
+  buildThinkingWarmupBody,
+  prepareAntigravityRequest,
+  transformAntigravityResponse,
+} from "../../plugin/request.js"
 import type { AntigravityDebugContext } from "../../plugin/debug.js"
 
 /**
@@ -18,6 +23,14 @@ export const legacyInference: InferenceApi<Fingerprint, AntigravityDebugContext>
       family: quotaGroup === "claude" ? "claude" : "gemini",
       quotaGroup,
     }
+  },
+  /** Rejects model IDs that are outside the configured Antigravity catalog. */
+  assertModelSupported(model) {
+    assertAntigravityModelSupported(model)
+  },
+  /** Builds the small Claude request used to prime thinking signatures. */
+  buildThinkingWarmupBody(bodyText, isClaudeThinking) {
+    return buildThinkingWarmupBody(bodyText, isClaudeThinking)
   },
   /** Prepares a request with the existing Antigravity transform pipeline. */
   prepareRequest(input) {

@@ -31,4 +31,5 @@ User guides in `../user/` describe what users can do.
   updating all references.
 - `R-ARCH-V2-DELEGATES-V1` keeps its historical name but means: V2 routes
   all Antigravity model traffic through the native engine in
-  `src/plugin/engine.ts`. There is no V1 runtime anymore.
+  `src/app/execute-request.ts`, reached through `src/app/composition.ts`.
+  There is no V1 runtime anymore.

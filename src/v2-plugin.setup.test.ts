@@ -102,7 +102,7 @@ vi.mock("./plugin/storage.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./plugin/storage.js")>()
   return { ...actual, loadAccounts, updateAccounts }
 })
-vi.mock("./plugin/engine.js", () => ({
+vi.mock("./app/composition.js", () => ({
   executeAntigravityRequest: mockNativeFetch,
   disposeAntigravityRuntimeResources: mockDisposeResources,
   refreshOAuthCredentialUnified: mockUnifiedRefresh,

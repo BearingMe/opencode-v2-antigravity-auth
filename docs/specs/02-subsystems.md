@@ -50,7 +50,7 @@ statusText}` on `!ok`; `invalid_grant` invalidates project cache and clears
 - Managed-project lookup, retry timing, cache coalescing, and fallback selection
   live in `src/modules/accounts/project-context/policy.ts`; the plugin project
   facade composes the Antigravity project port and preserves the raw loader API.
-- Refresh is unified: `src/plugin/engine.ts ::
+- Refresh is unified: `src/app/composition.ts ::
 refreshOAuthCredentialUnified` and the V2 authorize-callback path both go
   through `src/plugin/token.ts :: refreshAccessToken` (skew handling,
   `invalid_grant` eviction). `src/v2-plugin.ts ::
@@ -153,9 +153,11 @@ fingerprint+history[5],cachedQuota+updatedAt,verification*}`.
 - `src/plugin/accounts.ts` and `src/plugin/rotation.ts` preserve the existing
   plugin-facing API as compatibility facades; the request engine remains the
   sole router and continues to own retry orchestration.
-- `src/plugin/engine.ts` adds its own capacity tiers `[5,10,20,30,60 s]`,
-  `FIRST_RETRY 1 s / SWITCH 5 s`, dedup window 2 s, state reset 120 s,
-  `MAX_CONSECUTIVE_FAILURES=5` → 30 s cooldown.
+- `src/app/execute-request.ts` retries capacity/server-busy responses with
+  exponential 1/2/4/8 s delays (capped at 8 s, with ±10% jitter), up to three
+  in-place retries per endpoint and one fingerprint refresh before fallback.
+  It also retains `FIRST_RETRY 1 s / SWITCH 5 s`, dedup window 2 s, state reset
+  120 s, and `MAX_CONSECUTIVE_FAILURES=5` → 30 s cooldown.
 
 ## 2.6 Quota probing — account policy + Antigravity quota adapter
 

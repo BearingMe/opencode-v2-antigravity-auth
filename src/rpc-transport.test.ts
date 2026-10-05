@@ -40,7 +40,7 @@ vi.mock("./plugin/storage.js", async (importOriginal) => {
   return { ...actual, loadAccounts, updateAccounts }
 })
 
-vi.mock("./plugin/engine.js", () => ({
+vi.mock("./app/composition.js", () => ({
   executeAntigravityRequest: vi.fn(),
   disposeAntigravityRuntimeResources: vi.fn(async () => undefined),
   refreshOAuthCredentialUnified: vi.fn(async (credential: unknown) => credential),

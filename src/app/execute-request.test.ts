@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { AccountManager } from "./accounts.ts"
-import { formatRefreshParts } from "./auth.ts"
-import { DEFAULT_CONFIG } from "./config/schema.ts"
+import { AccountManager } from "../plugin/accounts.ts"
+import { formatRefreshParts } from "../plugin/auth.ts"
+import { DEFAULT_CONFIG } from "../plugin/config/schema.ts"
 import { ANTIGRAVITY_ENDPOINT_FALLBACKS } from "../constants.ts"
-import { AntigravityTokenRefreshError } from "./token.ts"
-import type { PluginClient } from "./types.ts"
+import { AntigravityTokenRefreshError } from "../plugin/token.ts"
+import type { PluginClient } from "../plugin/types.ts"
 
 const { mockPrepare, mockTransform, mockEnsureProjectContext, mockRefreshAccessToken } = vi.hoisted(() => ({
   mockPrepare: vi.fn(),
@@ -13,8 +13,8 @@ const { mockPrepare, mockTransform, mockEnsureProjectContext, mockRefreshAccessT
   mockRefreshAccessToken: vi.fn(),
 }))
 
-vi.mock("./request.ts", async (importOriginal) => {
-  const orig = await importOriginal<typeof import("./request.ts")>()
+vi.mock("../plugin/request.ts", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("../plugin/request.ts")>()
   return {
     ...orig,
     prepareAntigravityRequest: mockPrepare,
@@ -22,13 +22,13 @@ vi.mock("./request.ts", async (importOriginal) => {
   }
 })
 
-vi.mock("./project.ts", async (importOriginal) => {
-  const orig = await importOriginal<typeof import("./project.ts")>()
+vi.mock("../plugin/project.ts", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("../plugin/project.ts")>()
   return { ...orig, ensureProjectContext: mockEnsureProjectContext }
 })
 
-vi.mock("./token.ts", async (importOriginal) => {
-  const orig = await importOriginal<typeof import("./token.ts")>()
+vi.mock("../plugin/token.ts", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("../plugin/token.ts")>()
   return { ...orig, refreshAccessToken: mockRefreshAccessToken }
 })
 
@@ -40,8 +40,7 @@ import {
   isNativeEngineEnabled,
   refreshOAuthCredentialUnified,
   resetEngineStateForTests,
-  __testEngineExports,
-} from "./engine.ts"
+} from "../plugin/engine.ts"
 
 function makeClient(): PluginClient {
   return {
@@ -88,44 +87,17 @@ describe("engine request helpers", () => {
     expect(formatWaitTime(90000)).toBe("1m 30s")
   })
 
-  it("reads Retry-After headers with V1 precedence", () => {
-    const { retryAfterMsFromResponse } = __testEngineExports
-    expect(retryAfterMsFromResponse(new Response(null, { headers: { "retry-after-ms": "2500" } }), 60000)).toBe(2500)
-    expect(retryAfterMsFromResponse(new Response(null, { headers: { "retry-after": "7" } }), 60000)).toBe(7000)
-    expect(retryAfterMsFromResponse(new Response(null), 60000)).toBe(60000)
-  })
-
-  it("parses RetryInfo and ErrorInfo from rate-limit bodies", () => {
-    const { extractRateLimitBodyInfo } = __testEngineExports
-    const retryInfo = extractRateLimitBodyInfo({
-      error: {
-        message: "slow down",
-        details: [
-          { "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason: "RATE_LIMIT_EXCEEDED" },
-          { "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay: "3s" },
-        ],
-      },
-    })
-    expect(retryInfo).toMatchObject({ retryDelayMs: 3000, reason: "RATE_LIMIT_EXCEEDED" })
-
-    const quotaDelay = extractRateLimitBodyInfo({
-      error: {
-        message: "quota hit",
-        details: [{ "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason: "QUOTA_EXHAUSTED" }],
-      },
-    })
-    expect(quotaDelay.reason).toBe("QUOTA_EXHAUSTED")
-
-    expect(__testEngineExports.parseDurationToMs("1h16m0.667s")).toBe(3600000 + 960000 + 667)
-  })
-
   it("gates the native engine behind an opt-out flag", () => {
     const previous = process.env.OPENCODE_ANTIGRAVITY_V2_NATIVE
-    process.env.OPENCODE_ANTIGRAVITY_V2_NATIVE = "0"
-    expect(isNativeEngineEnabled()).toBe(false)
-    delete process.env.OPENCODE_ANTIGRAVITY_V2_NATIVE
-    expect(isNativeEngineEnabled()).toBe(true)
-    if (previous !== undefined) process.env.OPENCODE_ANTIGRAVITY_V2_NATIVE = previous
+    try {
+      process.env.OPENCODE_ANTIGRAVITY_V2_NATIVE = "0"
+      expect(isNativeEngineEnabled()).toBe(false)
+      delete process.env.OPENCODE_ANTIGRAVITY_V2_NATIVE
+      expect(isNativeEngineEnabled()).toBe(true)
+    } finally {
+      if (previous === undefined) delete process.env.OPENCODE_ANTIGRAVITY_V2_NATIVE
+      else process.env.OPENCODE_ANTIGRAVITY_V2_NATIVE = previous
+    }
   })
 })
 
@@ -374,6 +346,60 @@ describe("executeAntigravityRequest", () => {
     expect(mockPrepare).toHaveBeenCalledOnce()
     expect(manager.getAccountsSnapshot()[0]?.rateLimitResetTimes["gemini-antigravity:gemini-3-pro"]).toBeGreaterThan(
       Date.now(),
+    )
+  })
+
+  it.each([
+    {
+      name: "retry-after-ms over retry-after",
+      headers: { "retry-after-ms": "2500", "retry-after": "7" },
+      error: {
+        message: "slow down",
+        details: [{ "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason: "QUOTA_EXHAUSTED" }],
+      },
+      delayMs: 2500,
+    },
+    {
+      name: "RetryInfo's compound duration",
+      headers: {},
+      error: {
+        message: "slow down",
+        details: [
+          { "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason: "QUOTA_EXHAUSTED" },
+          { "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay: "1h16m0.667s" },
+        ],
+      },
+      delayMs: 4_560_667,
+    },
+  ])("applies provider retry hints from $name", async ({ headers, error, delayMs }) => {
+    vi.useFakeTimers()
+    const requestTime = Date.now()
+    const manager = makeManager([{ refreshToken: "rt-1", access: "at-1", expires: Date.now() + 3600_000 }])
+    const responseHeaders = new Headers({ "content-type": "application/json" })
+    for (const [name, value] of Object.entries(headers)) responseHeaders.set(name, value)
+    const fetchImpl = vi
+      .fn<() => Promise<Response>>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error }), { status: 429, headers: responseHeaders }))
+
+    const request = executeAntigravityRequest(
+      GEMINI_URL,
+      { method: "POST" },
+      {
+        client: makeClient(),
+        providerId: "antigravity",
+        config: { ...DEFAULT_CONFIG, request_jitter_max_ms: 0, scheduling_mode: "balance" },
+        accountManager: manager,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      },
+    )
+
+    await vi.advanceTimersByTimeAsync(1000)
+    const response = await request
+
+    expect(response.status).toBe(429)
+    expect(fetchImpl).toHaveBeenCalledOnce()
+    expect(manager.getAccountsSnapshot()[0]?.rateLimitResetTimes["gemini-antigravity:gemini-3-pro"]).toBe(
+      requestTime + delayMs,
     )
   })
 

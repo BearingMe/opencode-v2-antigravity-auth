@@ -148,13 +148,16 @@ src/
 ├── tui.ts                     # /antigravity dialog UI (host-rendered dialogs only)
 ├── constants.ts               # Endpoints, headers, OAuth identity, model routing
 ├── antigravity/oauth.ts       # PKCE authorize URL + code exchange + project discovery
+├── app/
+│   ├── composition.ts          # Selects OpenCode, account, inference, and transport adapters
+│   └── execute-request.ts      # Single request execution and retry orchestration
 ├── adapters/
 │   ├── filesystem/            # Account and recovery stores
 │   └── opencode/              # Host session, logging, and TUI adapters
 ├── modules/session-recovery/  # Error policy, session repair, and request-time turn repair
 ├── hooks/auto-update-checker/ # Version check (root sessions only; never installs)
 └── plugin/
-    ├── engine.ts              # Native request/rotation engine (sole router)
+    ├── engine.ts              # Compatibility exports for app execution
     ├── account-service.ts     # Shared account store service (tool + RPC backend)
     ├── account-ui-format.ts   # Quota bars, countdowns, one-liners (pure)
     ├── auth.ts / token.ts     # Refresh-part packing + unified refresh path

@@ -12,7 +12,7 @@ OpenCode ──▶ Plugin ──▶ Antigravity API ──▶ Claude/Gemini
                └─ THIS PLUGIN (auth, transform, recovery)
 ```
 
-1. **Routing in** (`src/v2-plugin.ts` + `src/plugin/engine.ts`)
+1. **Routing in** (`src/v2-plugin.ts` + `src/app/composition.ts`)
    - `aisdk.hook("sdk")` matches `antigravity-*` / OAuth-routed `gemini-*`
      models on the Antigravity SDK URL and assigns the OAuth fetch bridge.
      Plain `gemini-*` models with a non-OAuth (API-key) connection keep
@@ -21,7 +21,7 @@ OpenCode ──▶ Plugin ──▶ Antigravity API ──▶ Claude/Gemini
      `generativelanguage.googleapis.com` paths, strips credentials for
      external origins, normalizes the body without consuming the original
      request, and calls `executeAntigravityRequest()`.
-2. **Execution** (`src/plugin/engine.ts`, sole router)
+2. **Execution** (`src/app/execute-request.ts`, sole request path)
    - Account selection (sticky/hybrid/round-robin, rate-limit aware),
      unified token refresh, project-context resolution, soft-quota gate,
      endpoint fallback (daily → prod), optional thinking warmup,
@@ -78,7 +78,7 @@ src/
 ├── modules/inference/         # Request helpers, transforms, schema cleaning, streaming, signatures, and ports
 ├── platform/logging/          # Neutral events, policy, and safe log formatting
 └── plugin/
-    ├── engine.ts              # Native request/rotation engine (sole router)
+    ├── engine.ts              # Compatibility exports for app execution
     ├── account-service.ts     # Compatibility façade and RPC quota-schema validation
     ├── account-ui-format.ts   # Quota bars, countdowns, one-liners (pure)
     ├── auth.ts / token.ts     # Refresh-part packing and provider/cache composition
@@ -94,8 +94,12 @@ src/
     ├── refresh-queue.ts          # Proactive refresh compatibility façade
     ├── config/                # Zod schema, loader, model definitions, opencode.json updater
     ├── cache/ / stores/       # Compatibility facades for signature caches/stores
-    └── debug.ts / logger.ts / logging-utils.ts / version.ts / errors.ts / types.ts
+└── debug.ts / logger.ts / logging-utils.ts / version.ts / errors.ts / types.ts
 ```
+
+`src/plugin/engine.ts` remains a compatibility facade. The V2 bridge enters
+through `app/composition.ts`, which selects the existing account, inference,
+transport, and OpenCode adapters before calling the single executor.
 
 Logging is split by responsibility: `platform/logging/` owns neutral policy,
 events, and formatting; OpenCode host/console delivery is in

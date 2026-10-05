@@ -7,7 +7,8 @@ Inferred (likely intent). Details live in the referenced sections.
 ## Routing and scope
 
 - R-ARCH-V2-DELEGATES-V1 (Explicit, §01): V2 MUST route
-  all model traffic through the native engine (`src/plugin/engine.ts`).
+  all model traffic through the application execution path
+  (`src/app/composition.ts` → `src/app/execute-request.ts`).
   No parallel router, no legacy fallback. The name is historical; the
   requirement is the current native engine.
 - R-ARCH-ANTIGRAVITY-AUTH-ISOLATION (Explicit, §01): Antigravity MUST use its

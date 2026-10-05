@@ -10,6 +10,9 @@ import { loadManagedProject } from "../dist/src/adapters/antigravity/project-cli
 import { onboardManagedProject } from "../dist/src/plugin/project.js"
 import { refreshOAuthToken } from "../dist/src/adapters/antigravity/token-client.js"
 import { prepareAntigravityRequest } from "../dist/src/plugin/request.js"
+import { formatRefreshParts } from "../dist/src/plugin/auth.js"
+import { DEFAULT_CONFIG } from "../dist/src/plugin/config/schema.js"
+import { executeAntigravityRequest } from "../dist/src/app/composition.js"
 
 /** Exercises built Antigravity clients using synthetic OAuth data and mocked HTTP. */
 async function main() {
@@ -78,6 +81,18 @@ async function main() {
         groups: [{ displayName: "Gemini", buckets: [{ window: "weekly", remainingFraction: 0 }] }],
       })
     }
+    if (url.includes("v1internal:streamGenerateContent")) {
+      assert.equal(init?.method, "POST")
+      assert.equal(new Headers(init?.headers).get("authorization"), "Bearer synthetic-access")
+      const envelope = JSON.parse(String(init?.body))
+      assert.equal(envelope.project, "synthetic-project")
+      assert.equal(envelope.requestType, "agent")
+      assert.equal(envelope.request.contents[0].parts[0].text, "Reply OK")
+      return new Response(
+        `data: ${JSON.stringify({ response: { candidates: [{ content: { parts: [{ text: "Smoke OK" }] } }] } })}\n\ndata: [DONE]\n\n`,
+        { status: 200, headers: { "content-type": "text/event-stream" } },
+      )
+    }
     if (url === "https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:generateContent") {
       assert.equal(init?.method, "POST")
       assert.ok(init?.signal instanceof AbortSignal)
@@ -128,8 +143,43 @@ async function main() {
       true,
     )
 
-    assert.equal(requests.length, 9)
-    console.log("Antigravity communication smoke passed (synthetic credentials; mocked HTTP).")
+    const requestAccount = { index: 0, consecutiveFailures: 0 }
+    const accountManager = {
+      getAccountCount: () => 1,
+      getCurrentOrNextForFamily: () => requestAccount,
+      requestSaveToDisk: () => undefined,
+      toAuthDetails: () => ({
+        type: "oauth",
+        access: "synthetic-access",
+        expires: Date.now() + 3600_000,
+        refresh: formatRefreshParts({
+          refreshToken: "synthetic-refresh",
+          projectId: "synthetic-project",
+          managedProjectId: "synthetic-project",
+        }),
+      }),
+      isRateLimitedForFamily: () => false,
+      markAccountUsed: () => undefined,
+    }
+    const response = await executeAntigravityRequest(
+      "https://generativelanguage.googleapis.com/v1beta/models/antigravity-gemini-3.1-pro:streamGenerateContent?alt=sse",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "Reply OK" }] }] }),
+      },
+      {
+        client: { auth: { set: async () => undefined }, tui: { showToast: async () => undefined } },
+        providerId: "antigravity",
+        config: { ...DEFAULT_CONFIG },
+        accountManager,
+      },
+    )
+    assert.equal(response.status, 200)
+    assert.match(await response.text(), /Smoke OK/)
+
+    assert.equal(requests.length, 10)
+    console.log("Antigravity built-package request smoke passed (synthetic credentials; mocked HTTP).")
   } finally {
     globalThis.fetch = originalFetch
   }

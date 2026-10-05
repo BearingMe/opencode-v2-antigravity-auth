@@ -7,7 +7,9 @@
   `isGenerativeLanguageModelPath`, `parseOAuthCallbackInput`,
   `manageAccounts` (`src/v2-plugin.ts`); `executeAntigravityRequest`,
   `refreshOAuthCredentialUnified`, `disposeAntigravityRuntimeResources`
-  (`src/plugin/engine.ts`); `verifyAccountAccess` (`src/plugin/verify.ts`).
+  (`src/app/composition.ts`); `executeAntigravityRequest` is the composition
+  entry and delegates to `src/app/execute-request.ts`; `verifyAccountAccess`
+  (`src/plugin/verify.ts`).
 - Fetch scope rule (R-FETCH-SCOPE): the interceptor MUST only route
   absolute http(s) URLs on `generativelanguage.googleapis.com` matching
   `^/v1(beta)?/models/[^/]+:(generateContent|streamGenerateContent|
@@ -43,14 +45,16 @@ enable|disable|select|delete|delete_all` (see F3; out-of-range index is a
 - `exchangeAntigravity` never throws (`failed{error}` with raw server text).
 - Token refresh is unified: `src/plugin/token.ts :: refreshAccessToken` is
   the single implementation, reached via
-  `src/plugin/engine.ts :: refreshOAuthCredentialUnified` and via
+  `src/app/composition.ts :: refreshOAuthCredentialUnified` and via
   `src/v2-plugin.ts :: refreshOAuthCredential` (thin wrapper preserving the
   credential shape). `invalid_grant` → evict account + clear project/auth
   caches + rotate; all-invalid → login error. Do not reintroduce a parallel
   refresh path (see D-REFRESH-DUAL).
 - Rate-limit handling: classify → backoff (`Retry-After` ≥ 2 s respected)
   → `markRateLimitedWithReason` → rotate; all-blocked → wait (capped) or
-  quota-protection throw; capacity uses tiered `[5..60 s]` delays.
+  quota-protection throw; capacity/server-busy retries use exponential 1/2/4/8 s
+  delays (capped at 8 s with ±10% jitter), three in-place retries per endpoint,
+  then one fingerprint refresh before endpoint fallback.
 - Verification-required: toast `needs verification…`, persist
   `verificationRequired*` fields, disable on blocked; error status records
   without disabling.

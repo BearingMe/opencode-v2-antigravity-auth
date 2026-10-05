@@ -24,3 +24,12 @@ Here, `runtime` means the external execution host, not another `src/` directory.
 - Existing code is legacy-by-location, not wrong-by-default. Do not move it merely to clean up the tree; create a boundary before migrating implementation behind it.
 - Prefer behavior-preserving moves and keep relocation, redesign, and behavior changes separate unless unavoidable.
 - Add architecture only when it reduces dependency knowledge. Folders alone do not enforce boundaries; avoid cycles and keep changes small enough to understand independently.
+
+## Current request path
+
+- `composition.ts` selects account, inference, transport, and OpenCode host
+  adapters for each routed model request.
+- `execute-request.ts` coordinates those ports while preserving the existing
+  account rotation, quota protection, warmup, fallback, and retry behavior.
+- `plugin/engine.ts` is a compatibility facade; the V2 bridge calls the
+  application composition directly.

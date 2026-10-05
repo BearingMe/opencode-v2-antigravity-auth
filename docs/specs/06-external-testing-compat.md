@@ -79,7 +79,7 @@ event` transforms. V2 API explicitly "may change before stable".
   `model-resolver.test.ts`, `modules/accounts/selection/rotation.test.ts`,
   `modules/accounts/selection/backoff.test.ts`, `quota-fallback.test.ts`,
   `antigravity-account-rotation.test.ts`, `cross-model-integration.test.ts`).
-- `src/plugin/engine.test.ts`: native-engine tests (routing decision, quota
+- `src/app/execute-request.test.ts`: native-engine tests (routing decision, quota
   fallback, warmup URL, wait formatting, native-enable flag,
   unified-refresh delegation
   `refreshOAuthCredentialUnified → token.ts :: refreshAccessToken`).
@@ -131,7 +131,7 @@ event` transforms. V2 API explicitly "may change before stable".
    `adapters/antigravity/token-client.ts`
    (skew, `invalid_grant` eviction, project-id preservation, cache store)
    is the single refresh implementation, called via
-   `src/plugin/engine.ts :: refreshOAuthCredentialUnified` and the V2
+   `src/app/composition.ts :: refreshOAuthCredentialUnified` and the V2
    authorize-callback path. `src/v2-plugin.ts :: refreshOAuthCredential`
    remains only as a thin compatibility wrapper. Edits MUST NOT widen the
    gap again.

@@ -15,7 +15,8 @@ OpenCode `google` provider, integration, and credentials remain outside the
 plugin's ownership.
 
 Evidence: `src/v2-plugin.ts :: setup` (V2 bridge),
-`src/plugin/engine.ts :: executeAntigravityRequest` (sole native router),
+`src/app/composition.ts :: executeAntigravityRequest` and
+`src/app/execute-request.ts :: executeRequest` (single native request path),
 `src/constants.ts` (identity/endpoints/headers),
 `src/antigravity/oauth.ts :: authorizeAntigravity / exchangeAntigravity`.
 
@@ -77,7 +78,8 @@ Non-goals:
 - V2 bridge (current product path):
   `src/v2-plugin.ts` default export `Plugin.define({id:
 "opencode-v2-antigravity-auth"})`. Routing lives in
-  `src/plugin/engine.ts :: executeAntigravityRequest`;
+  `src/app/composition.ts :: executeAntigravityRequest`, with the execution
+  loop in `src/app/execute-request.ts`;
   `verifyAccountAccess` lives in `src/plugin/verify.ts`.
 - AI-SDK shim: `src/google-sdk.ts :: createGoogle` re-export. Models MUST
   point at `aisdk:<ANTIGRAVITY_SDK>` (the `./google-sdk.js` URL), never

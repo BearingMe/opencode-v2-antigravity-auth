@@ -27,7 +27,7 @@ import {
   disposeAntigravityRuntimeResources,
   executeAntigravityRequest,
   refreshOAuthCredentialUnified,
-} from "./plugin/engine.js"
+} from "./app/composition.js"
 import { getRecoverySuccessToast } from "./modules/session-recovery/index.js"
 import { initDiskSignatureCache } from "./plugin/cache.js"
 import { createProactiveRefreshQueue, type ProactiveRefreshQueue } from "./plugin/refresh-queue.js"
@@ -372,8 +372,8 @@ export default Plugin.define({
         path: destination.pathname,
       })
 
-      // Native engine: multi-account rotation, backoff, warmup, and signature
-      // handling live in src/plugin/engine.ts (no V1 harness involved).
+      // The application composition selects the module and transport adapters;
+      // execution and retry policy live in src/app/execute-request.ts.
       const accountManager = await loadNativeManager()
       return executeAntigravityRequest(normalized.input, normalized.init, {
         client: bridgeClient,
