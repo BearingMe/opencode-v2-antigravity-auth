@@ -248,7 +248,7 @@ thinking_disabled_violation`; gated by `session_recovery` and deduplicates
   history because V2's public prompt API accepts text only. Thinking-order
   repair prepends synthetic thinking (`prt_0000000000_thinking`) or strips
   thinking through the filesystem storage port. Optional `auto_resume`
-  continues a successful thinking repair. The application bridge composes
+  continues a successful thinking repair. The OpenCode adapter composes
   filesystem storage and OpenCode session ports; the `session.retry` hook stays
   provider-agnostic.
 

@@ -32,15 +32,14 @@ vi.mock("../plugin/token.ts", async (importOriginal) => {
   return { ...orig, refreshAccessToken: mockRefreshAccessToken }
 })
 
+import { executeAntigravityRequest, refreshOAuthCredentialUnified } from "./composition.ts"
 import {
-  executeAntigravityRequest,
   extractModelFromUrl,
   formatWaitTime,
   getModelFamilyFromUrl,
   isNativeEngineEnabled,
-  refreshOAuthCredentialUnified,
   resetEngineStateForTests,
-} from "../plugin/engine.ts"
+} from "./execute-request.ts"
 
 function makeClient(): PluginClient {
   return {

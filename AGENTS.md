@@ -158,7 +158,6 @@ src/
 │       └── hooks/             # Host event integrations, including update checks
 ├── modules/session-recovery/  # Error policy, session repair, and request-time turn repair
 └── plugin/
-    ├── engine.ts              # Compatibility exports for app execution
     ├── account-service.ts     # Shared account store service (tool + RPC backend)
     ├── account-ui-format.ts   # Quota bars, countdowns, one-liners (pure)
     ├── auth.ts / token.ts     # Refresh-part packing + unified refresh path

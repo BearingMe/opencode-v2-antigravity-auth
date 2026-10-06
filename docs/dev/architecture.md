@@ -41,7 +41,7 @@ OpenCode ──▶ Plugin ──▶ Antigravity API ──▶ Claude/Gemini
 
 Session recovery policy lives in `modules/session-recovery/`: pure in-request
 turn repair is separate from session-error recovery. The filesystem store and
-OpenCode session operations are composed by the application bridge through
+OpenCode session operations are composed by the OpenCode adapter through
 `adapters/filesystem/session-recovery-store.ts` and
 `adapters/opencode/session-recovery.ts`.
 
@@ -80,7 +80,6 @@ src/
 ├── modules/inference/         # Request helpers, transforms, schema cleaning, streaming, signatures, and ports
 ├── platform/logging/          # Neutral events, policy, and safe log formatting
 └── plugin/
-    ├── engine.ts              # Compatibility exports for app execution
     ├── account-service.ts     # Compatibility façade and RPC quota-schema validation
     ├── account-ui-format.ts   # Quota bars, countdowns, one-liners (pure)
     ├── auth.ts / token.ts     # Refresh-part packing and provider/cache composition
@@ -101,9 +100,9 @@ src/
 
 The package-root `src/v2-plugin.ts`, `src/tui.ts`, and `src/rpc.ts` files remain
 thin compatibility entrypoints. The server plugin and TUI implementation live
-under `adapters/opencode/`; the server adapter delegates account administration,
-session recovery, and model execution to application composition. The single
-request executor remains `app/execute-request.ts`.
+under `adapters/opencode/`; the server adapter composes account administration
+and session recovery, and delegates model execution to application composition.
+The single request executor remains `app/execute-request.ts`.
 
 Logging is split by responsibility: `platform/logging/` owns neutral policy,
 events, and formatting; OpenCode host/console delivery is in
@@ -122,7 +121,7 @@ Account membership and selection policy now live in
 the request engine and administration service migrate in later steps.
 
 Session-recovery policy and request-time turn repair now live in
-`modules/session-recovery/`. The application bridge composes the policy with
+`modules/session-recovery/`. The OpenCode adapter composes the policy with
 filesystem and OpenCode adapters; plugin recovery files remain compatibility
 facades only.
 

@@ -23,8 +23,7 @@ adapters/opencode/tui ──RPC──> adapters/opencode/rpc
 app/composition.ts ──selects──> account, inference, Antigravity transport,
                                 OpenCode host, and filesystem adapters
 app/execute-request.ts ──coordinates──> account pool + inference policies
-                                        and plugin compatibility facades
-plugin/engine.ts ──compatibility exports──> app/composition.ts + execute-request.ts
+                                         and plugin compatibility facades
 plugin account callers ──ports──> adapters/antigravity/*
 plugin/* ──uses──> constants.ts (identity/endpoints/headers)
                    + plugin/{auth,storage,logger,debug} kernels

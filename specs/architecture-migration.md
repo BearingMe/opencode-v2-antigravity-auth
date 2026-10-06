@@ -607,9 +607,10 @@ verification, and refresh policies into their accounts subdirectories.
   quota aggregation, checks, snapshots and presentation into `quota/`;
   verification writes into `verification/`; and token refresh, project-context
   lookup/onboarding, and proactive queue decisions into `refresh/` and
-  `project-context/`. Plugin and application bridges retain host/provider
-  composition and compatibility exports. RPC schema validation remains outside
-  credential-free domain results.
+  `project-context/`. At that checkpoint, plugin/application bridges still
+  handled host/provider composition and compatibility exports; Step 14 moved
+  active OpenCode composition under its adapter. RPC schema validation remains
+  outside credential-free domain results.
 - Preserved queue ordering and manager invalidation on successful mutations,
   delete-all, login changes, and verification changes. Added lifecycle-order
   coverage and made in-flight verification for a durable account fail closed
@@ -796,11 +797,12 @@ modules in `execute-request.ts` and wire adapters in `composition.ts`.
 - Moved the sole request execution loop and its state into
   `src/app/execute-request.ts`. `src/app/composition.ts` now selects the account,
   inference, Antigravity transport, and OpenCode host adapters; `src/v2-plugin.ts`
-  calls that composition directly. `src/plugin/engine.ts` remains a compatibility
-  re-export and forwards no independent request implementation. Host toast,
-  refresh, project-context, and credential-clear operations are supplied through
-  composition ports. Retry parsing remains covered through public request
-  behavior; the test-only private-helper export was removed.
+  calls that composition directly. At Step 12, `src/plugin/engine.ts` remained a
+  compatibility re-export with no independent request implementation; Step 14
+  later removed that unused facade. Host toast, refresh, project-context, and
+  credential-clear operations are supplied through composition ports. Retry
+  parsing remains covered through public request behavior; the test-only
+  private-helper export was removed.
 - Reconciled the normative routing/ownership references and corrected capacity
   retry documentation to match the implementation: exponential 1/2/4/8-second
   delays capped at 8 seconds with ±10% jitter, three in-place retries per
@@ -914,6 +916,17 @@ maintained documentation with the completed architecture.
   request, and session-recovery smokes passed using synthetic data. Oracle and
   review found no remaining blocker after the stale modules README reference was
   corrected. These checks do not establish the installed-host E2E gate.
+- Removed the unused `src/plugin/engine.ts` compatibility re-export and changed
+  its sole test consumer to import the application composition/executor directly.
+  Reconciled `AGENTS.md`, the system-architecture diagram, subsystem notes, and
+  developer architecture so they no longer describe the deleted facade or the
+  former application-owned recovery composition. Full Vitest (75 files / 1,212
+  tests), native TUI (13 / 164), typecheck, lint, boundary checks and fixtures,
+  changed-file formatting, clean build, and the built Antigravity request smoke
+  passed. Oracle and review identified stale facade/composition references in
+  maintained docs; those were reconciled and both follow-ups found no blockers.
+  The isolated installed-host E2E remains unverified and mandatory for final
+  acceptance.
 
 **Acceptance criteria:**
 

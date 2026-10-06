@@ -31,5 +31,5 @@ Here, `runtime` means the external execution host, not another `src/` directory.
   adapters for each routed model request.
 - `execute-request.ts` coordinates those ports while preserving the existing
   account rotation, quota protection, warmup, fallback, and retry behavior.
-- `plugin/engine.ts` is a compatibility facade; the V2 bridge calls the
-  application composition directly.
+- The V2 plugin calls `executeAntigravityRequest` from this composition; no
+  parallel plugin-engine route remains.
