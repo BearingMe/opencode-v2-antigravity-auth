@@ -164,7 +164,6 @@ src/
     ├── auth.ts / token.ts     # Refresh-part packing + unified refresh path
     ├── verify.ts / verification.ts  # Access verification + error helpers
     ├── request.ts / request-helpers.ts  # Transform core + schema/thinking utils
-    ├── transform/             # Pure per-family transforms (claude/gemini/sanitizer/resolver)
     ├── core/streaming/        # SSE transformer
     ├── thinking-recovery.ts / recovery.ts # Compatibility recovery facades
     ├── quota.ts               # Antigravity per-model + grouped quota probing

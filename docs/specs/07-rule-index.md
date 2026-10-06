@@ -96,7 +96,7 @@ FR2` — interleaving is a 400) (Strong + External).
 
 ## Architecture hygiene
 
-- R-ARCH-PURE-TRANSFORM (Strong, §01): keep `transform/*` pure.
+- R-ARCH-PURE-TRANSFORM (Strong, §01): keep `modules/inference/transforms/*` pure.
 - `hooks/*` MUST NOT gain auth/quota/storage deps (SHOULD, §01).
 - New code MUST use `getAntigravityHeaders()/getAntigravityVersion()/
 invalidatePackage()` over deprecated exports (Explicit).

@@ -47,8 +47,8 @@ In scope:
   `src/modules/inference/signature-*`, `src/modules/inference/streaming/*`).
   `src/plugin/request.ts`, `src/plugin/request-helpers.ts`, and
   `src/plugin/core/streaming/*` retain compatibility APIs and adapter wiring.
-  Legacy `src/plugin/transform/*` paths are compatibility exports during
-  migration.
+  The former `src/plugin/transform/*` re-export paths were removed in Step 14;
+  transform policy is consumed from `modules/inference/`.
 - Multi-account pool/selection and persistence policy
   (`src/modules/accounts/account-pool.ts`, `modules/accounts/selection/`,
   `modules/accounts/persistence/`), quota probing, fingerprints, project context

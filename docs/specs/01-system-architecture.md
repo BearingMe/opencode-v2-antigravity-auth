@@ -2,16 +2,16 @@
 
 ## Major parts
 
-| Part            | Paths                                                                                                                | Responsibility                                                                                                                                                                    |
-| --------------- | -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shared identity | `src/adapters/antigravity/constants.ts`, `src/constants.ts`, `src/shims.d.ts`, `src/adapters/opencode/google-sdk.ts` | OAuth client id/secret/scopes/redirect, endpoint orders, Antigravity headers, version pinning, hardening prompts, search tuning; `src/constants.ts` is a compatibility facade     |
-| Application     | `src/app/composition.ts`, `src/app/execute-request.ts`                                                               | Selects adapters and runs the single request execution + rotation loop                                                                                                            |
-| OpenCode V2     | `src/adapters/opencode/plugin.ts`, `src/adapters/opencode/{rpc,tui,config,hooks}/`                                   | V2 registration, host lifecycle, RPC/TUI, config, update hook, and SDK routing integration                                                                                        |
-| Compatibility   | `src/v2-plugin.ts`, `src/tui.ts`, `src/rpc.ts`, `src/google-sdk.ts`                                                  | Thin package/source entrypoint re-exports; implementation remains under `adapters/opencode/`                                                                                      |
-| OAuth facade    | `src/antigravity/oauth.ts`                                                                                           | Compatibility API for authorize/exchange; delegates endpoint communication to Antigravity adapters                                                                                |
-| Vendor clients  | `src/adapters/antigravity/*`                                                                                         | OAuth/token/project/quota/verification HTTP, headers, endpoint order, timeouts, and response wire parsing                                                                         |
-| Auto-update     | `src/adapters/opencode/hooks/auto-update-checker/*`                                                                  | Root-session npm check, toast or pinned rewrite + cache invalidate                                                                                                                |
-| Core domains    | `src/modules/*` + `src/plugin/*` + `cache/config/core/stores/transform`                                              | Account policy, request transforms, schema/thinking utils, quota/storage adapters, fingerprint/project/refresh, session-recovery policy, streaming, debug/logger, version, images |
+| Part            | Paths                                                                                                                | Responsibility                                                                                                                                                                |
+| --------------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shared identity | `src/adapters/antigravity/constants.ts`, `src/constants.ts`, `src/shims.d.ts`, `src/adapters/opencode/google-sdk.ts` | OAuth client id/secret/scopes/redirect, endpoint orders, Antigravity headers, version pinning, hardening prompts, search tuning; `src/constants.ts` is a compatibility facade |
+| Application     | `src/app/composition.ts`, `src/app/execute-request.ts`                                                               | Selects adapters and runs the single request execution + rotation loop                                                                                                        |
+| OpenCode V2     | `src/adapters/opencode/plugin.ts`, `src/adapters/opencode/{rpc,tui,config,hooks}/`                                   | V2 registration, host lifecycle, RPC/TUI, config, update hook, and SDK routing integration                                                                                    |
+| Compatibility   | `src/v2-plugin.ts`, `src/tui.ts`, `src/rpc.ts`, `src/google-sdk.ts`                                                  | Thin package/source entrypoint re-exports; implementation remains under `adapters/opencode/`                                                                                  |
+| OAuth facade    | `src/antigravity/oauth.ts`                                                                                           | Compatibility API for authorize/exchange; delegates endpoint communication to Antigravity adapters                                                                            |
+| Vendor clients  | `src/adapters/antigravity/*`                                                                                         | OAuth/token/project/quota/verification HTTP, headers, endpoint order, timeouts, and response wire parsing                                                                     |
+| Auto-update     | `src/adapters/opencode/hooks/auto-update-checker/*`                                                                  | Root-session npm check, toast or pinned rewrite + cache invalidate                                                                                                            |
+| Core domains    | `src/modules/{accounts,inference,session-recovery}/*`, `src/adapters/{antigravity,filesystem}/*`, `src/plugin/*`     | Account, inference, and recovery policy; vendor and filesystem adapters; plugin auth/request/debug/logging and account composition                                            |
 
 ## Dependency direction (normative)
 
@@ -23,13 +23,9 @@ adapters/opencode/tui ──RPC──> adapters/opencode/rpc
 app/composition.ts ──selects──> account, inference, Antigravity transport,
                                 OpenCode host, and filesystem adapters
 app/execute-request.ts ──coordinates──> account pool + inference policies
-                                         and plugin compatibility facades
-plugin account callers ──ports──> adapters/antigravity/*
-plugin/* ──uses──> constants.ts (identity/endpoints/headers)
-                   + plugin/{auth,storage,logger,debug} kernels
-adapters/opencode/account-pool.ts ──composes──> modules/accounts/ + filesystem store
-transform/*, request-helpers ──should stay──> pure re: I/O
-                   (except cache + config reads)
+adapters/opencode/* ──composes──> modules/* + vendor/filesystem adapters
+modules/inference/transforms/* ──should stay──> pure re: I/O
+plugin request boundary ──supplies──> config, environment, and diagnostics
 ```
 
 ### Rule: R-ARCH-V2-DELEGATES-V1
@@ -88,10 +84,9 @@ outside this plugin's routing scope and MUST retain its configured route.
 
 ### Rule: R-ARCH-PURE-TRANSFORM
 
-**Requirement:** `src/modules/inference/transforms/*` SHOULD be pure functions of
-`(payload, model, config)`. Network and filesystem work belong in adapters;
-account policy belongs in `src/modules/accounts/`, with plugin files retained
-only as compatibility boundaries during migration. Environment reads and
+**Requirement:** `src/modules/inference/transforms/*` SHOULD be pure functions
+of `(payload, model, config)`. Network and filesystem work belong in adapters;
+account policy belongs in `src/modules/accounts/`. Environment reads and
 diagnostics are supplied or handled by the request boundary.
 
 **Status:** Strong (consistent implementation; cross-module report).

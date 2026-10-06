@@ -960,6 +960,11 @@ maintained documentation with the completed architecture.
   Schema generation produced formatting-only differences, which were not
   retained; no generated artifact is included. Oracle and review found no
   blocker. The installed-host E2E remains unverified and mandatory.
+- Removed the unused `src/plugin/transform/` re-export files after confirming
+  the package, runtime, test, and script surfaces had no consumers. Inference
+  transforms remain directly available from `modules/inference/`; request and
+  streaming integration paths remain in place. Corrected the system-architecture
+  and rule-index references that still described the old facade/kernel layout.
 
 **Acceptance criteria:**
 
