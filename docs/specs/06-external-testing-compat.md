@@ -72,13 +72,15 @@ event` transforms. V2 API explicitly "may change before stable".
     behavior at capacity).
 - `plugin/*` + subdirs: colocated Vitest files covering model
   resolution, schema sanitization, cross-model sanitizer, quota fallback
-  (antigravity-first), rotation/hybrid selection, recovery,
-  thinking-recovery, token, storage (v1–v4, tombstones, replace semantics),
-  account-service presentation, account-ui-format, cache, debug/logger —
+  (antigravity-first), rotation/hybrid selection, token, storage (v1–v4,
+  tombstones, replace semantics), account-service
+  presentation, account-ui-format, cache, debug/logger —
   see `02-subsystems` and code refs (`request.test.ts`,
   `model-resolver.test.ts`, `modules/accounts/selection/rotation.test.ts`,
   `modules/accounts/selection/backoff.test.ts`, `quota-fallback.test.ts`,
   `antigravity-account-rotation.test.ts`, `cross-model-integration.test.ts`).
+- `modules/session-recovery/` and `adapters/opencode/session-recovery.test.ts`:
+  in-request repair policy and session-error recovery behavior.
 - `src/app/execute-request.test.ts`: native-engine tests (routing decision, quota
   fallback, warmup URL, wait formatting, native-enable flag,
   unified-refresh delegation
@@ -204,12 +206,10 @@ invalidateCache` remain exported. New code MUST use
   `src/adapters/antigravity/{oauth,token,project,quota,verification}-client.ts`
 - Update: `src/adapters/opencode/hooks/auto-update-checker/{index,checker,cache,constants,
 types,logging}.ts` + `checker.test.ts`, `index.test.ts`
-- Core: `src/plugin/{auth,token,cache,request,request-helpers,accounts,
-account-service,rotation,quota,storage,fingerprint,project,refresh-queue,
-recovery,thinking-recovery,errors,debug,logger,logging-utils,verify,
-verification,version,image-saver,types}.ts`
-- Subdirs: `src/plugin/{cache,config,core:streaming,recovery,stores,
-transform}/*`
+- Core: `src/plugin/{auth,token,cache,request,request-helpers,account-service,
+quota,fingerprint,project,refresh-queue,errors,debug,logger,logging-utils,
+verify,verification,version,image-saver,types}.ts`
+- Subdirs: `src/plugin/{core/streaming,stores,cache}/*`
 - Tests: `src/constants.test.ts`, `src/adapters/opencode/plugin.test.ts`,
   `src/adapters/opencode/plugin.accounts.test.ts`,
   `src/adapters/opencode/plugin.setup.test.ts` +

@@ -87,7 +87,6 @@ src/
     ├── verify.ts / verification.ts  # Access verification policy + compatibility exports
     ├── request.ts / request-helpers.ts  # Compatibility APIs and config/debug adapters
     ├── core/streaming/        # Compatibility exports for inference SSE transformer
-    ├── thinking-recovery.ts / recovery.ts # Compatibility facades for recovery policy
     ├── quota.ts               # Antigravity quota refresh/probe adapter composition
     ├── fingerprint.ts / project.ts  # Device fingerprints + project-context composition
     ├── refresh-queue.ts          # Proactive refresh compatibility façade

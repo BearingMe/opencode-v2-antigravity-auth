@@ -965,6 +965,11 @@ maintained documentation with the completed architecture.
   transforms remain directly available from `modules/inference/`; request and
   streaming integration paths remain in place. Corrected the system-architecture
   and rule-index references that still described the old facade/kernel layout.
+- Removed the unused `src/plugin/recovery.ts`, `thinking-recovery.ts`, and
+  `recovery/` compatibility layer after confirming it had no internal or
+  package-entrypoint consumers. Session recovery remains owned by
+  `modules/session-recovery/` and composed by `adapters/opencode/`; corrected
+  current source and test inventories accordingly.
 
 **Acceptance criteria:**
 

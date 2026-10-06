@@ -55,9 +55,11 @@ No linter or formatter is configured; style is enforced by convention
   path is absent.
 - `plugin/*` + subdirs: 20+ colocated suites — model resolution, schema and
   cross-model sanitization, quota fallback (Antigravity-first), rotation and
-  hybrid selection, recovery and thinking-recovery, token, storage (v1–v4,
-  tombstones, replace semantics), cache, debug/logger, verification,
-  version, account-service presentation, account UI formatting.
+  hybrid selection, token, storage (v1–v4, tombstones, replace semantics),
+  cache, debug/logger, verification, version, account-service presentation,
+  account UI formatting.
+- `modules/session-recovery/` and `adapters/opencode/session-recovery.test.ts`:
+  in-request turn repair, session-error policy, and OpenCode session adaptation.
 - `app/execute-request.test.ts`: native-engine parity (routing, quota fallback, warmup
   URL, wait formatting, unified-refresh delegation).
 - `adapters/opencode/hooks/auto-update-checker`: config/JSONC/entry forms, prerelease skip,

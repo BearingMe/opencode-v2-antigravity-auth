@@ -81,7 +81,7 @@ Git hooks managed via Husky + lint-staged (pre-commit: eslint --fix + prettier) 
 - `camelCase` for functions, variables, parameters
 - `PascalCase` for types, interfaces, classes, enums
 - `UPPER_SNAKE_CASE` for constants
-- `kebab-case` for file names (e.g., `request-helpers.ts`, `thinking-recovery.ts`)
+- `kebab-case` for file names (e.g., `request-helpers.ts`, `account-pool.ts`)
 - Test files: `*.test.ts` colocated with source
 
 ### Types
@@ -165,7 +165,6 @@ src/
     ├── verify.ts / verification.ts  # Access verification + error helpers
     ├── request.ts / request-helpers.ts  # Transform core + schema/thinking utils
     ├── core/streaming/        # SSE transformer
-    ├── thinking-recovery.ts / recovery.ts # Compatibility recovery facades
     ├── quota.ts               # Antigravity per-model + grouped quota probing
     ├── fingerprint.ts / project.ts  # Device fingerprints + managed project context
     ├── refresh-queue.ts          # Proactive refresh queue composition
