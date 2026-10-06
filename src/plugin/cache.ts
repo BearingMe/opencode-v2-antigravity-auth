@@ -13,7 +13,7 @@ import {
   type SignatureCachePersistence,
 } from "../adapters/filesystem/signature-cache-store.js"
 import type { SignatureCache } from "./cache/signature-cache.js"
-import type { SignatureCacheConfig } from "./config"
+import type { SignatureCacheConfig } from "../adapters/opencode/config/index.js"
 
 configureSignatureTextHash(hashSignatureText)
 
@@ -106,4 +106,4 @@ export async function disposeDiskSignatureCache(): Promise<void> {
 
 export { cacheSignature, clearSignatureCache, getCachedSignature }
 export { SignatureCache, createSignatureCache } from "./cache/signature-cache.js"
-export type { SignatureCacheConfig } from "./config"
+export type { SignatureCacheConfig } from "../adapters/opencode/config/index.js"

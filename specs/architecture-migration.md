@@ -950,6 +950,16 @@ maintained documentation with the completed architecture.
   build, and account-store, account-admin, Antigravity request, and session-
   recovery package smokes. Oracle and review found no blocker. These synthetic
   checks do not satisfy the installed-host E2E gate.
+- Removed the three `src/plugin/config/` compatibility re-exports after moving
+  runtime and test consumers to `src/adapters/opencode/config/`. Updated the
+  maintained configuration references; the adapter remains the sole owner of
+  config loading, schema, and model registration.
+- Verification passed: full Vitest (75 files / 1,212 tests), native TUI (13 / 164),
+  typecheck, lint, boundary checks and fixtures, changed-file Prettier, clean
+  build, built Antigravity request and logging smokes, and schema generation.
+  Schema generation produced formatting-only differences, which were not
+  retained; no generated artifact is included. Oracle and review found no
+  blocker. The installed-host E2E remains unverified and mandatory.
 
 **Acceptance criteria:**
 

@@ -301,10 +301,10 @@ thinking_disabled_violation`; gated by `session_recovery` and deduplicates
   Authorization masking (12 k preview). `debug` controls file logging only;
   `debug_tui` independently controls the TUI panel
   (`OPENCODE_ANTIGRAVITY_DEBUG` vs `OPENCODE_ANTIGRAVITY_DEBUG_TUI`).
-- `config/`: Zod `AntigravityConfigSchema` + `DEFAULT_CONFIG`
-  (`config/schema.ts`), user-then-project load with signature_cache
-  deep-merge (`loader.ts`), `OPENCODE_MODEL_DEFINITIONS`
-  (`config/models.ts`), opencode.json injector (`updater.ts`).
+- `adapters/opencode/config/`: Zod `AntigravityConfigSchema` + `DEFAULT_CONFIG`
+  (`schema.ts`), user-then-project load with signature_cache deep-merge
+  (`loader.ts`), `OPENCODE_MODEL_DEFINITIONS` (`models.ts`), opencode.json
+  injector (`updater.ts`).
 - `modules/inference/signature-cache.ts` owns the 1 h in-memory cache, 100-entry
   per-scope cap, expiry-then-oldest-quarter eviction, and disk-port promotion.
   `modules/inference/signature-store.ts` owns the signed-thinking store;

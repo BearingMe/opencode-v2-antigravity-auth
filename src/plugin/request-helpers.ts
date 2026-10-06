@@ -1,6 +1,6 @@
 import { processImageData } from "./image-saver"
 import { createLogger } from "./logger"
-import { getKeepThinking } from "./config"
+import { getKeepThinking } from "../adapters/opencode/config/index.js"
 import {
   applyToolPairingFixes as applyInferenceToolPairingFixes,
   deepFilterThinkingBlocks as filterInferencePayload,

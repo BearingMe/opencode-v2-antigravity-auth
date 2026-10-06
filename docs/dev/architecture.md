@@ -92,7 +92,6 @@ src/
     ├── quota.ts               # Antigravity quota refresh/probe adapter composition
     ├── fingerprint.ts / project.ts  # Device fingerprints + project-context composition
     ├── refresh-queue.ts          # Proactive refresh compatibility façade
-    ├── config/                # Compatibility exports during migration
     ├── cache/ / stores/       # Compatibility facades for signature caches/stores
 └── debug.ts / logger.ts / logging-utils.ts / version.ts / errors.ts / types.ts
 ```

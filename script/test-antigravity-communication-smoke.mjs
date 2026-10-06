@@ -17,7 +17,7 @@ import { onboardManagedProject } from "../dist/src/plugin/project.js"
 import { refreshOAuthToken } from "../dist/src/adapters/antigravity/token-client.js"
 import { prepareAntigravityRequest } from "../dist/src/plugin/request.js"
 import { formatRefreshParts } from "../dist/src/plugin/auth.js"
-import { DEFAULT_CONFIG } from "../dist/src/plugin/config/schema.js"
+import { DEFAULT_CONFIG } from "../dist/src/adapters/opencode/config/schema.js"
 import { executeAntigravityRequest } from "../dist/src/app/composition.js"
 
 /** Exercises built Antigravity clients using synthetic OAuth data and mocked HTTP. */

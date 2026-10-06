@@ -1,7 +1,7 @@
 import { writeFileSync, mkdirSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { AntigravityConfigSchema } from "../src/plugin/config/schema.js"
+import { AntigravityConfigSchema } from "../src/adapters/opencode/config/schema.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const outputPath = join(__dirname, "../assets/antigravity.schema.json")

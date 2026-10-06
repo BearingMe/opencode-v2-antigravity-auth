@@ -41,13 +41,13 @@ Sources (precedence, lowest to highest): schema defaults, then user
 config directory when set), then project `.opencode/antigravity.json`
 (partial Zod, `signature_cache` deep-merged), then documented
 `OPENCODE_ANTIGRAVITY_*` environment overrides (invalid values warn and are
-ignored) — `plugin/config/loader.ts :: loadConfig`; runtime singleton
+ignored) — `adapters/opencode/config/loader.ts :: loadConfig`; runtime singleton
 `initRuntimeConfig / getKeepThinking`.
 A config file that fails validation is ignored as a whole: lower-precedence
 settings remain (an invalid project file does not reset valid user
 settings to defaults); environment overrides apply individually.
 
-Key knobs and defaults (`config/schema.ts :: DEFAULT_CONFIG`): `quiet_mode`,
+Key knobs and defaults (`adapters/opencode/config/schema.ts :: DEFAULT_CONFIG`): `quiet_mode`,
 `toast_scope root_only|all`, `debug/debug_tui/log_dir`, `keep_thinking`,
 `session_recovery/auto_resume/resume_text`, `signature_cache{enabled,
 memory/disk/write}`, empty-response retries, `tool_id_recovery`,

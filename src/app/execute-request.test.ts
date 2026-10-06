@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { AccountManager } from "../adapters/opencode/account-pool.ts"
 import { formatRefreshParts } from "../plugin/auth.ts"
-import { DEFAULT_CONFIG } from "../plugin/config/schema.ts"
+import { DEFAULT_CONFIG } from "../adapters/opencode/config/schema.ts"
 import { ANTIGRAVITY_ENDPOINT_FALLBACKS } from "../constants.ts"
 import { AntigravityTokenRefreshError } from "../plugin/token.ts"
 import type { PluginClient } from "../plugin/types.ts"

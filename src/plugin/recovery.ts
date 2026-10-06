@@ -8,7 +8,7 @@ import {
   isRecoverableSessionError,
   type RecoveryRequest,
 } from "../modules/session-recovery/index.js"
-import type { AntigravityConfig } from "./config"
+import type { AntigravityConfig } from "../adapters/opencode/config/index.js"
 import { logToast } from "./debug"
 import { createLogger } from "./logger"
 import type { PluginClient } from "./types"

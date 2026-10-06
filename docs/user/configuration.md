@@ -91,4 +91,4 @@ Antigravity across the account pool.
 
 The JSON schema (`assets/antigravity.schema.json`) is the authoritative
 reference for every key. When this guide and the schema disagree, the schema
-and `src/plugin/config/schema.ts` win.
+and `src/adapters/opencode/config/schema.ts` win.

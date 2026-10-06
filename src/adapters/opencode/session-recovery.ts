@@ -9,7 +9,7 @@ import { createSessionRecoveryPolicy } from "../../modules/session-recovery/inde
 import { fileRecoveryStorage } from "../filesystem/session-recovery-store.js"
 import { logToast } from "../../plugin/debug.js"
 import { createLogger } from "../../plugin/logger.js"
-import type { AntigravityConfig } from "../../plugin/config/index.js"
+import type { AntigravityConfig } from "./config/index.js"
 import type { PluginClient } from "../../plugin/types.js"
 
 /** Converts the V2 session-context message shape to recovery's small record. */

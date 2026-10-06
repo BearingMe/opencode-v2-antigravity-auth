@@ -7,7 +7,7 @@ import {
 } from "../modules/inference/index.js"
 import { buildFingerprintHeaders, getSessionFingerprint, type Fingerprint } from "./fingerprint"
 import { processImageData } from "./image-saver"
-import { getKeepThinking } from "./config"
+import { getKeepThinking } from "../adapters/opencode/config/index.js"
 import {
   DEBUG_MESSAGE_PREFIX,
   isDebugTuiEnabled,

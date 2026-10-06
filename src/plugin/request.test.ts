@@ -28,9 +28,9 @@ import {
   MIN_SIGNATURE_LENGTH,
 } from "../modules/inference/index.js"
 import { createStreamingTransformer, transformSseLine, transformStreamingPayload } from "./core/streaming"
-import { DEFAULT_CONFIG } from "./config"
+import { DEFAULT_CONFIG } from "../adapters/opencode/config/index.js"
 import { initializeDebug } from "./debug"
-import * as config from "./config"
+import * as config from "../adapters/opencode/config/index.js"
 import type { SignatureStore, ThoughtBuffer, StreamingCallbacks, StreamingOptions } from "./core/streaming/types"
 
 /**

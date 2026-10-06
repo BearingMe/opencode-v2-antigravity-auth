@@ -4,7 +4,7 @@ import { writeOpenCodeLog } from "../adapters/opencode/logging.js"
 import type { GitignoreUpdate } from "../adapters/filesystem/config-directory.js"
 import { formatBodyPreviewForLog, formatErrorForLog, truncateTextForLog } from "../platform/logging/format.js"
 import { deriveDebugPolicy } from "../platform/logging/policy.js"
-import type { AntigravityConfig } from "./config"
+import type { AntigravityConfig } from "../adapters/opencode/config/index.js"
 import { formatAccountContextLabel, formatAccountLabel } from "./logging-utils"
 
 const MAX_BODY_PREVIEW_CHARS = 12000
