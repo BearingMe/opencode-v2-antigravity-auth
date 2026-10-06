@@ -850,13 +850,33 @@ integration into `adapters/opencode/`.
   command-palette entry open the same account list; list navigation, search,
   scrolling, footer/status display, and dismissal work; login Add/reconnect,
   empty-state, repeated-login, and Google-integration isolation checks pass.
-  No failures were reported. Quota/action screens and several edge cases remain
-  unchecked.
+  No failures were reported. The user subsequently confirmed the disposable
+  account appears in the isolated profile's populated `/antigravity` list. The
+  user reports that Show quota displays cached data when there is
+  no connection and that manual refresh updates the quota quickly. Back-key
+  behavior in account list, account info, verification, and quota dialogs is
+  confirmed. Verify works for healthy accounts and accounts requiring external
+  verification. The user also confirmed Disable/Enable and Remove work, and that a
+  stale account target from another open screen produces an error. The account
+  list's Ctrl+T toggle remains untested because Orca reserves that shortcut;
+  equivalent Disable/Enable actions were tested through the account menu. The
+  user confirms the installed RPC `list` call returns the disposable account as
+  expected and both RPC `disable` and `enable` mutations succeed. RPC `select`
+  also succeeds and reports the account active at index 0. The user confirms
+  those RPC responses contain no token or raw credential data and that the
+  disposable account was removed during cleanup.
 - The user reports passing a normal Antigravity prompt, which is marked passed in
-  the deferred checklist. The supplied screenshot shows a tool call, an
-  interrupted turn, and a follow-up in the same session. The outgoing context
-  and call-result invariant were not captured, and the user has not recorded the
-  host process exit status; recovery and clean-shutdown checks remain open.
+  the deferred checklist. On 2026-10-06, the user repeated the isolated-host
+  cancellation/follow-up with the read-only observers loaded around Antigravity.
+  Both records used the same call ID and showed exactly one result before and
+  after the Antigravity hook (`canonicalCancellation: false`); therefore the
+  result was already present before the plugin hook, and the plugin did not add
+  one. The no-duplicate invariant is captured, but this did not exercise
+  plugin-generated recovery; do not claim that path passed without a naturally
+  dangling-call scenario. The screenshot confirms the follow-up continued. The
+  user subsequently reported standalone host exit status `0`. This verifies the
+  process exit for this run; the fresh-session/unload/profile-cleanup repeat
+  remains unchecked.
 - The earlier OpenCode 2.0.18 smoke also verified registration, SDK resolution,
   RPC, safe mutations, and the empty-account alert. Its earlier synthetic
   interrupted-call and routing probes remain diagnostic only, as detailed below.
@@ -870,10 +890,13 @@ integration into `adapters/opencode/`.
   endpoint without contacting Google. That synthetic session timed out after
   repeated requests and its smoke process exited nonzero; it is not the later
   user-reported successful manual prompt.
-- Step 13 remains blocked while the interrupted-call recovery and clean-shutdown
-  evidence, populated-account action/quota flow, and detailed installed RPC
-  mutation/credential-free checks remain unchecked. Do not begin Step 14 until
-  the remaining installed-host gate is complete. The repeatable checklist is in
+- Step 13 remains blocked while naturally dangling-call/plugin recovery and the
+  fresh-session/unload/profile-cleanup repeat remain unchecked. Disposable
+  account removal is complete. The populated account/quota flow and installed RPC
+  list/disable/enable/select plus credential-free response checks are now
+  verified. The standalone process exited `0` on the captured run. Do not begin
+  Step 14 until the remaining installed-host gate is complete. The repeatable
+  checklist is in
   [manual testing](../docs/dev/manual-testing.md#deferred-step-13-installed-host-e2e-gate).
 
 ## 14. Remove scaffolding and verify the final architecture
