@@ -850,12 +850,16 @@ integration into `adapters/opencode/`.
   command-palette entry open the same account list; list navigation, search,
   scrolling, footer/status display, and dismissal work; login Add/reconnect,
   empty-state, repeated-login, and Google-integration isolation checks pass.
-  No failures were reported. The quota/action screens, several edge cases, and
-  the deferred end-to-end routing/recovery gate remain unchecked.
+  No failures were reported. Quota/action screens and several edge cases remain
+  unchecked.
+- The user reports passing a normal Antigravity prompt, which is marked passed in
+  the deferred checklist. The supplied screenshot shows a tool call, an
+  interrupted turn, and a follow-up in the same session. The outgoing context
+  and call-result invariant were not captured, and the user has not recorded the
+  host process exit status; recovery and clean-shutdown checks remain open.
 - The earlier OpenCode 2.0.18 smoke also verified registration, SDK resolution,
-  RPC, safe mutations, and the empty-account alert. These checks do not establish
-  normal request completion or plugin recovery after a naturally interrupted
-  tool call.
+  RPC, safe mutations, and the empty-account alert. Its earlier synthetic
+  interrupted-call and routing probes remain diagnostic only, as detailed below.
 - A synthetic interrupted-call fixture confirmed that the built plugin's V2
   context hook inserts the canonical cancelled tool result into a localhost
   model request. The fixture used a temporary pre-hook to remove OpenCode's
@@ -863,13 +867,13 @@ integration into `adapters/opencode/`.
   adapter evidence, not a passing end-to-end recovery smoke.
 - A synthetic account and mocked fetch confirmed that the installed model route
   dispatched the expected project and prompt to Antigravity's native streaming
-  endpoint without contacting Google. The session timed out after repeated
-  requests and the smoke process exited nonzero; generation completion remains
-  unverified.
-- Oracle and independent review agree Step 13 remains blocked. Do not mark it
-  complete or begin Step 14 until an installed-host smoke exits successfully
-  and covers the outstanding dialog and normal recovery behavior. The repeatable
-  follow-up checklist is in
+  endpoint without contacting Google. That synthetic session timed out after
+  repeated requests and its smoke process exited nonzero; it is not the later
+  user-reported successful manual prompt.
+- Step 13 remains blocked while the interrupted-call recovery and clean-shutdown
+  evidence, populated-account action/quota flow, and detailed installed RPC
+  mutation/credential-free checks remain unchecked. Do not begin Step 14 until
+  the remaining installed-host gate is complete. The repeatable checklist is in
   [manual testing](../docs/dev/manual-testing.md#deferred-step-13-installed-host-e2e-gate).
 
 ## 14. Remove scaffolding and verify the final architecture

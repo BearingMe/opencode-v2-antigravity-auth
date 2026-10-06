@@ -147,7 +147,7 @@ revision, host logs, and final process exit status.
       account: list it, disable and re-enable it, select it, and verify the
       returned state. Confirm responses contain no credential material. Remove
       only the disposable account during cleanup.
-- [ ] Select an available Antigravity model and complete a normal prompt. Verify
+- [x] Select an available Antigravity model and complete a normal prompt. Verify
       the assistant response is persisted as complete, the session reaches its
       normal terminal state, and there are no retry/error loops. Registration or
       observing a native request URL alone is not a routing pass.
