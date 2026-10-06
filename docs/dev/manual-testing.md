@@ -162,6 +162,43 @@ revision, host logs, and final process exit status.
       plugin unloads cleanly, the host exits with status 0, and the isolated
       profile can be removed without touching normal OpenCode state.
 
+### Capture the interrupted-call context
+
+The optional read-only probes in `script/step-13-observer/` report tool-call IDs,
+matching result counts, and whether the canonical cancellation result is present.
+They do not log prompts or tool output and are not loaded automatically.
+
+1. From the project directory, get absolute paths for the probe plugin
+   directories:
+   ```powershell
+   $before = (Resolve-Path .\script\step-13-observer\before).Path.Replace('\', '/')
+   $after = (Resolve-Path .\script\step-13-observer\after).Path.Replace('\', '/')
+   $before
+   $after
+   ```
+   In the isolated test profile's `opencode.json` or `opencode.jsonc`, put those
+   two directory paths around the existing Antigravity plugin entry, in this
+   order: before probe, Antigravity, after probe. Keep the existing settings and
+   do not add the probes to your normal profile. Plugin paths are resolved
+   relative to the config file, so use the absolute paths printed above.
+2. In PowerShell, from the project directory and with the same isolated-profile
+   environment you used for the test, run `opencode --standalone`.
+3. Trigger a tool that takes long enough to still be running, press Esc before
+   its result appears, then send a follow-up in the same session.
+4. In another PowerShell window with the same isolated-profile environment, run:
+   ```powershell
+   $logPath = opencode debug paths log
+   Get-Content $logPath -Wait | Select-String "step13-recovery-probe"
+   ```
+5. Compare the `before` and `after` records for the interrupted call ID. A
+   missing result before the Antigravity hook and exactly one result afterward,
+   with `canonicalCancellation: true`, confirms the plugin inserted the
+   expected result. If the result was already present in the `before` record,
+   OpenCode supplied it; do not count that as plugin recovery.
+6. Exit the standalone host normally. In the first PowerShell window, run
+   `$LASTEXITCODE`; it must be `0`. `opencode service status` checks the shared
+   service, not this foreground process's exit status.
+
 The earlier recovery probe asserted that the plugin inserted the canonical
 result only after a temporary pre-hook removed OpenCode's result. The routing
 probe captured OAuth refresh and native Antigravity dispatch with a synthetic
