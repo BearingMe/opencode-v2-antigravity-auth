@@ -23,7 +23,13 @@ import type { PluginClient } from "./types.js"
 import { checkAccountsQuota } from "./quota.js"
 import { verifyAccountAccess } from "./verify.js"
 import { createLogger } from "./logger.js"
-import { fingerprintRefreshToken, loadAccounts, saveAccounts, saveAccountsReplace, updateAccounts } from "./storage.js"
+import {
+  fingerprintRefreshToken,
+  loadAccounts,
+  saveAccounts,
+  saveAccountsReplace,
+  updateAccounts,
+} from "../adapters/filesystem/account-store.js"
 
 const log = createLogger("account-service")
 
@@ -120,7 +126,7 @@ export type {
   AccountQuotaResult,
 } from "../modules/accounts/index.js"
 export type { AccountMetadataV3, AccountStorageV4 } from "../modules/accounts/index.js"
-export { fingerprintRefreshToken } from "./storage.js"
+export { fingerprintRefreshToken } from "../adapters/filesystem/account-store.js"
 
 /** Verification states presented in account summaries. */
 export type VerificationStatus = AccountSummary["verificationStatus"]

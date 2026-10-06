@@ -14,8 +14,8 @@ const { loadAccounts, updateAccounts, verifyAccountAccess, written, memory } = v
   memory: { store: null as unknown },
 }))
 
-vi.mock("../../plugin/storage.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../plugin/storage.js")>()
+vi.mock("../filesystem/account-store.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../filesystem/account-store.js")>()
   return { ...actual, loadAccounts, updateAccounts }
 })
 vi.mock("../../plugin/verify.js", () => ({

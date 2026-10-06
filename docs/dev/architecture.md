@@ -90,7 +90,6 @@ src/
     ├── core/streaming/        # Compatibility exports for inference SSE transformer
     ├── thinking-recovery.ts / recovery.ts # Compatibility facades for recovery policy
     ├── quota.ts               # Antigravity quota refresh/probe adapter composition
-    ├── storage.ts               # Compatibility facade for the v4 account store
     ├── fingerprint.ts / project.ts  # Device fingerprints + project-context composition
     ├── refresh-queue.ts          # Proactive refresh compatibility façade
     ├── config/                # Compatibility exports during migration
@@ -112,8 +111,9 @@ Antigravity trace context and compatibility-facing logger calls.
 
 Account persistence policy now lives in `modules/accounts/persistence/` and
 the locked filesystem implementation is in
-`adapters/filesystem/account-store.ts`. `plugin/storage.ts` remains a
-compatibility facade while existing callers migrate in later steps.
+`adapters/filesystem/account-store.ts`. Runtime callers use the owning module or
+filesystem adapter directly; the former `plugin/storage.ts` compatibility
+facade was removed in Step 14.
 
 Account membership and selection policy now live in
 `modules/accounts/account-pool.ts` and `modules/accounts/selection/`.

@@ -19,7 +19,7 @@ import { ensureProjectContext } from "./project"
 import { refreshAccessToken } from "./token"
 import { getModelFamily } from "../modules/inference/index.js"
 import type { PluginClient, OAuthAuthDetails } from "./types"
-import type { AccountMetadataV3, QuotaSummaryGroup } from "./storage"
+import type { AccountMetadataV3, QuotaSummaryGroup } from "../modules/accounts/index.js"
 
 /** Compatibility aliases retained for plugin consumers of the quota API. */
 export type QuotaGroup = AccountQuotaGroup

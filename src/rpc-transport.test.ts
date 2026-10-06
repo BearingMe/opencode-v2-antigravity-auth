@@ -8,7 +8,7 @@ const { loadAccounts, updateAccounts, verifyAccountAccess } = vi.hoisted(() => (
   verifyAccountAccess: vi.fn(async () => ({ status: "ok" as const, message: "verified" })),
 }))
 
-// Transactional storage mock mirroring src/plugin/storage.ts updateAccounts.
+// Transactional storage mock mirroring adapters/filesystem/account-store.ts updateAccounts.
 updateAccounts.mockImplementation(async (updater: (current: unknown) => { storage: unknown; result: unknown }) => {
   const current = (await loadAccounts()) ?? { version: 4, accounts: [], activeIndex: 0 }
   const input = structuredClone(current)
@@ -35,8 +35,8 @@ vi.mock("./antigravity/oauth.js", () => ({
   })),
 }))
 
-vi.mock("./plugin/storage.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./plugin/storage.js")>()
+vi.mock("./adapters/filesystem/account-store.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./adapters/filesystem/account-store.js")>()
   return { ...actual, loadAccounts, updateAccounts }
 })
 

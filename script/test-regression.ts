@@ -185,7 +185,7 @@ const HEAVY_TESTS: MultiTurnTest[] = [
       { prompt: "Read src/plugin/request.ts first 25 lines", model: GEMINI_FLASH },
       { prompt: "Use grep to find 'async' in src/plugin/request.ts", model: CLAUDE_SONNET },
       { prompt: "Run: echo 'checkpoint 2' && pwd", model: GEMINI_FLASH },
-      { prompt: "Read src/plugin/storage.ts first 20 lines", model: CLAUDE_SONNET },
+      { prompt: "Read src/adapters/filesystem/account-store.ts first 20 lines", model: CLAUDE_SONNET },
       { prompt: "Use lsp_diagnostics on src/plugin/token.ts", model: GEMINI_FLASH },
       { prompt: "Read vitest.config.ts completely", model: CLAUDE_SONNET },
       { prompt: "Run: git status --short | head -5", model: GEMINI_FLASH },

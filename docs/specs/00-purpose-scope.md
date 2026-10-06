@@ -53,7 +53,8 @@ In scope:
   (`src/modules/accounts/account-pool.ts`, `modules/accounts/selection/`,
   `modules/accounts/persistence/`), quota probing, fingerprints, project context
   (`src/plugin/quota.ts`, `fingerprint.ts`,
-  `project.ts`, `storage.ts`, `refresh-queue.ts`).
+  `project.ts`, `refresh-queue.ts`; persistence through
+  `src/adapters/filesystem/account-store.ts`).
 - Recovery (in-flight turn repair + session-error hook), debug file/TUI
   logging split (`debug` vs `debug_tui`), version pinning,
   auto-update checker, `antigravity_accounts` tool, `/antigravity` dialog

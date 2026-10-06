@@ -73,7 +73,7 @@ const {
   }
 })
 
-// Transactional storage mock mirroring src/plugin/storage.ts updateAccounts:
+// Transactional storage mock mirroring adapters/filesystem/account-store.ts updateAccounts:
 // the updater runs against a clone of the latest loadAccounts value and its
 // replacement store is recorded. Unchanged inputs record nothing.
 updateAccounts.mockImplementation(
@@ -98,8 +98,8 @@ vi.mock("../../plugin/version.js", () => ({
 }))
 
 vi.mock("../../antigravity/oauth.js", () => ({ authorizeAntigravity, exchangeAntigravity }))
-vi.mock("../../plugin/storage.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../plugin/storage.js")>()
+vi.mock("../filesystem/account-store.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../filesystem/account-store.js")>()
   return { ...actual, loadAccounts, updateAccounts }
 })
 vi.mock("../../app/composition.js", async (importOriginal) => ({

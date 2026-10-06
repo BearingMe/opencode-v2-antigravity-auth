@@ -16,8 +16,8 @@ const { loadAccounts, updateAccounts, checkAccountsQuota, verifyAccountAccess, q
   }),
 )
 
-vi.mock("../../plugin/storage.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../plugin/storage.js")>()
+vi.mock("../../adapters/filesystem/account-store.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../adapters/filesystem/account-store.js")>()
   // Tombstone helpers and the token fingerprint stay real: only the
   // file-backed load/update paths are faked.
   return { ...actual, loadAccounts, updateAccounts }
@@ -27,7 +27,7 @@ vi.mock("../../plugin/verify.js", () => ({ verifyAccountAccess }))
 
 import { manageAccounts } from "../../v2-plugin.js"
 import { createAccountAdmin, MAX_SAVED_ACCOUNTS, resolveAccountTarget } from "./index.js"
-import { fingerprintRefreshToken, saveAccounts, saveAccountsReplace } from "../../plugin/storage.js"
+import { fingerprintRefreshToken, saveAccounts, saveAccountsReplace } from "../../adapters/filesystem/account-store.js"
 import type { AccountStorageV4, AccountTarget, QuotaPresentationOptions } from "./index.js"
 
 let nextAccountId = 0
@@ -62,7 +62,7 @@ const persistRefreshRotation = (...args: Parameters<typeof accountAdmin.persistR
 // Transactional storage mock: runs the updater against a clone of the latest
 // loadAccounts value and records the replacement store. Updaters that return
 // their input unchanged signal "no change" and record nothing, mirroring
-// updateAccounts in src/plugin/storage.ts.
+// updateAccounts in adapters/filesystem/account-store.ts.
 updateAccounts.mockImplementation(
   async (updater: (current: AccountStorageV4) => Promise<{ storage: AccountStorageV4; result: unknown }>) => {
     const current = (await loadAccounts()) ?? { version: 4, accounts: [], activeIndex: 0 }

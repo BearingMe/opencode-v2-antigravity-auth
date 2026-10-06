@@ -168,7 +168,6 @@ src/
     ├── core/streaming/        # SSE transformer
     ├── thinking-recovery.ts / recovery.ts # Compatibility recovery facades
     ├── quota.ts               # Antigravity per-model + grouped quota probing
-    ├── storage.ts               # Compatibility facade for v4 persistent storage
     ├── fingerprint.ts / project.ts  # Device fingerprints + managed project context
     ├── refresh-queue.ts          # Proactive refresh queue composition
     ├── config/                # Temporary compatibility exports; removed in Step 14

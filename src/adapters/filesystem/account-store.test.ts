@@ -1,16 +1,14 @@
 import { promises as fs } from "node:fs"
 import { existsSync, readFileSync, writeFileSync, appendFileSync } from "node:fs"
 import { describe, expect, it, vi, beforeEach } from "vitest"
-import {
-  AccountStoreUnreadableError,
-  deduplicateAccountsByEmail,
-  migrateV2ToV3,
-  loadAccounts,
-  type AccountMetadata,
-  type AccountMetadataV3,
-  type AccountStorage,
-  type AccountStorageV4,
-} from "./storage"
+import { deduplicateAccountsByEmail, migrateV2ToV3 } from "../../modules/accounts/index.js"
+import type {
+  AccountMetadata,
+  AccountMetadataV3,
+  AccountStorage,
+  AccountStorageV4,
+} from "../../modules/accounts/index.js"
+import { AccountStoreUnreadableError, loadAccounts } from "./account-store.js"
 
 /**
  * Creates an AccountMetadata fixture for testing.
@@ -439,7 +437,7 @@ describe("Storage Migration", () => {
     it("creates .gitignore when file does not exist", async () => {
       vi.mocked(fs.readFile).mockRejectedValue({ code: "ENOENT" })
 
-      const { ensureGitignore } = await import("./storage")
+      const { ensureGitignore } = await import("./account-store.js")
       await ensureGitignore(configDir)
 
       expect(fs.writeFile).toHaveBeenCalled()
@@ -453,7 +451,7 @@ describe("Storage Migration", () => {
     it("appends missing entries to existing .gitignore", async () => {
       vi.mocked(fs.readFile).mockResolvedValue("existing-entry")
 
-      const { ensureGitignore } = await import("./storage")
+      const { ensureGitignore } = await import("./account-store.js")
       await ensureGitignore(configDir)
 
       expect(fs.appendFile).toHaveBeenCalled()
@@ -473,7 +471,7 @@ describe("Storage Migration", () => {
       ].join("\n")
       vi.mocked(fs.readFile).mockResolvedValue(existing)
 
-      const { ensureGitignore } = await import("./storage")
+      const { ensureGitignore } = await import("./account-store.js")
       await ensureGitignore(configDir)
 
       expect(fs.writeFile).not.toHaveBeenCalled()
@@ -483,7 +481,7 @@ describe("Storage Migration", () => {
     it("handles permission errors gracefully", async () => {
       vi.mocked(fs.readFile).mockRejectedValue({ code: "EACCES" })
 
-      const { ensureGitignore } = await import("./storage")
+      const { ensureGitignore } = await import("./account-store.js")
       await expect(ensureGitignore(configDir)).resolves.not.toThrow()
 
       expect(fs.writeFile).not.toHaveBeenCalled()
@@ -497,7 +495,7 @@ describe("Storage Migration", () => {
     it("creates .gitignore when file does not exist", async () => {
       vi.mocked(existsSync).mockReturnValue(false)
 
-      const { ensureGitignoreSync } = await import("./storage")
+      const { ensureGitignoreSync } = await import("./account-store.js")
       ensureGitignoreSync(configDir)
 
       expect(writeFileSync).toHaveBeenCalled()
@@ -512,7 +510,7 @@ describe("Storage Migration", () => {
       vi.mocked(existsSync).mockReturnValue(true)
       vi.mocked(readFileSync).mockReturnValue("existing-entry")
 
-      const { ensureGitignoreSync } = await import("./storage")
+      const { ensureGitignoreSync } = await import("./account-store.js")
       ensureGitignoreSync(configDir)
 
       expect(appendFileSync).toHaveBeenCalled()
@@ -533,7 +531,7 @@ describe("Storage Migration", () => {
       ].join("\n")
       vi.mocked(readFileSync).mockReturnValue(existing)
 
-      const { ensureGitignoreSync } = await import("./storage")
+      const { ensureGitignoreSync } = await import("./account-store.js")
       ensureGitignoreSync(configDir)
 
       expect(writeFileSync).not.toHaveBeenCalled()
@@ -560,7 +558,7 @@ describe("Storage Migration", () => {
     })
 
     it("reads once and writes the updater replacement atomically", async () => {
-      const { updateAccounts } = await import("./storage")
+      const { updateAccounts } = await import("./account-store.js")
 
       const result = await updateAccounts((current) => ({
         storage: { ...current, activeIndex: 0 },
@@ -575,7 +573,7 @@ describe("Storage Migration", () => {
     })
 
     it("skips the write when the updater returns its input unchanged", async () => {
-      const { updateAccounts } = await import("./storage")
+      const { updateAccounts } = await import("./account-store.js")
 
       const result = await updateAccounts((current) => ({ storage: current, result: "noop" }))
 
@@ -585,7 +583,7 @@ describe("Storage Migration", () => {
     })
 
     it("aborts without writing when the updater throws", async () => {
-      const { updateAccounts } = await import("./storage")
+      const { updateAccounts } = await import("./account-store.js")
 
       await expect(
         updateAccounts(() => {
@@ -597,7 +595,7 @@ describe("Storage Migration", () => {
     })
 
     it("fails closed without writing when the store is unreadable (EACCES)", async () => {
-      const { updateAccounts } = await import("./storage")
+      const { updateAccounts } = await import("./account-store.js")
       const denied = new Error("EACCES") as NodeJS.ErrnoException
       denied.code = "EACCES"
       vi.mocked(fs.readFile).mockImplementation((path) => {
@@ -616,7 +614,7 @@ describe("Storage Migration", () => {
     })
 
     it("fails closed without writing when the store read fails (EIO)", async () => {
-      const { saveAccountsReplace } = await import("./storage")
+      const { saveAccountsReplace } = await import("./account-store.js")
       const ioError = new Error("EIO") as NodeJS.ErrnoException
       ioError.code = "EIO"
       vi.mocked(fs.readFile).mockImplementation((path) => {

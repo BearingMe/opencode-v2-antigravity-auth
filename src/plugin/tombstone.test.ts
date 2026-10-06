@@ -4,19 +4,22 @@ import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { AccountManager } from "../adapters/opencode/account-pool.js"
 import { deleteAllAccounts, mutateAccount, persistOAuthAccount } from "./account-service.js"
+import { fingerprintRefreshToken } from "../adapters/filesystem/account-store.js"
+import {
+  tombstoneForAccount,
+  addTombstones,
+  MAX_TOMBSTONES,
+  type AccountMetadataV3,
+  type AccountStorageV4,
+} from "../modules/accounts/index.js"
 import {
   AccountStoreUnreadableError,
-  MAX_TOMBSTONES,
-  addTombstones,
   getStoragePath,
   loadAccounts,
   saveAccounts,
   saveAccountsReplace,
-  tombstoneForAccount,
   updateAccounts,
-  type AccountMetadataV3,
-  type AccountStorageV4,
-} from "./storage"
+} from "../adapters/filesystem/account-store.js"
 
 let configDir = ""
 
@@ -160,11 +163,11 @@ describe("account tombstones", () => {
   })
 
   it("duplicate tombstone refreshes removedAt to the latest deletion", async () => {
-    const first = tombstoneForAccount({ id: "acc-one", refreshToken: "token-one" }, 100)
+    const first = tombstoneForAccount({ id: "acc-one", refreshToken: "token-one" }, fingerprintRefreshToken, 100)
     const existing = addTombstones(undefined, [first])
     expect(existing?.[0]?.removedAt).toBe(100)
 
-    const second = tombstoneForAccount({ id: "acc-one", refreshToken: "token-one" }, 200)
+    const second = tombstoneForAccount({ id: "acc-one", refreshToken: "token-one" }, fingerprintRefreshToken, 200)
     const refreshed = addTombstones(existing, [second])
 
     expect(refreshed).toHaveLength(1)
@@ -173,7 +176,7 @@ describe("account tombstones", () => {
 
   it("caps tombstones at MAX_TOMBSTONES, pruning the oldest", async () => {
     const entries = Array.from({ length: MAX_TOMBSTONES + 5 }, (_, index) =>
-      tombstoneForAccount({ id: `acc-${index}`, refreshToken: `token-${index}` }, index),
+      tombstoneForAccount({ id: `acc-${index}`, refreshToken: `token-${index}` }, fingerprintRefreshToken, index),
     )
 
     const capped = addTombstones(undefined, entries)

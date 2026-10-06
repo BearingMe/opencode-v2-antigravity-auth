@@ -1,14 +1,14 @@
 /**
- * Storage and recovery tests for account persistence (loadAccounts / saveAccounts).
+ * Persistence tests for account-store reads and writes (loadAccounts / saveAccounts).
  *
  * Covers Issue #89 failure modes (missing files, malformed JSON, schema migrations,
- * and save error safety) against storage.ts.
+ * and save error safety against account-store.ts.
  */
 
 import { promises as fs } from "node:fs"
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
-import * as storageModule from "./storage"
-import type { AccountStorageV4, AccountMetadataV3 } from "./storage"
+import * as storageModule from "./account-store.js"
+import type { AccountStorageV4, AccountMetadataV3 } from "../../modules/accounts/index.js"
 
 vi.mock("proper-lockfile", () => ({
   default: {

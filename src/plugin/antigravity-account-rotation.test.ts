@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { AccountManager } from "../adapters/opencode/account-pool.js"
-import type { AccountStorageV4 } from "./storage"
+import type { AccountStorageV4 } from "../modules/accounts/index.js"
 
 /**
  * Creates a two-account AccountStorageV4 test fixture with optional overrides.

@@ -472,9 +472,10 @@ into `adapters/filesystem/debug-log.ts`, and host behavior into its adapter.
   a ported function.
 - `src/adapters/filesystem/account-store.ts` implements the account persistence
   port and owns config paths, Windows legacy-path migration, permissions,
-  locking, parsing/writes, and atomic replacement. The existing
-  `src/plugin/storage.ts` remains a compatibility facade for later migration
-  steps; account pool/selection and administration were not relocated.
+  locking, parsing/writes, and atomic replacement. At this checkpoint,
+  `src/plugin/storage.ts` remained a compatibility facade and account
+  pool/selection and administration were not relocated; Step 14 later removed
+  that facade after moving its callers to the owning module and adapter.
 - Preserved the explicit `clearTombstones` full-replacement path, including its
   intentional no-read behavior for corrupt stores. Ordinary merge, replace,
   and update transactions still fail closed on unreadable data. Regression
@@ -940,6 +941,15 @@ maintained documentation with the completed architecture.
   Prettier, and `git diff --check`. Clean-built account-store, account-admin,
   and Antigravity request smokes passed using synthetic data/credentials. Oracle
   and review found no blocker after the remaining boundary docs were corrected.
+- Removed `src/plugin/storage.ts` after moving persistence consumers to
+  `adapters/filesystem/account-store.ts` and tombstone-policy consumers to
+  `modules/accounts/`. Relocated storage-focused tests beside the filesystem
+  adapter and updated the built account-store smoke to target those owners.
+- Verification passed: full Vitest (75 files / 1,212 tests), native TUI (13 / 164),
+  typecheck, lint, boundary checks and fixtures, changed-file Prettier, clean
+  build, and account-store, account-admin, Antigravity request, and session-
+  recovery package smokes. Oracle and review found no blocker. These synthetic
+  checks do not satisfy the installed-host E2E gate.
 
 **Acceptance criteria:**
 

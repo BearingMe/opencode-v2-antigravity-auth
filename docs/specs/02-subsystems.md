@@ -179,8 +179,8 @@ replace policy, and tombstone matching live in
 owns `OPENCODE_CONFIG_DIR || ~/.config/opencode/antigravity-accounts.json`
 (win32 legacy `%APPDATA%` migration rename→copy; chmod 0600; gitignore
 entries), `proper-lockfile` (10 s stale, 5 retries), atomic tmp→rename, and
-secure file access. `src/plugin/storage.ts` remains a compatibility facade for
-callers awaiting later account migrations.
+secure file access. Runtime callers use this adapter directly for persistence;
+the former `src/plugin/storage.ts` compatibility facade was removed in Step 14.
 
 `loadAccounts` migrates+saves, validates refreshToken, dedupes by email (newest
 lastUsed/addedAt), and clamps `activeIndex`. Service writes MUST use the

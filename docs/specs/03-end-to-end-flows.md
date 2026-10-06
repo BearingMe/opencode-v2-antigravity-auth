@@ -5,7 +5,7 @@
 Trigger: `opencode auth login` (select Antigravity; one account per command,
 up to 10 saved accounts; rerun the command to add another).
 Participants: V2 `antigravity` / `antigravity-oauth` pre-authorization form → `antigravity/oauth.ts` →
-`storage.ts` (via `account-service.ts`) → `project.ts` → `quota.ts`.
+`adapters/filesystem/account-store.ts` (via `account-service.ts`) → `project.ts` → `quota.ts`.
 The method declares one required selection field (no Skip option).
 
 1. The form shows saved pool state (`N/10`, disabled markers) and the

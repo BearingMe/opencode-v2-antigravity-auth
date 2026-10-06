@@ -10,7 +10,8 @@ const previousConfigDir = process.env.OPENCODE_CONFIG_DIR
 /** Runs account persistence against a synthetic legacy and current store. */
 async function runAccountStoreSmoke() {
   process.env.OPENCODE_CONFIG_DIR = configDir
-  const storage = await import("../dist/src/plugin/storage.js")
+  const storage = await import("../dist/src/adapters/filesystem/account-store.js")
+  const { addTombstones, tombstoneForAccount } = await import("../dist/src/modules/accounts/index.js")
 
   assert.equal(await storage.loadAccounts(), null, "a missing account store should stay absent on load")
 
@@ -48,12 +49,12 @@ async function runAccountStoreSmoke() {
   const staleSnapshot = poolSaved
   const deleted = poolSaved?.accounts[0]
   assert.ok(deleted, "the synthetic account should be available for deletion")
-  const tombstone = storage.tombstoneForAccount(deleted, 100)
+  const tombstone = tombstoneForAccount(deleted, storage.fingerprintRefreshToken, 100)
   await storage.updateAccounts((current) => ({
     storage: {
       ...current,
       accounts: [],
-      removedAccounts: storage.addTombstones(current.removedAccounts, [tombstone]),
+      removedAccounts: addTombstones(current.removedAccounts, [tombstone]),
     },
     result: undefined,
   }))

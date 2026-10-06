@@ -10,7 +10,7 @@ import { createOpenCodeAccountAdministration } from "./account-administration.js
 import { ANTIGRAVITY_PROVIDER_ID } from "../../constants.js"
 import { AntigravityAccounts } from "./rpc.js"
 import { formatRefreshParts, isOAuthAuth, parseRefreshParts } from "../../plugin/auth.js"
-import { loadAccounts } from "../../plugin/storage.js"
+import { loadAccounts } from "../filesystem/account-store.js"
 import {
   MAX_SAVED_ACCOUNTS,
   checkQuota as checkAccountsQuota,
