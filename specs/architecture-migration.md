@@ -845,10 +845,17 @@ integration into `adapters/opencode/`.
   as did typecheck, lint, both boundary checks, changed-file Prettier,
   `git diff --check`, and the clean-build Antigravity package smoke. The default
   parallel run was load-sensitive; the complete single-worker run passed.
-- The earlier OpenCode 2.0.18 smoke verified registration, SDK resolution, RPC,
-  and safe mutations. The visible `/antigravity` empty-account alert opened and
-  Esc closed it; populated-account navigation and keymaps remain unverified in
-  the installed host.
+- The user has since marked the following installed-host checks as passed in
+  [manual testing](../docs/dev/manual-testing.md): `/antigravity` and the
+  command-palette entry open the same account list; list navigation, search,
+  scrolling, footer/status display, and dismissal work; login Add/reconnect,
+  empty-state, repeated-login, and Google-integration isolation checks pass.
+  No failures were reported. The quota/action screens, several edge cases, and
+  the deferred end-to-end routing/recovery gate remain unchecked.
+- The earlier OpenCode 2.0.18 smoke also verified registration, SDK resolution,
+  RPC, safe mutations, and the empty-account alert. These checks do not establish
+  normal request completion or plugin recovery after a naturally interrupted
+  tool call.
 - A synthetic interrupted-call fixture confirmed that the built plugin's V2
   context hook inserts the canonical cancelled tool result into a localhost
   model request. The fixture used a temporary pre-hook to remove OpenCode's

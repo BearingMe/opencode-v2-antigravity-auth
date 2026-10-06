@@ -7,34 +7,34 @@ checks — never your real multi-account store.
 
 ## Entry and navigation
 
-- [ ] `/antigravity` opens the account list dialog (`Antigravity accounts`
+- [x] `/antigravity` opens the account list dialog (`Antigravity accounts`
       with saved account emails).
-- [ ] `Antigravity accounts` in the command palette opens the same list
+- [x] `Antigravity accounts` in the command palette opens the same list
       (no duplicate command entries).
-- [ ] Arrows move, Enter confirms, Esc cancels at every dialog. Esc from the
+- [x] Arrows move, Enter confirms, Esc cancels at every dialog. Esc from the
       list closes it with no toast and no state change.
-- [ ] List footer shows `Add accounts: opencode auth login`.
-- [ ] A small `●` beside each email is green for enabled and red for disabled,
+- [x] List footer shows `Add accounts: opencode auth login`.
+- [x] A small `●` beside each email is green for enabled and red for disabled,
       including the selected row. Disabled accounts also show `[disabled]`.
       The shared footer contains the colored enabled/disabled legend and one login
       hint; the login hint is not repeated beside account emails.
-- [ ] Search filters accounts; arrows/Enter work with filtered results. No-match
+- [x] Search filters accounts; arrows/Enter work with filtered results. No-match
       results cannot select an account. Long lists scroll while retaining the footer.
 
 ## Add separation (login adds, `/antigravity` manages)
 
-- [ ] Login shows the required Add/reconnect selection and saved-account
+- [x] Login shows the required Add/reconnect selection and saved-account
       summary before opening the browser. Ctrl+C opens no browser and writes
       nothing. No Exit option or custom host build is required.
-- [ ] Stock host: select Antigravity, then Add opens consent once. After
+- [x] Stock host: select Antigravity, then Add opens consent once. After
       completion the host exits; another login shows the updated count. There
       is no repeated-add loop.
 
-- [ ] Empty state with no saved accounts: alert pointing to
+- [x] Empty state with no saved accounts: alert pointing to
       `opencode auth login` (no crash, no empty select).
-- [ ] Repeated login with the same Google account reconnects: still one
+- [x] Repeated login with the same Google account reconnects: still one
       entry, quota works, durable id preserved.
-- [ ] Antigravity login registers under its own integration; Google provider,
+- [x] Antigravity login registers under its own integration; Google provider,
       Google sign-in methods, and active Google connections remain unchanged.
 - [ ] Existing `google/<model>` selections for Antigravity models are migrated
       to `antigravity/<model>`; ordinary Google API-key models retain their route.
