@@ -3,7 +3,13 @@ import type {
   RecoveryConversationMessage,
   RecoverySessionPort,
   RecoveryToolResultBatch,
+  SessionRecoveryApi,
 } from "../../modules/session-recovery/index.js"
+import { createSessionRecoveryPolicy } from "../../modules/session-recovery/index.js"
+import { fileRecoveryStorage } from "../filesystem/session-recovery-store.js"
+import { logToast } from "../../plugin/debug.js"
+import { createLogger } from "../../plugin/logger.js"
+import type { AntigravityConfig } from "../../plugin/config/index.js"
 import type { PluginClient } from "../../plugin/types.js"
 
 /** Converts the V2 session-context message shape to recovery's small record. */
@@ -66,6 +72,31 @@ export function createOpenCodeRecoverySessionPort(client: PluginClient, director
       await client.tui.showToast({ body: { title, message, variant } })
     },
   }
+}
+
+/** Composes session-recovery policy with OpenCode and filesystem adapters. */
+export function createOpenCodeSessionRecovery(
+  client: PluginClient,
+  directory: string,
+  config: AntigravityConfig,
+): SessionRecoveryApi | null {
+  const logger = createLogger("session-recovery")
+  return createSessionRecoveryPolicy(
+    {
+      storage: fileRecoveryStorage,
+      session: createOpenCodeRecoverySessionPort(client, directory),
+      logger: {
+        debug: (message, context) => logger.debug(message, context),
+        error: (message, context) => logger.error(message, context),
+        toast: logToast,
+      },
+    },
+    {
+      enabled: config.session_recovery,
+      autoResume: config.auto_resume,
+      resumeText: config.resume_text,
+    },
+  )
 }
 
 /** Inserts planned cancelled results into OpenCode's mutable model history. */

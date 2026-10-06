@@ -1,4 +1,11 @@
-import type { AccountSelectionStrategy, CooldownReason, ModelFamily, QuotaGroup } from "./index.js"
+import type {
+  AccountPool,
+  AccountSelectionInput,
+  AccountSelectionStrategy,
+  CooldownReason,
+  ModelFamily,
+  QuotaGroup,
+} from "./index.js"
 import type { AccountClockPort } from "./ports.js"
 import {
   addTombstones,
@@ -278,7 +285,7 @@ export function computeSoftQuotaCacheTtlMs(ttlConfig: "auto" | number, refreshIn
  *
  * Source of truth for the pool is `antigravity-accounts.json`.
  */
-export class AccountPoolManager {
+export class AccountPoolManager implements AccountPool<ManagedAccount> {
   private readonly dependencies: AccountPoolDependencies
   private accounts: ManagedAccount[] = []
   private cursor = 0
@@ -689,6 +696,20 @@ export class AccountPoolManager {
     this.cursor++
     // Note: lastUsed is now updated after successful request via markAccountUsed()
     return account
+  }
+
+  /** Selects a pool member using inference's explicit family and quota classification. */
+  selectForRequest(input: AccountSelectionInput): ManagedAccount | null {
+    const { family, model, quotaGroup } = input.classification
+    return this.getCurrentOrNextForFamily(
+      family,
+      model,
+      input.strategy,
+      input.pidOffsetEnabled,
+      input.softQuotaThresholdPercent,
+      input.softQuotaCacheTtlMs,
+      quotaGroup,
+    )
   }
 
   /** Sets an explicit retry deadline for an account's family/model quota. */

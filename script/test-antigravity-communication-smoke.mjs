@@ -160,7 +160,7 @@ async function main() {
     const requestAccount = { index: 0, consecutiveFailures: 0 }
     const accountManager = {
       getAccountCount: () => 1,
-      getCurrentOrNextForFamily: () => requestAccount,
+      selectForRequest: () => requestAccount,
       requestSaveToDisk: () => undefined,
       toAuthDetails: () => ({
         type: "oauth",

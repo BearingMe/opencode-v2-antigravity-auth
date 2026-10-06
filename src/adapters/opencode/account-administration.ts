@@ -1,11 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { ANTIGRAVITY_PROVIDER_ID } from "../../constants.js"
-import {
-  createAccountAdmin,
-  type AccountAdminService,
-  type AccountPool,
-  type AccountSelectionInput,
-} from "../../modules/accounts/index.js"
+import { createAccountAdmin, type AccountAdminService } from "../../modules/accounts/index.js"
 import {
   fingerprintRefreshToken,
   loadAccounts,
@@ -17,14 +12,9 @@ import type { PluginClient } from "../../plugin/types.js"
 import { checkAccountsQuota } from "../../plugin/quota.js"
 import { verifyAccountAccess } from "../../plugin/verify.js"
 import { createLogger } from "../../plugin/logger.js"
-import type { AccountManager, ManagedAccount } from "../../plugin/accounts.js"
 
-/**
- * Exposes the existing account service through the new application contract.
- *
- * @example `createLegacyAccountAdministration(client, "antigravity")`
- */
-export function createLegacyAccountAdministration(
+/** Composes account policy with persistence, quota, and verification adapters. */
+export function createOpenCodeAccountAdministration(
   client?: PluginClient,
   providerId = ANTIGRAVITY_PROVIDER_ID,
 ): AccountAdminService {
@@ -49,27 +39,4 @@ export function createLegacyAccountAdministration(
     },
     warn: (message) => log.warn(message),
   })
-}
-
-/**
- * Adapts the old pool selector to the explicit request-classification contract.
- *
- * @example `createLegacyAccountPool(manager).selectForRequest(input)`
- */
-export function createLegacyAccountPool(manager: AccountManager): AccountPool<ManagedAccount> {
-  return {
-    /** Delegates selection while preserving inference's quota classification. */
-    selectForRequest(input: AccountSelectionInput) {
-      const { family, model, quotaGroup } = input.classification
-      return manager.getCurrentOrNextForFamily(
-        family,
-        model,
-        input.strategy,
-        input.pidOffsetEnabled,
-        input.softQuotaThresholdPercent,
-        input.softQuotaCacheTtlMs,
-        quotaGroup,
-      )
-    },
-  }
 }

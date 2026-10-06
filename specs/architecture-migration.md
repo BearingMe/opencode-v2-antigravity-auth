@@ -334,15 +334,16 @@ Legacy implementation may initially satisfy these contracts.
 - Public account, inference, and session-recovery contracts are under
   `src/modules/{accounts,inference,session-recovery}/`; their port types omit
   OpenCode client and filesystem implementation types.
-- Current behavior is reached through temporary adapters in
-  `src/app/legacy-bridges/`. The account selection bridge passes inference's
-  family/model/quota-group result as data; legacy direct account callers retain
-  a compatibility fallback until their later migration.
+- During the early migration, module behavior was reached through temporary
+  adapters in `src/app/legacy-bridges/`. Step 14 removed those adapters: the
+  account pool now implements the request-selection contract directly, while
+  OpenCode-owned account, inference, and recovery composition lives under
+  `src/adapters/opencode/`.
 - Recovery ports include the storage reads/repairs and the semantic operation
   for injecting synthetic tool results. The current filesystem and host-backed
   recovery code remains the implementation for now.
-- Remove each legacy bridge when its destination module and host adapter own the
-  corresponding behavior; Step 14 must leave no `legacy-bridges/` facade.
+- Each bridge was removed after its destination module and host adapter owned
+  the corresponding behavior; no `legacy-bridges/` facade remains.
 - Validation: `bun run test` passed (49 files / 1,147 tests);
   `bun run test:tui` passed after a clean build (13 tests); typecheck, lint,
   changed-file Prettier, and `git diff --check` passed. Focused smoke passed
@@ -803,8 +804,9 @@ modules in `execute-request.ts` and wire adapters in `composition.ts`.
 - Reconciled the normative routing/ownership references and corrected capacity
   retry documentation to match the implementation: exponential 1/2/4/8-second
   delays capped at 8 seconds with ±10% jitter, three in-place retries per
-  endpoint, then one fingerprint refresh before fallback. The existing temporary
-  bridge exceptions now point at composition and remain tracked for Step 14.
+  endpoint, then one fingerprint refresh before fallback. The Step 14 bridge
+  cleanup moved account/recovery adapter composition to the OpenCode adapter and
+  made the account pool implement its selection contract directly.
 - Validation passed: `bun run test` (76 files / 1,212 tests),
   `bun run test:tui` (clean package build / 13 tests / 164 expectations),
   `bun run typecheck`, `bun run lint`, `bun run check:boundaries`,
@@ -893,6 +895,25 @@ mandatory final acceptance gate so it runs against the completed architecture.
 
 **Description:** Remove superseded implementations/facades and reconcile
 maintained documentation with the completed architecture.
+
+### Step 14 progress
+
+- Removed `src/app/legacy-bridges/` and its active boundary-exception manifest.
+  `AccountPoolManager` now implements `AccountPool.selectForRequest`, including
+  the request's explicit quota classification. OpenCode account administration,
+  inference composition, and session-recovery composition now live under
+  `src/adapters/opencode/`; the account-admin built-package smoke targets that
+  adapter and isolated filesystem storage.
+- The Step 14 acceptance criteria remain open. Compatibility facades elsewhere
+  in `src/plugin/`, complete runtime JSDoc audit, consolidated validation, and
+  the mandatory isolated-profile installed-host E2E still need completion.
+- Scoped-task verification passed: Vitest (75 files / 1,212 tests) with one
+  worker, native TUI (13 tests / 164 expectations), typecheck, lint, both
+  boundary checks (7 fixture tests / 22 expectations), changed-file Prettier,
+  and `git diff --check`. Clean-built account-administration, Antigravity
+  request, and session-recovery smokes passed using synthetic data. Oracle and
+  review found no remaining blocker after the stale modules README reference was
+  corrected. These checks do not establish the installed-host E2E gate.
 
 **Acceptance criteria:**
 

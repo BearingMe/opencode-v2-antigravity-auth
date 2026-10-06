@@ -5,7 +5,8 @@ import { ID as ModelID, Info as ModelInfo, VariantID as ModelVariantID } from "@
 import { ID as ProviderID, Info as ProviderInfo } from "@opencode/schema/provider"
 import { IntegrationMethodID } from "@opencode/schema/integration-id"
 import { authorizeAntigravity, exchangeAntigravity } from "../../antigravity/oauth.js"
-import { applyOpenCodeToolResultBatches } from "./session-recovery.js"
+import { applyOpenCodeToolResultBatches, createOpenCodeSessionRecovery } from "./session-recovery.js"
+import { createOpenCodeAccountAdministration } from "./account-administration.js"
 import { ANTIGRAVITY_PROVIDER_ID } from "../../constants.js"
 import { AntigravityAccounts } from "./rpc.js"
 import { formatRefreshParts, isOAuthAuth, parseRefreshParts } from "../../plugin/auth.js"
@@ -22,8 +23,6 @@ import { createLogger, initLogger } from "../../plugin/logger.js"
 import { initRuntimeConfig, loadConfig } from "./config/index.js"
 import { AccountManager } from "../../plugin/accounts.js"
 import {
-  createAccountAdministration,
-  createSessionRecovery,
   disposeAntigravityRuntimeResources,
   executeAntigravityRequest,
   refreshOAuthCredentialUnified,
@@ -123,7 +122,7 @@ export const opencodePlugin = Plugin.define({
     initRuntimeConfig(nativeConfig)
     initLogger(bridgeClient)
     await initAntigravityVersion()
-    const accountAdministration = createAccountAdministration(bridgeClient, ANTIGRAVITY_PROVIDER_ID)
+    const accountAdministration = createOpenCodeAccountAdministration(bridgeClient, ANTIGRAVITY_PROVIDER_ID)
 
     // Accounts RPC lives on the production server plugin: a separate entry has
     // no host auto-load contract (only "." and "./tui" load automatically),
@@ -228,7 +227,7 @@ export const opencodePlugin = Plugin.define({
       initDiskSignatureCache(nativeConfig.signature_cache)
     }
 
-    const sessionRecovery = createSessionRecovery(bridgeClient, ctx.location.directory, nativeConfig)
+    const sessionRecovery = createOpenCodeSessionRecovery(bridgeClient, ctx.location.directory, nativeConfig)
 
     const updateChecker = createAutoUpdateCheckerHook(bridgeClient, ctx.location.directory, {
       showStartupToast: true,
@@ -833,7 +832,7 @@ export async function manageAccounts(
   invalidateFetch: () => void,
   setAuth: (auth: OAuthAuthDetails) => void,
 ): Promise<{ content: string }> {
-  const accountAdministration = createAccountAdministration(client, ANTIGRAVITY_PROVIDER_ID)
+  const accountAdministration = createOpenCodeAccountAdministration(client, ANTIGRAVITY_PROVIDER_ID)
 
   // Legacy tool adapter: input/output contract is unchanged. All storage
   // reads/writes live in the account service; this wrapper only

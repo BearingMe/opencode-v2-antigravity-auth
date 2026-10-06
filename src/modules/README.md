@@ -24,13 +24,15 @@
 Run `bun run check:boundaries` before changing imports across these boundaries.
 It resolves TypeScript imports (including `.js` specifiers that map to `.ts`)
 and checks public module entrypoints, dependency direction, host/filesystem
-imports, scoped legacy exceptions, and runtime import cycles. Type-only imports
-still obey boundary rules but do not create runtime-cycle edges.
+imports, exact legacy exceptions when a manifest is present, and runtime import
+cycles. Type-only imports still obey boundary rules but do not create
+runtime-cycle edges.
 
 Modules and platform code may use the approved pure `zod` package; other
 external package imports need an explicit adapter/port or a reviewed checker
 allowance.
 
-Exact legacy bridge allowances, with their removal steps, live in
-`script/boundary-exceptions.json`. Do not broaden an allowance to a directory or
-reuse it from another source file. Runtime cycles have no current allowances.
+The repository currently has no legacy boundary exceptions. If a later migration
+requires one, keep it exact to its source/target pair and record its removal
+checkpoint in `script/boundary-exceptions.json`. Runtime cycles have no current
+allowances.

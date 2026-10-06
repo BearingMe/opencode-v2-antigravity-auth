@@ -98,4 +98,22 @@ describe("accounts module pool selection", () => {
 
     expect(manager.getCurrentOrNextForFamily("claude", undefined, "hybrid")?.index).toBe(1)
   })
+
+  it("uses the request's explicit quota group for cached quota eligibility", () => {
+    const { manager } = createPoolFixture(poolStorage(1))
+    manager.updateQuotaCache(0, {
+      "gemini-pro": { remainingFraction: 0.01, modelCount: 1 },
+      "gemini-flash": { remainingFraction: 0.8, modelCount: 1 },
+    })
+
+    const selected = manager.selectForRequest({
+      classification: { family: "gemini", model: "gemini-1.5-flash", quotaGroup: "gemini-pro" },
+      strategy: "sticky",
+      pidOffsetEnabled: false,
+      softQuotaThresholdPercent: 90,
+      softQuotaCacheTtlMs: 10 * 60 * 1000,
+    })
+
+    expect(selected).toBeNull()
+  })
 })

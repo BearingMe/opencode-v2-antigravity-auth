@@ -9,9 +9,10 @@ const previousConfigDir = process.env.OPENCODE_CONFIG_DIR
 /** Exercises account administration against isolated storage and synthetic credentials. */
 async function runAccountAdminSmoke() {
   process.env.OPENCODE_CONFIG_DIR = configDir
-  const { createLegacyAccountAdministration } = await import("../dist/src/app/legacy-bridges/accounts.js")
-  const { loadAccounts } = await import("../dist/src/plugin/storage.js")
-  const administration = createLegacyAccountAdministration()
+  const { createOpenCodeAccountAdministration } =
+    await import("../dist/src/adapters/opencode/account-administration.js")
+  const { loadAccounts } = await import("../dist/src/adapters/filesystem/account-store.js")
+  const administration = createOpenCodeAccountAdministration()
 
   await administration.persistOAuth(
     { refresh: "synthetic-refresh-0", email: "smoke-0@example.invalid", projectId: "synthetic-project" },

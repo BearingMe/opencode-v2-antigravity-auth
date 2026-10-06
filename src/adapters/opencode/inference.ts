@@ -9,12 +9,8 @@ import {
 } from "../../plugin/request.js"
 import type { AntigravityDebugContext } from "../../plugin/debug.js"
 
-/**
- * Implements the inference contract using the still-location-bound pipeline.
- *
- * @example `legacyInference.prepareRequest(request)`
- */
-export const legacyInference: InferenceApi<Fingerprint, AntigravityDebugContext> = {
+/** Inference operations composed with the OpenCode plugin's runtime adapters. */
+export const openCodeInference: InferenceApi<Fingerprint, AntigravityDebugContext> = {
   /** Classifies the model once for downstream account policy. */
   classifyModel(model) {
     const quotaGroup = getModelFamily(model)
