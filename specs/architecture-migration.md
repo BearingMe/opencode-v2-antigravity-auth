@@ -127,22 +127,22 @@ concise: commands/results, Oracle and review outcomes, smoke scenario/results,
 documentation audit, and any blockers. Update evidence in the same scoped commit;
 the tracker may identify that commit by subject to avoid self-referential hashes.
 
-| Step | Title                                 | Status  | Evidence / commit                                                                            |
-| ---- | ------------------------------------- | ------- | -------------------------------------------------------------------------------------------- |
-| 1    | Baseline and ownership map            | done    | `test: isolate suite state and map architecture baseline`                                    |
-| 2    | Public APIs and ports                 | done    | `refactor: define module contracts and legacy bridges`                                       |
-| 3    | Mechanical boundary checks            | done    | `build: enforce architecture boundaries and required test suites`                            |
-| 4    | Logging separation                    | done    | `refactor: separate logging facilities from destinations`                                    |
-| 5    | Account persistence                   | done    | `refactor: separate account persistence policy from filesystem storage`                      |
-| 6    | Account pool and selection            | done    | `refactor: migrate account pool and selection policies`                                      |
-| 7    | Antigravity account communication     | done    | `2cd7ef3`                                                                                    |
-| 8    | Account administration and lifecycle  | done    | `98da1fb`, `8c70e45`                                                                         |
-| 9    | Session recovery                      | done    | `refactor: migrate session recovery policies`                                                |
-| 10   | Inference transforms and signatures   | done    | `8e77da0`                                                                                    |
-| 11   | Inference pipelines and client        | done    | `refactor: migrate inference request and response pipelines`                                 |
-| 12   | Application execution and composition | done    | `refactor: extract application request execution and composition`                            |
-| 13   | OpenCode integration and packaging    | pending | Partial snapshot: `refactor: consolidate OpenCode integration under adapter`; blockers below |
-| 14   | Final architecture verification       | pending | —                                                                                            |
+| Step | Title                                 | Status  | Evidence / commit                                                       |
+| ---- | ------------------------------------- | ------- | ----------------------------------------------------------------------- |
+| 1    | Baseline and ownership map            | done    | `test: isolate suite state and map architecture baseline`               |
+| 2    | Public APIs and ports                 | done    | `refactor: define module contracts and legacy bridges`                  |
+| 3    | Mechanical boundary checks            | done    | `build: enforce architecture boundaries and required test suites`       |
+| 4    | Logging separation                    | done    | `refactor: separate logging facilities from destinations`               |
+| 5    | Account persistence                   | done    | `refactor: separate account persistence policy from filesystem storage` |
+| 6    | Account pool and selection            | done    | `refactor: migrate account pool and selection policies`                 |
+| 7    | Antigravity account communication     | done    | `2cd7ef3`                                                               |
+| 8    | Account administration and lifecycle  | done    | `98da1fb`, `8c70e45`                                                    |
+| 9    | Session recovery                      | done    | `refactor: migrate session recovery policies`                           |
+| 10   | Inference transforms and signatures   | done    | `8e77da0`                                                               |
+| 11   | Inference pipelines and client        | done    | `refactor: migrate inference request and response pipelines`            |
+| 12   | Application execution and composition | done    | `refactor: extract application request execution and composition`       |
+| 13   | OpenCode integration and packaging    | done    | `docs: close Step 13 and defer final E2E`                               |
+| 14   | Final architecture verification       | pending | —                                                                       |
 
 ## 1. Establish the migration baseline and ownership map
 
@@ -829,15 +829,17 @@ integration into `adapters/opencode/`.
 
 **Acceptance criteria:**
 
-- [ ] `plugin.ts` delegates composition/execution rather than implementing them.
-- [ ] RPC omits absent optionals, uses durable ids, and is credential-free.
-- [ ] TUI rendering, keymaps, controllers, and cleanup retain behavior.
-- [ ] Existing config/settings remain compatible.
-- [ ] Root, `./tui`, `./rpc`, and public OAuth exports remain usable.
-- [ ] SDK URL and Solid/OpenTUI compilation resolve from the built package.
-- [ ] Installed-host smoke covers routing, dialogs, mutations, and recovery.
+- [x] `plugin.ts` delegates composition/execution rather than implementing them.
+- [x] RPC omits absent optionals, uses durable ids, and is credential-free.
+- [x] TUI rendering, keymaps, controllers, and cleanup retain behavior.
+- [x] Existing config/settings remain compatible.
+- [x] Root, `./tui`, `./rpc`, and public OAuth exports remain usable.
+- [x] SDK URL and Solid/OpenTUI compilation resolve from the built package.
 
-### Step 13 partial verification and blockers
+Installed-host E2E is not waived; by user approval, it is moved to Step 14's
+mandatory final acceptance gate so it runs against the completed architecture.
+
+### Step 13 implementation verification
 
 - Full suite passed (76 files / 1,212 tests) with:
   `bun run test -- --maxWorkers=1 --minWorkers=1 --testTimeout=15000`.
@@ -874,13 +876,18 @@ integration into `adapters/opencode/`.
   endpoint without contacting Google. That synthetic session timed out after
   repeated requests and its smoke process exited nonzero; it is not the later
   user-reported successful manual prompt.
-- Step 13 remains blocked: recent UI, RPC, prompt, and exit-status checks used
-  default paths and are not isolated-host evidence. Naturally dangling-call/plugin
-  recovery and the fresh-session/unload/profile-cleanup repeat also remain
-  unchecked. Repeat the full gate only after `opencode debug paths` confirms
-  disposable config, data, and state paths. Do not begin Step 14 until the
-  installed-host gate is complete. The repeatable checklist is in
-  [manual testing](../docs/dev/manual-testing.md#deferred-step-13-installed-host-e2e-gate).
+- Per user approval, the installed-host E2E is deferred—not waived—and remains a
+  mandatory Step 14 final acceptance gate. The earlier default-path runs are
+  functional observations only. The isolated-profile routing, dialogs, account
+  mutations, naturally dangling-call recovery, fresh-session, unload, and
+  profile-cleanup checks are not yet verified; run the repeatable checklist in
+  [manual testing](../docs/dev/manual-testing.md#deferred-final-migration-acceptance-installed-host-e2e)
+  after Step 14 implementation.
+- The changed TUI exports, named local helpers, and RPC test helpers were
+  JSDoc-audited; no runtime behavior changed in this closure task.
+- Step 13's full implementation verification is recorded above. Oracle and
+  review found no remaining implementation blockers after the JSDoc audit; the
+  deferred live-host E2E is tracked solely under Step 14.
 
 ## 14. Remove scaffolding and verify the final architecture
 
@@ -895,7 +902,11 @@ maintained documentation with the completed architecture.
 - [ ] Every runtime function/method has appropriate JSDoc.
 - [ ] Full suites, typecheck, clean build, lint, and entrypoint checks pass.
 - [ ] Required behavioral suites gate normal CI.
-- [ ] Final installed-host and live request smoke pass.
+- [ ] Final installed-host and live request smoke pass against a verified
+      disposable config, data, and state profile. Cover account UI/RPC
+      mutations, successful model routing, naturally dangling-call recovery,
+      fresh-session behavior, clean plugin unload, and profile cleanup without
+      touching the normal account store.
 - [ ] Oracle/review confirm dependency graph and behavior-preservation evidence.
 
 ## Execution rules

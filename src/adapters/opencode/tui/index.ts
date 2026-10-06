@@ -58,6 +58,7 @@ export function isInvalidRpcResponse(error: unknown): boolean {
   return false
 }
 
+/** The result returned by an account mutation RPC. */
 export type MutateOutcome = { op: string; remaining: number } | { ok: false; kind: string; accountCount: number }
 
 /** Identifies mutations rejected because their durable target is stale. */
@@ -75,13 +76,16 @@ type QuotaFetch =
   | { ok: false; reason: "missing" }
   | { ok: false; reason: "failed"; invalidResponse: boolean }
 
+/** Registers account-management commands and disposes their dialogs on unload. */
 export const opencodeTuiPlugin = Plugin.define({
   id: "antigravity-accounts-tui",
+  /** Registers UI commands and owns their dialog lifecycle. */
   setup(context) {
     let disposed = false
     let closeQuota: (() => void) | undefined
     let closeAccountList: (() => void) | undefined
     let closeMissingAccount: (() => void) | undefined
+    /** Shows a generic toast while keeping RPC diagnostics in the host log. */
     const toastFailure = (invalidResponse: boolean) => {
       // Keep the user-visible toast generic: server-side diagnostics
       // (schema rejections) already land in the host log.
@@ -91,9 +95,11 @@ export const opencodeTuiPlugin = Plugin.define({
         variant: "error",
       })
     }
+    /** Maps a caught RPC failure to the appropriate user-facing toast. */
     const toastRpcFailure = (detail: unknown) => {
       toastFailure(isInvalidRpcResponse(detail))
     }
+    /** Warns that a durable account id became stale and the list will refresh. */
     const toastStaleAccount = async () => {
       context.ui.toast.show({
         title: "Antigravity accounts",
@@ -102,6 +108,7 @@ export const opencodeTuiPlugin = Plugin.define({
       })
     }
 
+    /** Loads the account list and opens the account picker. */
     const openList = async (): Promise<void> => {
       if (disposed) return
       let listing: { accounts: Array<ListAccount> }
@@ -157,17 +164,20 @@ export const opencodeTuiPlugin = Plugin.define({
       })
       const picked = await new Promise<string | undefined>((resolve) => {
         let settled = false
+        /** Settles the picker once and releases its unload closer. */
         const settle = (id: string | undefined) => {
           if (settled) return
           settled = true
           closeAccountList = undefined
           resolve(id)
         }
+        /** Resolves the current picker choice and closes its dialog. */
         const choose = (id: string | undefined) => {
           if (settled) return
           settle(id)
           context.ui.dialog.clear()
         }
+        /** Toggles an account and reports stale targets without applying local state. */
         const toggle = async (id: string): Promise<boolean> => {
           const target = listing.accounts.find((entry) => entry.id === id)
           if (!target) return false
@@ -232,6 +242,7 @@ export const opencodeTuiPlugin = Plugin.define({
       await openActions(selected)
     }
 
+    /** Fetches a quota snapshot and preserves missing-account versus RPC failures. */
     const fetchQuotaEntry = async (account: ListAccount, refresh: boolean): Promise<QuotaFetch> => {
       try {
         const presentation = (await context.client.rpc(AntigravityAccounts).quota(
@@ -248,6 +259,7 @@ export const opencodeTuiPlugin = Plugin.define({
       }
     }
 
+    /** Acknowledges a missing-account notice before returning to the refreshed list. */
     const showMissingThenList = async (account: ListAccount): Promise<void> => {
       if (disposed) return
       const acknowledged = await new Promise<boolean>((resolve) => {
@@ -258,6 +270,7 @@ export const opencodeTuiPlugin = Plugin.define({
           closeMissingAccount = undefined
           resolve(value)
         }
+        /** Resolves the notice only while it is still active. */
         const acknowledge = () => {
           if (settled || disposed) return
           settle(true)
@@ -283,6 +296,7 @@ export const opencodeTuiPlugin = Plugin.define({
       if (acknowledged && !disposed) await openList()
     }
 
+    /** Opens the quota view and owns its refresh, navigation, and cleanup lifecycle. */
     const openQuota = async (account: ListAccount): Promise<void> => {
       const initial = await fetchQuotaEntry(account, false)
       if (disposed) return
@@ -296,6 +310,7 @@ export const opencodeTuiPlugin = Plugin.define({
         return
       }
       let navigated = false
+      /** Returns to the list at most once and disposes the dialog controller. */
       const goListOnce = async (missing = false): Promise<void> => {
         if (navigated || disposed) return
         navigated = true
@@ -370,6 +385,7 @@ export const opencodeTuiPlugin = Plugin.define({
       context.ui.dialog.set({ size: "medium" })
     }
 
+    /** Presents account actions and dispatches the selected operation. */
     const openActions = async (account: ListAccount): Promise<void> => {
       if (disposed) return
       const toggleLabel = account.enabled ? "Disable" : "Enable"

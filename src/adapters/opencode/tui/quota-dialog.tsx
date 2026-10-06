@@ -5,6 +5,7 @@ import { formatQuotaPercentage, formatResetCountdown, quotaBarParts } from "../.
 import type { QuotaDialogController } from "./quota-controller.js"
 import { DialogShell } from "./dialog-shell.js"
 
+/** A command registered on the modal's keymap layer. */
 export interface QuotaDialogKeymapCommand {
   id: string
   title: string
@@ -12,6 +13,7 @@ export interface QuotaDialogKeymapCommand {
   run: () => void
 }
 
+/** Registers keymap commands owned by a quota dialog. */
 export type QuotaDialogLayer = (
   input: () => {
     mode: string
@@ -20,6 +22,7 @@ export type QuotaDialogLayer = (
   },
 ) => void
 
+/** Presentation and controller dependencies for an account quota dialog. */
 export interface QuotaDialogProps {
   email: string
   enabled: boolean
@@ -67,6 +70,7 @@ function quotaResetLabel(fraction: number | null, resetTime: number | null): str
   return formatResetCountdown(resetTime).replace(/^resets in /, "")
 }
 
+/** Shows a stale-account notice and returns to the account list on dismissal. */
 export interface MissingAccountDialogProps {
   email: string
   acknowledge: () => void
@@ -74,6 +78,7 @@ export interface MissingAccountDialogProps {
   colors: { base: RGBA; muted: RGBA }
 }
 
+/** Explains that a quota dialog's account was removed while the view was open. */
 export function MissingAccountDialogView(props: MissingAccountDialogProps) {
   props.layer(() => ({
     mode: "modal",
@@ -97,6 +102,7 @@ export function MissingAccountDialogView(props: MissingAccountDialogProps) {
   )
 }
 
+/** Renders per-model and grouped quota, including refresh and scrolling controls. */
 export function QuotaDialogView(props: QuotaDialogProps) {
   const [state, setState] = createSignal(props.controller.snapshot())
   const [contentWidth, setContentWidth] = createSignal(0)
@@ -191,6 +197,7 @@ export function QuotaDialogView(props: QuotaDialogProps) {
       ? "Not checked yet"
       : `Updated ${new Date(checkedAt).toLocaleString("en-GB", { hour12: false })}${freshness === "stale" ? " · stale" : ""}`
   }
+  /** Estimates wrapped footer rows so the quota body fits the dialog. */
   const quotaFooterExtraRows = () => {
     const width = Math.max(1, contentWidth())
     const shortcut = props.shortcuts("antigravity.quota.refresh") ?? "ctrl+r"
@@ -233,6 +240,7 @@ export function QuotaDialogView(props: QuotaDialogProps) {
         Math.max(0, Math.ceil(props.email.length / Math.max(1, contentWidth())) - 1) -
         quotaFooterExtraRows(),
     )
+  /** Estimates grouped-quota height before the renderer reports its layout. */
   const initialSummaryHeight = () =>
     summaryGroups().reduce(
       (height, group) =>

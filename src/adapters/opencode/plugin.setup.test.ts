@@ -340,6 +340,7 @@ describe("V2 Antigravity runtime bridge", () => {
     expect(handlers).toBeDefined()
     if (!handlers) throw new Error("expected RPC handlers")
     expect(Object.keys(handlers).sort()).toEqual(["deleteAll", "list", "mutate", "ping", "quota", "verify"])
+    /** Invokes a registered RPC handler and fails clearly when it is absent. */
     const call = async (name: string, input: unknown) => {
       const handler = handlers[name]
       if (!handler) throw new Error(`missing RPC handler: ${name}`)
@@ -515,6 +516,7 @@ describe("V2 Antigravity runtime bridge", () => {
       ],
       activeIndex: 0,
     })
+    /** Asserts that an RPC result contains no seeded credential material. */
     const scanSecrets = (value: unknown) => {
       const text = JSON.stringify(value)
       expect(text).not.toContain("secret-refresh-token-one")

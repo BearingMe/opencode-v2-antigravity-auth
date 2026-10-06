@@ -41,6 +41,7 @@ export function AccountListDialogView(props: AccountListDialogProps) {
   const [overrides, setOverrides] = createSignal<Record<string, boolean>>({})
   let scroll: ScrollBoxRenderable | undefined
 
+  /** Applies pending toggle results to the account rows shown in the picker. */
   const accountList = () => {
     const map = overrides()
     return props.accounts.map((account) => {
@@ -65,6 +66,7 @@ export function AccountListDialogView(props: AccountListDialogProps) {
       `${account.email} ${account.description}`.toLowerCase().includes(query().trim().toLowerCase()),
     )
   const selectedAccount = () => filtered()[selected()]
+  /** Moves the selected row and scrolls it into view. */
   const move = (delta: number) => {
     const length = filtered().length
     if (length === 0) return

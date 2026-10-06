@@ -207,12 +207,15 @@ checks — never your real multi-account store.
       temp dir (legacy fallback); on Linux/macOS point `XDG_CONFIG_HOME` at a
       temp dir. Delete the temp dirs afterwards.
 
-## Deferred Step 13 installed-host E2E gate
+## Deferred final migration acceptance: installed-host E2E
 
-Run this against the built plugin in the target OpenCode 2.0.18 host, using an
-isolated config/data directory and a disposable Antigravity test account. Keep
-the existing account store untouched. Record the OpenCode version, plugin
-revision, host logs, and final process exit status.
+Run this mandatory final acceptance gate after Step 14 implementation, against
+the built plugin in the target OpenCode 2.0.18 host. It was deferred from Step 13
+by approval, not waived.
+
+Use an isolated config/data/state profile and a disposable Antigravity test
+account. Keep the existing account store untouched. Record the OpenCode version,
+plugin revision, host logs, and final process exit status.
 
 **Isolation note:** The user's `opencode debug paths` output showed default user
 config, data, and state directories. `--standalone` uses a private server but
@@ -312,7 +315,8 @@ result only after a temporary pre-hook removed OpenCode's result. The routing
 probe captured OAuth refresh and native Antigravity dispatch with a synthetic
 account and mocked fetch, but generation timed out after retries. Both host
 processes exited nonzero; these are diagnostic observations, not passing E2E
-results. Step 13 remains pending until the checklist above passes.
+results. These observations do not pass the final gate; complete the checklist
+above after Step 14 implementation before declaring the migration verified.
 
 ## Known limitations (do not file as regressions)
 

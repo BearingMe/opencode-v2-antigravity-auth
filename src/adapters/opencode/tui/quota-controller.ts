@@ -1,5 +1,6 @@
 import type { QuotaDetailSnapshot, QuotaRefreshOutcome } from "../../../plugin/account-ui-format.js"
 
+/** Dependencies used by one quota dialog controller. */
 export interface QuotaDialogDeps {
   initial: QuotaDetailSnapshot
   refreshQuota: () => Promise<QuotaRefreshOutcome>
@@ -8,11 +9,15 @@ export interface QuotaDialogDeps {
   goList: () => Promise<void>
 }
 
+/** State exposed to the mounted quota dialog view. */
 export interface QuotaDialogState {
   entry: QuotaDetailSnapshot
   refreshing: boolean
   failed: boolean
 }
+
+/** Controller API used by the quota dialog view and host integration. */
+export type QuotaDialogController = ReturnType<typeof createQuotaDialogController>
 
 /** Owns one quota dialog's refresh, stale-account, navigation, and disposal state. */
 export function createQuotaDialogController(deps: QuotaDialogDeps) {
@@ -80,5 +85,3 @@ export function createQuotaDialogController(deps: QuotaDialogDeps) {
     },
   }
 }
-
-export type QuotaDialogController = ReturnType<typeof createQuotaDialogController>
