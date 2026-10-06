@@ -1,6 +1,6 @@
 import { AccountRefreshQueue, type ProactiveRefreshConfig } from "../modules/accounts/index.js"
 import { createLogger } from "./logger.js"
-import type { AccountManager, ManagedAccount } from "./accounts.js"
+import type { AccountPoolManager as AccountManager, ManagedAccount } from "../modules/accounts/index.js"
 import { refreshAccessToken } from "./token.js"
 import type { OAuthAuthDetails, PluginClient } from "./types.js"
 

@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { AccountManager, type ModelFamily, resolveQuotaGroup } from "./accounts"
-import { updateAccounts } from "./storage"
-import type { AccountMetadataV3, AccountStorageV4 } from "./storage"
-import type { OAuthAuthDetails } from "./types"
+import { AccountManager } from "./account-pool"
+import { resolveQuotaGroup } from "../../modules/accounts/index.js"
+import type { ModelFamily, AccountMetadataV3, AccountStorageV4 } from "../../modules/accounts/index.js"
+import { updateAccounts } from "../filesystem/account-store.js"
+import type { OAuthAuthDetails } from "../../plugin/types.js"
 
 const { writtenStores } = vi.hoisted(() => ({ writtenStores: [] as AccountStorageV4[] }))
 
@@ -21,8 +22,8 @@ function accountEntry(overrides: Partial<AccountMetadataV3> = {}): AccountMetada
 }
 
 // Mock storage to prevent test data from leaking to real config files
-vi.mock("./storage", async (importOriginal) => {
-  const original = await importOriginal<typeof import("./storage")>()
+vi.mock("../filesystem/account-store.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../filesystem/account-store.js")>()
   return {
     ...original,
     saveAccounts: vi.fn().mockResolvedValue(undefined),

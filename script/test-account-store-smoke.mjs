@@ -35,27 +35,15 @@ async function runAccountStoreSmoke() {
   assert.equal(migrated?.accounts[0]?.email, "smoke@example.invalid")
   assert.equal(JSON.parse(readFileSync(storePath, "utf8")).version, 4, "the migration should persist")
 
-  const { AccountPoolManager } = await import("../dist/src/modules/accounts/index.js")
-  const { generateFingerprint, updateFingerprintVersion } = await import("../dist/src/plugin/fingerprint.js")
-  const manager = new AccountPoolManager(undefined, migrated, {
-    clock: { now: () => 100 },
-    update: storage.updateAccounts,
-    fingerprintToken: storage.fingerprintRefreshToken,
-    generateId: () => "synthetic-account-id",
-    generateFingerprint,
-    updateFingerprintVersion,
-    processId: 1,
-    formatAccountLabel: (_email, index) => `Account ${index + 1}`,
-    logSoftQuotaSkipped: () => undefined,
-    logSelection: () => undefined,
-    random: () => 0.5,
-  })
+  const { AccountManager } = await import("../dist/src/adapters/opencode/account-pool.js")
+  const manager = await AccountManager.loadFromDisk()
   assert.equal(manager.getCurrentOrNextForFamily("gemini", undefined, "sticky")?.index, 0)
+  const usedAt = Date.now()
   manager.markAccountUsed(0)
   await manager.saveToDisk()
   const poolSaved = await storage.loadAccounts()
   assert.ok(poolSaved, "the synthetic pool save should produce a current store")
-  assert.equal(poolSaved?.accounts[0]?.lastUsed, 100, "pool bookkeeping should persist through the storage port")
+  assert.ok(poolSaved?.accounts[0]?.lastUsed >= usedAt, "pool bookkeeping should persist through the storage adapter")
 
   const staleSnapshot = poolSaved
   const deleted = poolSaved?.accounts[0]

@@ -56,6 +56,7 @@ text-only.
 src/
 ├── adapters/opencode/
 │   ├── plugin.ts              # V2 server registration and host lifecycle wiring
+│   ├── account-pool.ts        # Filesystem/identity composition for account pool
 │   ├── google-sdk.ts          # Isolated AI SDK hook-routing module
 │   ├── rpc.ts                 # AntigravityAccounts RPC contract (credential-free)
 │   ├── tui/                   # /antigravity dialog UI and controller
@@ -89,7 +90,6 @@ src/
     ├── core/streaming/        # Compatibility exports for inference SSE transformer
     ├── thinking-recovery.ts / recovery.ts # Compatibility facades for recovery policy
     ├── quota.ts               # Antigravity quota refresh/probe adapter composition
-    ├── accounts.ts / rotation.ts # Compatibility facades for the accounts module
     ├── storage.ts               # Compatibility facade for the v4 account store
     ├── fingerprint.ts / project.ts  # Device fingerprints + project-context composition
     ├── refresh-queue.ts          # Proactive refresh compatibility façade
@@ -117,8 +117,8 @@ compatibility facade while existing callers migrate in later steps.
 
 Account membership and selection policy now live in
 `modules/accounts/account-pool.ts` and `modules/accounts/selection/`.
-`plugin/accounts.ts` and `plugin/rotation.ts` preserve existing callers while
-the request engine and administration service migrate in later steps.
+`adapters/opencode/account-pool.ts` supplies the filesystem, fingerprint, and
+logging dependencies used to construct the runtime account pool.
 
 Session-recovery policy and request-time turn repair now live in
 `modules/session-recovery/`. The OpenCode adapter composes the policy with
@@ -145,7 +145,8 @@ search stays in the request pipeline.
   project. It only uses file debug logging.
 - External-origin fetches must never receive `x-goog-api-key` or
   `authorization`.
-- `transform/*` must not import `accounts.ts` / `storage.ts`.
+- `modules/inference/transforms/*` must not depend on account-selection policy
+  or filesystem persistence.
 - Runtime (non-test) imports must resolve under **both** `tsconfig.json`
   and `tsconfig.build.json`: use `.js`-suffixed or extensionless relative
   imports. `.ts`-suffixed imports pass `typecheck` but fail `bun run build`

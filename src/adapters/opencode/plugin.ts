@@ -21,7 +21,7 @@ import { OPENCODE_MODEL_DEFINITIONS } from "./config/models.js"
 import type { OAuthAuthDetails, PluginClient } from "../../plugin/types.js"
 import { createLogger, initLogger } from "../../plugin/logger.js"
 import { initRuntimeConfig, loadConfig } from "./config/index.js"
-import { AccountManager } from "../../plugin/accounts.js"
+import { AccountManager } from "./account-pool.js"
 import {
   disposeAntigravityRuntimeResources,
   executeAntigravityRequest,
@@ -30,7 +30,7 @@ import {
 import { getRecoverySuccessToast } from "../../modules/session-recovery/index.js"
 import { initDiskSignatureCache } from "../../plugin/cache.js"
 import { createProactiveRefreshQueue, type ProactiveRefreshQueue } from "../../plugin/refresh-queue.js"
-import { initHealthTracker, initTokenTracker } from "../../plugin/rotation.js"
+import { initHealthTracker, initTokenTracker } from "../../modules/accounts/index.js"
 import { initAntigravityVersion } from "../../plugin/version.js"
 import { createAutoUpdateCheckerHook } from "./hooks/auto-update-checker/index.js"
 

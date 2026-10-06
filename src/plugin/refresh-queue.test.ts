@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { ProactiveRefreshQueue } from "./refresh-queue"
-import { AccountManager } from "./accounts"
+import { AccountManager } from "../adapters/opencode/account-pool.js"
 import type { AccountStorageV4 } from "./storage"
 import type { PluginClient } from "./types"
 

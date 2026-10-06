@@ -150,9 +150,9 @@ fingerprint+history[5],cachedQuota+updatedAt,verification*}`.
   threshold 100 (`selection/rotation.ts :: selectHybridAccount`,
   `HealthScoreTracker` init 70 +1/−10/−20, 2/h recovery, max 100, min-usable
   50; `TokenBucketTracker` max 50, regen 6/min).
-- `src/plugin/accounts.ts` and `src/plugin/rotation.ts` preserve the existing
-  plugin-facing API as compatibility facades; the request engine remains the
-  sole router and continues to own retry orchestration.
+- `src/adapters/opencode/account-pool.ts` supplies persistence, fingerprint,
+  and logging dependencies to the accounts module. The request engine remains
+  the sole router and continues to own retry orchestration.
 - `src/app/execute-request.ts` retries capacity/server-busy responses with
   exponential 1/2/4/8 s delays (capped at 8 s, with ±10% jitter), up to three
   in-place retries per endpoint and one fingerprint refresh before fallback.

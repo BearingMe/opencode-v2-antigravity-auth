@@ -47,7 +47,7 @@ vi.mock("./app/composition.js", async (importOriginal) => ({
   refreshOAuthCredentialUnified: vi.fn(async (credential: unknown) => credential),
 }))
 
-vi.mock("./plugin/accounts.js", () => ({
+vi.mock("./adapters/opencode/account-pool.js", () => ({
   AccountManager: { loadFromDisk: vi.fn() },
 }))
 

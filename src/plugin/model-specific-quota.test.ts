@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest"
-import { AccountManager } from "./accounts"
+import { AccountManager } from "../adapters/opencode/account-pool.js"
 import type { OAuthAuthDetails } from "./types"
 
 const MODEL_PRO = "gemini-1.5-pro"

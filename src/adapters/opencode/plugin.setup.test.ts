@@ -108,7 +108,7 @@ vi.mock("../../app/composition.js", async (importOriginal) => ({
   disposeAntigravityRuntimeResources: mockDisposeResources,
   refreshOAuthCredentialUnified: mockUnifiedRefresh,
 }))
-vi.mock("../../plugin/accounts.js", () => ({
+vi.mock("./account-pool.js", () => ({
   AccountManager: { loadFromDisk: mockLoadManager },
 }))
 vi.mock("../../plugin/refresh-queue.js", () => ({

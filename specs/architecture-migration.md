@@ -515,13 +515,15 @@ health, cooldown, and rotation policies into `selection/`.
   `src/modules/accounts/account-pool.ts`; injected time, randomness, persistence,
   identity, fingerprint, and logging dependencies. Pool membership, family
   cursors, stable IDs, failure bookkeeping, and transactional save/tombstone
-  behavior remain in the accounts module. The plugin-facing
-  `src/plugin/accounts.ts` facade and engine route remain intact.
+  behavior remain in the accounts module. At this checkpoint the host-facing
+  `src/plugin/accounts.ts` and `src/plugin/rotation.ts` wrappers remained; Step 14
+  moved pool construction to `src/adapters/opencode/account-pool.ts` and removed
+  both compatibility paths.
 - Moved health/token-bucket trackers, hybrid selection, backoff classification,
-  and retry policy into `src/modules/accounts/selection/`. Kept the shared
-  index-keyed trackers and setup configuration; `src/plugin/rotation.ts` remains
-  a compatibility facade. The account module has no inference or transport
-  implementation imports.
+  and retry policy into `src/modules/accounts/selection/`. At this checkpoint,
+  `src/plugin/rotation.ts` re-exported the module API; Step 14 removed it and the
+  OpenCode adapter now imports tracker setup directly from the module. The
+  account module has no inference or transport implementation imports.
 - Moved selection tests with the policy and replaced stochastic range loops
   with controlled randomness/time. Added pool tests for sticky, round-robin,
   hybrid, cooldown exhaustion/recovery, and an engine integration test proving
@@ -927,6 +929,17 @@ maintained documentation with the completed architecture.
   maintained docs; those were reconciled and both follow-ups found no blockers.
   The isolated installed-host E2E remains unverified and mandatory for final
   acceptance.
+- Moved the filesystem/fingerprint/logging construction behind
+  `src/adapters/opencode/account-pool.ts`; the runtime now imports the
+  persistence implementation directly from `adapters/filesystem/`. Removed
+  `src/plugin/accounts.ts` and `src/plugin/rotation.ts`, updated their runtime
+  and test consumers, and moved the account-manager test suite beside its
+  adapter. The built account-store smoke now exercises `AccountManager.loadFromDisk()`.
+- Verification passed: Vitest (75 files / 1,212 tests), native TUI (13 tests / 164
+  expectations), typecheck, lint, boundary checks and fixtures, changed-file
+  Prettier, and `git diff --check`. Clean-built account-store, account-admin,
+  and Antigravity request smokes passed using synthetic data/credentials. Oracle
+  and review found no blocker after the remaining boundary docs were corrected.
 
 **Acceptance criteria:**
 

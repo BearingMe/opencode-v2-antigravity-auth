@@ -152,6 +152,7 @@ src/
 │   ├── filesystem/            # Account and recovery stores
 │   └── opencode/
 │       ├── plugin.ts          # V2 server registration and host lifecycle wiring
+│       ├── account-pool.ts    # OpenCode/filesystem dependencies for the account pool
 │       ├── rpc.ts             # Credential-free AntigravityAccounts contract
 │       ├── tui/               # /antigravity host dialogs and controller
 │       ├── config/            # OpenCode config, model registration, and settings
@@ -167,9 +168,9 @@ src/
     ├── core/streaming/        # SSE transformer
     ├── thinking-recovery.ts / recovery.ts # Compatibility recovery facades
     ├── quota.ts               # Antigravity per-model + grouped quota probing
-    ├── accounts.ts / storage.ts  # Pool manager + v4 persistent store (tombstones)
+    ├── storage.ts               # Compatibility facade for v4 persistent storage
     ├── fingerprint.ts / project.ts  # Device fingerprints + managed project context
-    ├── refresh-queue.ts / rotation.ts  # Proactive refresh + health/token-bucket scoring
+    ├── refresh-queue.ts          # Proactive refresh queue composition
     ├── config/                # Temporary compatibility exports; removed in Step 14
     ├── cache/ / stores/       # Signature caches (memory + disk)
     └── debug.ts / logger.ts / logging-utils.ts / version.ts / errors.ts / types.ts

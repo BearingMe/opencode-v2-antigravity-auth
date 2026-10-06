@@ -27,7 +27,7 @@ app/execute-request.ts ──coordinates──> account pool + inference policie
 plugin account callers ──ports──> adapters/antigravity/*
 plugin/* ──uses──> constants.ts (identity/endpoints/headers)
                    + plugin/{auth,storage,logger,debug} kernels
-plugin/{accounts,rotation}.ts ──compatibility facades──> modules/accounts/
+adapters/opencode/account-pool.ts ──composes──> modules/accounts/ + filesystem store
 transform/*, request-helpers ──should stay──> pure re: I/O
                    (except cache + config reads)
 ```
@@ -105,8 +105,8 @@ diagnostics are supplied or handled by the request boundary.
 - `account_selection_strategy = sticky | round-robin | hybrid` (default
   `hybrid`) + pool policy in `src/modules/accounts/account-pool.ts` and health,
   token-bucket, and backoff policy in `src/modules/accounts/selection/`.
-  `src/plugin/accounts.ts` and `src/plugin/rotation.ts` remain compatibility
-  facades for existing callers.
+  `src/adapters/opencode/account-pool.ts` supplies filesystem and host-specific
+  dependencies; health, token-bucket, and backoff policy remain in the module.
 - `TransformContext/Result`, request/response pipelines, signature policy, and
   `StreamingCallbacks` live in `src/modules/inference/`; plugin request and
   streaming paths are compatibility adapters.
@@ -135,5 +135,5 @@ deleteAll/ping`) — the interactive management surface sharing the
   promote to SHOULD.)
 - External-origin fetches MUST NOT receive `x-goog-api-key` or
   `authorization` headers (see R-FETCH-SCOPE).
-- `transform/*` MUST NOT import `accounts.ts` / `storage.ts` (inferred;
-  no current violation reported).
+- `modules/inference/transforms/*` MUST NOT depend on account-selection policy
+  or filesystem persistence (inferred; no current violation reported).
