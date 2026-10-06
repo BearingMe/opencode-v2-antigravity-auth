@@ -970,6 +970,10 @@ maintained documentation with the completed architecture.
   package-entrypoint consumers. Session recovery remains owned by
   `modules/session-recovery/` and composed by `adapters/opencode/`; corrected
   current source and test inventories accordingly.
+- Removed the nested plugin signature cache/store facades. The active cache
+  composition now imports the filesystem adapter directly, and the thought-
+  buffer behavior tests live beside the inference-owned implementation; its
+  exported buffer factory now has the required API documentation.
 
 **Acceptance criteria:**
 

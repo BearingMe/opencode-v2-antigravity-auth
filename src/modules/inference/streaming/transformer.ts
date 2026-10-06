@@ -12,6 +12,7 @@ function hashString(str: string): string {
   return (hash >>> 0).toString(16)
 }
 
+/** Creates an isolated buffer for streamed thought text keyed by part index. */
 export function createThoughtBuffer(): ThoughtBuffer {
   const buffer = new Map<number, string>()
   return {

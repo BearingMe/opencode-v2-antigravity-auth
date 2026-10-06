@@ -209,7 +209,7 @@ types,logging}.ts` + `checker.test.ts`, `index.test.ts`
 - Core: `src/plugin/{auth,token,cache,request,request-helpers,account-service,
 quota,fingerprint,project,refresh-queue,errors,debug,logger,logging-utils,
 verify,verification,version,image-saver,types}.ts`
-- Subdirs: `src/plugin/{core/streaming,stores,cache}/*`
+- Subdirs: `src/plugin/core/streaming/*`
 - Tests: `src/constants.test.ts`, `src/adapters/opencode/plugin.test.ts`,
   `src/adapters/opencode/plugin.accounts.test.ts`,
   `src/adapters/opencode/plugin.setup.test.ts` +

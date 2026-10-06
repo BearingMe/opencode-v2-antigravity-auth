@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
-import { createThoughtBuffer } from "./signature-store"
+import { createThoughtBuffer } from "./transformer.js"
 
-describe("streamed thought buffer compatibility", () => {
+describe("streamed thought buffer", () => {
   it("retains thought fragments by provider part index", () => {
     const buffer = createThoughtBuffer()
     buffer.set(3, "first fragment")

@@ -168,7 +168,7 @@ src/
     ├── quota.ts               # Antigravity per-model + grouped quota probing
     ├── fingerprint.ts / project.ts  # Device fingerprints + managed project context
     ├── refresh-queue.ts          # Proactive refresh queue composition
-    ├── cache/ / stores/       # Signature caches (memory + disk)
+    ├── cache.ts               # Auth cache and signature-persistence composition
     └── debug.ts / logger.ts / logging-utils.ts / version.ts / errors.ts / types.ts
 ```
 
