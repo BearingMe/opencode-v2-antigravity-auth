@@ -845,38 +845,22 @@ integration into `adapters/opencode/`.
   as did typecheck, lint, both boundary checks, changed-file Prettier,
   `git diff --check`, and the clean-build Antigravity package smoke. The default
   parallel run was load-sensitive; the complete single-worker run passed.
-- The user has since marked the following installed-host checks as passed in
-  [manual testing](../docs/dev/manual-testing.md): `/antigravity` and the
-  command-palette entry open the same account list; list navigation, search,
-  scrolling, footer/status display, and dismissal work; login Add/reconnect,
-  empty-state, repeated-login, and Google-integration isolation checks pass.
-  No failures were reported. The user subsequently confirmed the disposable
-  account appears in the isolated profile's populated `/antigravity` list. The
-  user reports that Show quota displays cached data when there is
-  no connection and that manual refresh updates the quota quickly. Back-key
-  behavior in account list, account info, verification, and quota dialogs is
-  confirmed. Verify works for healthy accounts and accounts requiring external
-  verification. The user also confirmed Disable/Enable and Remove work, and that a
-  stale account target from another open screen produces an error. The account
-  list's Ctrl+T toggle remains untested because Orca reserves that shortcut;
-  equivalent Disable/Enable actions were tested through the account menu. The
-  user confirms the installed RPC `list` call returns the disposable account as
-  expected and both RPC `disable` and `enable` mutations succeed. RPC `select`
-  also succeeds and reports the account active at index 0. The user confirms
-  those RPC responses contain no token or raw credential data and that the
-  disposable account was removed during cleanup.
-- The user reports passing a normal Antigravity prompt, which is marked passed in
-  the deferred checklist. On 2026-10-06, the user repeated the isolated-host
-  cancellation/follow-up with the read-only observers loaded around Antigravity.
-  Both records used the same call ID and showed exactly one result before and
-  after the Antigravity hook (`canonicalCancellation: false`); therefore the
-  result was already present before the plugin hook, and the plugin did not add
-  one. The no-duplicate invariant is captured, but this did not exercise
-  plugin-generated recovery; do not claim that path passed without a naturally
-  dangling-call scenario. The screenshot confirms the follow-up continued. The
-  user subsequently reported standalone host exit status `0`. This verifies the
-  process exit for this run; the fresh-session/unload/profile-cleanup repeat
-  remains unchecked.
+- The user reports that installed UI/RPC behaviors work: account list and
+  management, quota refresh, Verify, stale-target errors, and RPC
+  list/disable/enable/select with no raw credentials in results. The user also
+  reports that the account store is fine and that add/remove/enable/disable
+  behaved normally. However, a later `opencode debug paths` from the test shell
+  showed the default config, data, and state directories. `--standalone` only
+  isolated the server, not those paths. Treat these as functional observations,
+  not isolated-host E2E evidence; repeat the gate using verified disposable
+  config/data/state paths.
+- The interrupted-call observer records showed exactly one result before and
+  after the Antigravity hook (`canonicalCancellation: false`); the result was
+  already present before the plugin hook, so this did not exercise
+  plugin-generated recovery. The user reported a normal Antigravity prompt, a
+  follow-up after interruption, and host exit status `0`, but these also came
+  from the default paths and do not satisfy the isolated-host gate. Do not claim
+  plugin recovery without a naturally dangling-call scenario.
 - The earlier OpenCode 2.0.18 smoke also verified registration, SDK resolution,
   RPC, safe mutations, and the empty-account alert. Its earlier synthetic
   interrupted-call and routing probes remain diagnostic only, as detailed below.
@@ -890,13 +874,12 @@ integration into `adapters/opencode/`.
   endpoint without contacting Google. That synthetic session timed out after
   repeated requests and its smoke process exited nonzero; it is not the later
   user-reported successful manual prompt.
-- Step 13 remains blocked while naturally dangling-call/plugin recovery and the
-  fresh-session/unload/profile-cleanup repeat remain unchecked. Disposable
-  account removal is complete. The populated account/quota flow and installed RPC
-  list/disable/enable/select plus credential-free response checks are now
-  verified. The standalone process exited `0` on the captured run. Do not begin
-  Step 14 until the remaining installed-host gate is complete. The repeatable
-  checklist is in
+- Step 13 remains blocked: recent UI, RPC, prompt, and exit-status checks used
+  default paths and are not isolated-host evidence. Naturally dangling-call/plugin
+  recovery and the fresh-session/unload/profile-cleanup repeat also remain
+  unchecked. Repeat the full gate only after `opencode debug paths` confirms
+  disposable config, data, and state paths. Do not begin Step 14 until the
+  installed-host gate is complete. The repeatable checklist is in
   [manual testing](../docs/dev/manual-testing.md#deferred-step-13-installed-host-e2e-gate).
 
 ## 14. Remove scaffolding and verify the final architecture

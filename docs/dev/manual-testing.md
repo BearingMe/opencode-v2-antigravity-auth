@@ -214,24 +214,30 @@ isolated config/data directory and a disposable Antigravity test account. Keep
 the existing account store untouched. Record the OpenCode version, plugin
 revision, host logs, and final process exit status.
 
-- [x] Start with no accounts and verify `/antigravity` opens the login alert;
+**Isolation note:** The user's `opencode debug paths` output showed default user
+config, data, and state directories. `--standalone` uses a private server but
+does not isolate those paths. The recent checks are functional observations,
+not evidence for this isolated-host gate. The user reports that the account
+store is fine and add/remove/enable/disable work normally.
+
+- [ ] Start with no accounts and verify `/antigravity` opens the login alert;
 
   Esc dismisses it. Then add the disposable account and verify the populated
   list, row selection, actions, quota view, refresh, and Esc/back keymaps.
 
-- [x] Exercise the installed `AntigravityAccounts` RPC against the disposable
+- [ ] Exercise the installed `AntigravityAccounts` RPC against the disposable
 
   account: list it, disable and re-enable it, select it, and verify the
   returned state. Confirm responses contain no credential material.
 
-- [x] Remove only the disposable account during cleanup.
-- [x] Select an available Antigravity model and complete a normal prompt. Verify
+- [ ] Remove only the disposable account during cleanup.
+- [ ] Select an available Antigravity model and complete a normal prompt. Verify
 
   the assistant response is persisted as complete, the session reaches its
   normal terminal state, and there are no retry/error loops. Registration or
   observing a native request URL alone is not a routing pass.
 
-- [x] One standalone host run exited with status `0` (user-reported).
+- [ ] One standalone host run in the isolated profile exits with status `0`.
 - [ ] Trigger a real tool call, cancel the running turn with Esc, then continue
 
   the same session. Capture the outgoing model context/request and verify
