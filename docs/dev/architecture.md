@@ -54,20 +54,16 @@ text-only.
 
 ```text
 src/
-├── adapters/opencode/
-│   ├── plugin.ts              # V2 server registration and host lifecycle wiring
-│   ├── account-pool.ts        # Filesystem/identity composition for account pool
-│   ├── google-sdk.ts          # Isolated AI SDK hook-routing module
-│   ├── rpc.ts                 # AntigravityAccounts RPC contract (credential-free)
-│   ├── tui/                   # /antigravity dialog UI and controller
-│   ├── config/                # OpenCode config/model registration details
-│   └── hooks/                 # Host event integrations, including update checks
-├── constants.ts               # Compatibility exports for provider/model constants
-├── adapters/antigravity/{oauth,version}.ts # Provider OAuth/version; host facades live in adapters/opencode/
 ├── adapters/
-│   ├── antigravity/           # OAuth identity/endpoints/headers and account/inference clients
+│   ├── antigravity/           # OAuth, project/version, and provider HTTP clients
 │   ├── filesystem/            # Account/recovery/signature stores and debug-file destination
-│   └── opencode/              # Host logging and session-recovery operations
+│   └── opencode/              # Host lifecycle, logging, facades, RPC, and TUI
+│       ├── plugin.ts          # V2 registration and host lifecycle wiring
+│       ├── google-sdk.ts      # Isolated AI SDK hook-routing module
+│       ├── tui/               # /antigravity dialog UI and controller
+│       ├── config/            # OpenCode config/model registration details
+│       └── hooks/             # Host event integrations, including update checks
+├── app/                       # Composition and single request executor
 ├── modules/accounts/
 │   ├── account-pool.ts        # Membership, family cursors, cooldowns, and pool bookkeeping
 │   ├── account-admin.ts       # Credential-free administration use cases and mutations
@@ -81,16 +77,14 @@ src/
 ├── modules/inference/         # Request helpers, transforms, schema cleaning, streaming, signatures, and ports
 ├── platform/logging/          # Neutral events, policy, and safe log formatting
 └── plugin/
-    ├── account-service.ts     # Compatibility façade and RPC quota-schema validation
-    ├── account-ui-format.ts   # Quota bars, countdowns, one-liners (pure)
-    ├── auth.ts / token.ts     # Refresh-part packing and provider/cache composition
-    ├── verify.ts                  # Account verification refresh/probe composition
-    ├── request.ts / request-helpers.ts  # Compatibility APIs and config/debug adapters
-    ├── quota.ts               # Antigravity quota refresh/probe adapter composition
-    ├── fingerprint.ts / project.ts  # Device fingerprints + project-context composition
-    ├── refresh-queue.ts          # Proactive refresh host composition
-    ├── cache.ts               # Auth cache and signature-persistence composition
-└── debug.ts / logger.ts / logging-utils.ts / errors.ts / types.ts
+    ├── account-service.ts     # Account store service used by tool/RPC
+    ├── cache.ts               # Remaining auth-cache composition
+    ├── fingerprint.ts         # Device fingerprint composition
+    ├── quota.ts               # Antigravity quota probe composition
+    ├── refresh-queue.ts       # Proactive refresh composition
+    ├── request.ts / request-helpers.ts
+    ├── token.ts               # Unified credential-refresh composition
+    └── verify.ts              # Account verification probe composition
 ```
 
 The package-root `src/v2-plugin.ts`, `src/tui.ts`, and `src/rpc.ts` files remain
@@ -102,8 +96,8 @@ The single request executor remains `app/execute-request.ts`.
 Logging is split by responsibility: `platform/logging/` owns neutral policy,
 events, and formatting; OpenCode host/console delivery is in
 `adapters/opencode/logging.ts`; file paths, retention, and writes are in
-`adapters/filesystem/debug-log.ts`. The remaining plugin logging files keep
-Antigravity trace context and compatibility-facing logger calls.
+`adapters/filesystem/debug-log.ts`. Antigravity trace context and request
+logging remain in `adapters/opencode/debug.ts`.
 
 Account persistence policy now lives in `modules/accounts/persistence/` and
 the locked filesystem implementation is in

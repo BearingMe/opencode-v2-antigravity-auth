@@ -6,7 +6,7 @@ const { refreshAccessToken, ensureProjectContext } = vi.hoisted(() => ({
 }))
 
 vi.mock("./token.js", () => ({ refreshAccessToken }))
-vi.mock("./project.js", () => ({ ensureProjectContext }))
+vi.mock("../adapters/opencode/project.js", () => ({ ensureProjectContext }))
 
 import { checkAccountsQuota } from "./quota.js"
 

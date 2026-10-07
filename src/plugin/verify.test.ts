@@ -12,8 +12,8 @@ vi.mock("./token.ts", async (importOriginal) => {
   return { ...orig, refreshAccessToken: mockRefreshAccessToken }
 })
 
-vi.mock("./project.ts", async (importOriginal) => {
-  const orig = await importOriginal<typeof import("./project.ts")>()
+vi.mock("../adapters/opencode/project.js", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("../adapters/opencode/project.js")>()
   return { ...orig, ensureProjectContext: mockEnsureProjectContext }
 })
 

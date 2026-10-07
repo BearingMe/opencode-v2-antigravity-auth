@@ -3,7 +3,7 @@ import { checkAccountQuotas, type AccountQuotaProbeResult, type AccountQuotaResu
 import { availableModelsQuotaProbe, groupedQuotaProbe } from "../adapters/antigravity/quota-client.js"
 import { accessTokenExpired, formatRefreshParts, parseRefreshParts } from "../modules/accounts/index.js"
 import { logQuotaFetch, logQuotaStatus } from "../adapters/opencode/debug.js"
-import { ensureProjectContext } from "./project"
+import { ensureProjectContext } from "../adapters/opencode/project.js"
 import { refreshAccessToken } from "./token"
 import { getModelFamily } from "../modules/inference/index.js"
 import type { PluginClient } from "../adapters/opencode/types.js"

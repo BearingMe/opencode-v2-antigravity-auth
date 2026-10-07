@@ -75,7 +75,7 @@ Rules:
   Esc, replacement, and cleanup with fixture RPC data.
 - TUI→server calls go through `context.client.rpc(AntigravityAccounts)`
   with the current location. Quota text renders via the pure helpers in
-  `src/plugin/account-ui-format.ts` (`renderQuotaBar`, `formatResetCountdown`,
+  `src/adapters/opencode/tui/account-ui-format.ts` (`renderQuotaBar`, `formatResetCountdown`,
   `formatAccountOneLiner`).
 
 ## Transport codec

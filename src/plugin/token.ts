@@ -7,7 +7,7 @@ import { createAccountCredentialRefreshPolicy } from "../modules/accounts/index.
 import { calculateTokenExpiry, formatRefreshParts, parseRefreshParts } from "../modules/accounts/index.js"
 import { clearCachedAuth, storeCachedAuth } from "./cache.js"
 import { createLogger } from "../adapters/opencode/logger.js"
-import { invalidateProjectContextCache } from "./project.js"
+import { invalidateProjectContextCache } from "../adapters/opencode/project.js"
 import type { AccountOAuthCredential, AccountRefreshParts } from "../modules/accounts/index.js"
 import type { PluginClient } from "../adapters/opencode/types.js"
 

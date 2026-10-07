@@ -186,7 +186,7 @@ the receiving boundary exists; their current path remains legacy-by-location.
 | `src/plugin/cache.ts`, `src/plugin/cache/signature-cache.ts`, `src/plugin/stores/signature-store.ts`                                                                                                           | Separate auth snapshot behavior into accounts refresh; keep signature policy and in-memory signature stores in `modules/inference/signatures/`; move disk serialization/path operations to `adapters/filesystem/signature-store.ts`.                                                                                                       |
 | `src/plugin/request.ts`, `src/plugin/request-helpers.ts`, `src/plugin/transform/{claude,cross-model-sanitizer,gemini,index,model-resolver,types}.ts`, `src/plugin/core/streaming/{index,transformer,types}.ts` | `modules/inference/{request,response,transform,streaming}/`; split pure transforms from protocol-envelope/network work and keep transforms pure.                                                                                                                                                                                           |
 | `src/plugin/thinking-recovery.ts`, `src/plugin/recovery.ts`, `src/plugin/recovery/{constants,storage,types}.ts`                                                                                                | `modules/session-recovery/`; separate in-request turn repair from session-error detection and repair. Keep storage needs in the module contract; OpenCode message/part layout and file access belong to `adapters/opencode/`. Inference reaches recovery only through its public contract.                                                 |
-| `src/antigravity/oauth.ts`, `src/plugin/token.ts`, `src/plugin/project.ts`, `src/plugin/fingerprint.ts`, `src/plugin/version.ts`                                                                               | `adapters/antigravity/`; preserve OAuth, token, project-discovery, fingerprint, and version wire behavior.                                                                                                                                                                                                                                 |
+| `src/plugin/token.ts`, `src/plugin/fingerprint.ts`, `src/adapters/antigravity/{oauth,project,version}.ts`                                                                                                      | `adapters/antigravity/`; preserve OAuth, token, project-discovery, fingerprint, and version wire behavior.                                                                                                                                                                                                                                 |
 | External-request portions of `src/plugin/request.ts`                                                                                                                                                           | `adapters/antigravity/inference-client.ts`; do not move account selection, retries, or inference policy there.                                                                                                                                                                                                                             |
 | `src/plugin/errors.ts`                                                                                                                                                                                         | `modules/inference/` for inference/request errors; split only if a distinct account or adapter error contract is demonstrated.                                                                                                                                                                                                             |
 | `src/plugin/image-saver.ts`                                                                                                                                                                                    | `adapters/filesystem/`; image-output path and writes are infrastructure, not inference policy. Add/fold a cohesive leaf within this adapter during migration; do not add a new top-level capability.                                                                                                                                       |
@@ -423,10 +423,10 @@ into `adapters/filesystem/debug-log.ts`, and host behavior into its adapter.
   delivery now live in `src/adapters/opencode/logging.ts`; file path selection,
   retention, timestamped writes, and config ignore updates live in
   `src/adapters/filesystem/`.
-- `plugin/logger.ts` remains the compatibility facade; `plugin/debug.ts` keeps
-  Antigravity request/account trace context and header redaction. The storage
-  module retains its existing `.gitignore` exports and reporting via wrappers;
-  account storage behavior was not moved.
+- At Step 4 completion, `plugin/logger.ts` was the compatibility facade and
+  `plugin/debug.ts` kept Antigravity request/account trace context and header
+  redaction. Step 14 later moved host logging/debug into `adapters/opencode/`;
+  account storage retained its `.gitignore` exports and reporting wrappers.
 - Removed the Step 3 runtime-cycle exception after breaking the debug → storage
   edge. The boundary checker passes with no cycle allowance. Debug `close()`
   waits for the file stream to close; reinitialization and explicit disposal
@@ -563,8 +563,9 @@ account policies through ports.
 ### Step 7 progress notes
 
 - Added Antigravity OAuth, token, project, quota, verification, and provider
-  constants adapters. `src/constants.ts`, `src/antigravity/oauth.ts`, and
-  `src/plugin/verification.ts` retain compatibility exports.
+  constants adapters. At Step 7 completion, `src/constants.ts`,
+  `src/antigravity/oauth.ts`, and `src/plugin/verification.ts` retained
+  compatibility exports; later Step 14 notes record their relocation/removal.
 - Connected token refresh, OAuth/managed-project discovery, quota probes, and
   verification through accounts ports. Retry timing, project context/cache,
   quota aggregation/presentation, refresh invalidation, and verification
@@ -1089,6 +1090,16 @@ maintained documentation with the completed architecture.
   expectations), changed-file Prettier, `git diff --check`, clean build, and the
   built Antigravity request smoke (synthetic credentials, mocked HTTP). Oracle
   and review found no remaining code blocker. Installed-host E2E remains open.
+- Moved managed-project policy composition from `src/plugin/project.ts` into
+  `adapters/antigravity/project.ts`, with a host-logging facade in
+  `adapters/opencode/project.ts`. Updated app/plugin consumers, test mocks, the
+  built communication smoke, and current architecture references. Verification
+  passed: Vitest (75 files / 1,200 tests), native TUI (13 / 164), typecheck,
+  lint, boundary checks and fixtures (7 tests / 22 expectations), changed-file
+  Prettier, `git diff --check`, clean build, and the built Antigravity
+  communication smoke (synthetic credentials, mocked HTTP). Oracle confirmed
+  ownership and identified a stale §2.2 reference, which was corrected; review
+  found no code blocker. Installed-host E2E remains open.
 
 **Acceptance criteria:**
 

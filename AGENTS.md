@@ -144,7 +144,7 @@ Git hooks managed via Husky + lint-staged (pre-commit: eslint --fix + prettier) 
 src/
 ├── v2-plugin.ts / tui.ts / rpc.ts / google-sdk.ts # Compatibility entrypoints
 ├── constants.ts               # Endpoints, headers, OAuth identity, model routing
-├── adapters/antigravity/{oauth,version}.ts # Provider OAuth/version workflow; host facades live in opencode/
+├── adapters/antigravity/{oauth,project,version}.ts # Provider OAuth/project/version composition
 ├── app/
 │   ├── composition.ts          # Selects OpenCode, account, inference, and transport adapters
 │   └── execute-request.ts      # Single request execution and retry orchestration
@@ -160,15 +160,14 @@ src/
 ├── modules/session-recovery/  # Error policy, session repair, and request-time turn repair
 └── plugin/
     ├── account-service.ts     # Shared account store service (tool + RPC backend)
-    ├── account-ui-format.ts   # Quota bars, countdowns, one-liners (pure)
     ├── auth.ts / token.ts     # Refresh-part packing + unified refresh path
     ├── verify.ts                  # Account verification refresh/probe composition
     ├── request.ts / request-helpers.ts  # Transform core + schema/thinking utils
     ├── quota.ts               # Antigravity per-model + grouped quota probing
-    ├── fingerprint.ts / project.ts  # Device fingerprints + managed project context
+    ├── fingerprint.ts               # Device fingerprint composition
     ├── refresh-queue.ts          # Proactive refresh queue composition
     ├── cache.ts               # Auth cache and signature-persistence composition
-    └── remaining composition files (request, account, token, quota, project, verification)
+    └── remaining composition files (request, account, token, quota, verification)
 ```
 
 > Historical: V1 `src/plugin.ts`, `cli.ts`, `server.ts`, `ui/`, and

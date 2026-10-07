@@ -49,8 +49,10 @@ statusText}` on `!ok`; `invalid_grant` invalidates project cache and clears
   cached auth; preserves project ids when the server omits `refresh_token`;
   stores cached auth + invalidates project cache on success.
 - Managed-project lookup, retry timing, cache coalescing, and fallback selection
-  live in `src/modules/accounts/project-context/policy.ts`; the plugin project
-  facade composes the Antigravity project port and preserves the raw loader API.
+  live in `src/modules/accounts/project-context/policy.ts`;
+  `adapters/antigravity/project.ts` composes the policy with its provider port,
+  and `adapters/opencode/project.ts` binds the host logger while preserving the
+  raw loader API.
 - Refresh is unified: `src/app/composition.ts ::
 refreshOAuthCredentialUnified` and the V2 authorize-callback path both go
   through `src/plugin/token.ts :: refreshAccessToken` (skew handling,
@@ -207,14 +209,16 @@ composes ONLY `User-Agent` (applied on the antigravity path in
 requests). `getRandomizedHeaders("antigravity")` never emits linux
 (Linux masquerades as macOS).
 
-## 2.9 Managed projects — policy in `src/plugin/project.ts`, transport in
+## 2.9 Managed projects — policy in `src/modules/accounts/project-context/policy.ts`,
 
-`src/adapters/antigravity/project-client.ts`
+transport in `src/adapters/antigravity/project-client.ts`, composition in
+`src/adapters/antigravity/project.ts`, with the host logger facade in
+`src/adapters/opencode/project.ts`
 
 `loadManagedProject` (`loadCodeAssist` + duetProject across LOAD+FALLBACK,
 nodejs UA + Client-Metadata), adapter onboarding sessions (one `onboardUser`
 attempt per current endpoint, each request/body read bounded at 10 s),
-`plugin/project.ts :: onboardManagedProject` (10×5 s retries per endpoint),
+`adapters/antigravity/project.ts :: onboardManagedProject` (10×5 s retries per endpoint),
 `ensureProjectContext` (empty without token; refresh-keyed cache + pending
 dedup; managed short-circuit; else load→onboard FREE→fallback
 `projectId`→`ANTIGRAVITY_DEFAULT_PROJECT_ID`; caches under new key).

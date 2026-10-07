@@ -22,8 +22,8 @@ vi.mock("../plugin/request.ts", async (importOriginal) => {
   }
 })
 
-vi.mock("../plugin/project.ts", async (importOriginal) => {
-  const orig = await importOriginal<typeof import("../plugin/project.ts")>()
+vi.mock("../adapters/opencode/project.ts", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("../adapters/opencode/project.ts")>()
   return { ...orig, ensureProjectContext: mockEnsureProjectContext }
 })
 

@@ -7,12 +7,14 @@ const { antigravityManagedProjectPort } = vi.hoisted(() => ({
   },
 }))
 
-vi.mock("../adapters/antigravity/project-client.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../adapters/antigravity/project-client.js")>()),
+vi.mock("./project-client.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./project-client.js")>()),
   antigravityManagedProjectPort,
 }))
 
-import { onboardManagedProject } from "./project.js"
+import { createAntigravityProjectService } from "./project.js"
+
+const { onboardManagedProject } = createAntigravityProjectService({ debug: vi.fn(), warn: vi.fn() })
 
 afterEach(() => {
   vi.clearAllMocks()

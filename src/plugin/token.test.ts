@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { ANTIGRAVITY_PROVIDER_ID } from "../constants"
 import { clearCachedAuth, resolveCachedAuth, storeCachedAuth } from "./cache"
-import { ensureProjectContext, invalidateProjectContextCache } from "./project"
+import { ensureProjectContext, invalidateProjectContextCache } from "../adapters/opencode/project.js"
 import { AntigravityTokenRefreshError, refreshAccessToken } from "./token"
 import type { AccountOAuthCredential } from "../modules/accounts/index.js"
 import type { PluginClient } from "../adapters/opencode/types.js"
