@@ -88,9 +88,9 @@ event` transforms. V2 API explicitly "may change before stable".
 - `src/plugin/verify.ts` + `verify.test.ts`:
   `verifyAccountAccess` (blocked→disabled+URL, ok passthrough,
   error-without-disable).
-- `src/adapters/antigravity/verification-parser.ts` (re-exported by
-  `src/plugin/verification.ts`) + `verification.test.ts`: shared
-  verification-error helpers (URL normalization, error-detail extraction).
+- `src/adapters/antigravity/verification-parser.ts` +
+  `verification-parser.test.ts`: shared verification-error helpers (URL
+  normalization, error-detail extraction).
 - No search tool or search module remains; endpoint orderings are PROD→DAILY
   load, DAILY→PROD fallback.
 - `adapters/opencode/hooks/auto-update-checker`: `checker.test.ts` (config/JSONC/entry

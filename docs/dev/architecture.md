@@ -84,7 +84,7 @@ src/
     ├── account-service.ts     # Compatibility façade and RPC quota-schema validation
     ├── account-ui-format.ts   # Quota bars, countdowns, one-liners (pure)
     ├── auth.ts / token.ts     # Refresh-part packing and provider/cache composition
-    ├── verify.ts / verification.ts  # Access verification policy + compatibility exports
+    ├── verify.ts                  # Account verification refresh/probe composition
     ├── request.ts / request-helpers.ts  # Compatibility APIs and config/debug adapters
     ├── quota.ts               # Antigravity quota refresh/probe adapter composition
     ├── fingerprint.ts / project.ts  # Device fingerprints + project-context composition

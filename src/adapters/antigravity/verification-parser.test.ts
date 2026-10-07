@@ -4,7 +4,7 @@ import {
   extractVerificationErrorDetails,
   normalizeGoogleVerificationUrl,
   selectBestVerificationUrl,
-} from "./verification.ts"
+} from "./verification-parser.js"
 
 describe("verification helpers", () => {
   it("decodes escaped entities in verification text", () => {

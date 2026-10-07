@@ -979,6 +979,17 @@ maintained documentation with the completed architecture.
   request path already supplies image processing to inference; no runtime source
   depended on the old default-image wrapper. Updated the subsystem ownership
   note to remove its compatibility-export claim.
+- Removed `src/plugin/verification.ts`, a parser-only re-export, and changed the
+  application executor to import the Antigravity parser directly. Moved parser
+  tests beside that adapter; retained `src/plugin/verify.ts`, which owns the
+  account refresh/probe composition. The removed path is not a package export.
+- Verification passed: full Vitest (75 files / 1,200 tests), native TUI (13 / 164),
+  typecheck, lint, boundary checks and fixtures (7 tests / 22 expectations),
+  changed-file Prettier, `git diff --check`, clean build, and the built Antigravity
+  request smoke (synthetic credentials, mocked HTTP). Oracle and review found no
+  blocker. No runtime functions or methods changed, so this slice adds no JSDoc
+  audit surface. The smoke is not installed-host E2E; final acceptance remains
+  open.
 
 **Acceptance criteria:**
 

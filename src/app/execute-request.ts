@@ -26,7 +26,7 @@ import {
 } from "../plugin/debug.js"
 import type { AntigravityDebugContext } from "../plugin/debug.js"
 import { createLogger } from "../plugin/logger.js"
-import { extractVerificationErrorDetails } from "../plugin/verification.js"
+import { extractVerificationErrorDetails } from "../adapters/antigravity/verification-parser.js"
 import type { AntigravityConfig } from "../adapters/opencode/config/index.js"
 import type { ProjectContextResult } from "../modules/accounts/index.js"
 import type { InferenceApi } from "../modules/inference/index.js"

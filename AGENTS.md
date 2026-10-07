@@ -162,7 +162,7 @@ src/
     ├── account-service.ts     # Shared account store service (tool + RPC backend)
     ├── account-ui-format.ts   # Quota bars, countdowns, one-liners (pure)
     ├── auth.ts / token.ts     # Refresh-part packing + unified refresh path
-    ├── verify.ts / verification.ts  # Access verification + error helpers
+    ├── verify.ts                  # Account verification refresh/probe composition
     ├── request.ts / request-helpers.ts  # Transform core + schema/thinking utils
     ├── quota.ts               # Antigravity per-model + grouped quota probing
     ├── fingerprint.ts / project.ts  # Device fingerprints + managed project context
