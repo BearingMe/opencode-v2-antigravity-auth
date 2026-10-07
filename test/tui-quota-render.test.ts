@@ -4,7 +4,7 @@ import { createElement, insert, setProp, testRender } from "@opentui/solid"
 import { MissingAccountDialogView, QuotaDialogView } from "../dist/src/adapters/opencode/tui/quota-dialog.js"
 import { createQuotaDialogController } from "../dist/src/adapters/opencode/tui/quota-controller.js"
 import { AccountListDialogView } from "../dist/src/adapters/opencode/tui/account-list-dialog.js"
-import type { QuotaRefreshOutcome } from "../src/plugin/account-ui-format.js"
+import type { QuotaRefreshOutcome } from "../src/adapters/opencode/tui/account-ui-format.js"
 import type { QuotaDialogKeymapCommand } from "../src/adapters/opencode/tui/quota-dialog.js"
 
 const snapshot = (fraction: number) => ({

@@ -5,8 +5,12 @@ import {
   type InferenceRequestOptions,
   type PreparedInferenceRequest,
 } from "../modules/inference/index.js"
-import { buildFingerprintHeaders, getSessionFingerprint, type Fingerprint } from "./fingerprint"
-import { processImageData } from "./image-saver"
+import {
+  buildFingerprintHeaders,
+  getSessionFingerprint,
+  type Fingerprint,
+} from "../adapters/antigravity/fingerprint.js"
+import { processImageData } from "../adapters/filesystem/image-saver.js"
 import { getKeepThinking } from "../adapters/opencode/config/index.js"
 import {
   DEBUG_MESSAGE_PREFIX,

@@ -114,6 +114,7 @@ export {
 } from "./constants.js"
 export * from "./transforms/index.js"
 export { cleanJSONSchemaForAntigravity } from "./schema-cleaner.js"
+export { EmptyResponseError, ToolIdMismatchError } from "./errors.js"
 export {
   cacheSignature,
   clearSignatureCache,

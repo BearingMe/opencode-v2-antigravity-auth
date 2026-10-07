@@ -1,4 +1,4 @@
-import { processImageData } from "./image-saver"
+import { processImageData } from "../adapters/filesystem/image-saver.js"
 import { createLogger } from "./logger"
 import { getKeepThinking } from "../adapters/opencode/config/index.js"
 import {

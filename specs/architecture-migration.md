@@ -1040,6 +1040,16 @@ maintained documentation with the completed architecture.
   `errors.test.ts`, `image-saver.ts`, `types.ts`, `version.test.ts`, and
   `shims.d.ts`); no unrelated formatting edits were made. The smoke is not
   installed-host E2E; final acceptance remains open.
+- Relocated inference errors to `modules/inference`, fingerprinting to
+  `adapters/antigravity`, image persistence to `adapters/filesystem`, and quota
+  presentation to `adapters/opencode/tui`. Updated consumers and exposed error
+  classes through the inference public API. Post-format verification passed:
+  Vitest (75 files / 1,200 tests), native TUI (13 / 164), typecheck, lint,
+  boundary checks and fixtures (7 tests / 22 expectations), changed-file
+  Prettier, `git diff --check`, clean package build, and the built Antigravity
+  request smoke (synthetic credentials, mocked HTTP). Oracle and review found
+  no blocker. Implementations and existing JSDoc were preserved; Step 14 remains
+  open for the remaining legacy paths and installed-host E2E.
 
 **Acceptance criteria:**
 

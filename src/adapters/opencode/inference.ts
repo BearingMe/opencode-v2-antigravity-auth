@@ -1,6 +1,6 @@
 import type { InferenceApi } from "../../modules/inference/index.js"
 import { getModelFamily } from "../../modules/inference/index.js"
-import type { Fingerprint } from "../../plugin/fingerprint.js"
+import type { Fingerprint } from "../antigravity/fingerprint.js"
 import {
   assertAntigravityModelSupported,
   buildThinkingWarmupBody,

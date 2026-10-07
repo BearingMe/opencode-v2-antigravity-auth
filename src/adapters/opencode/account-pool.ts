@@ -6,7 +6,7 @@ import {
   type PoolOAuthAuth,
 } from "../../modules/accounts/index.js"
 import { fingerprintRefreshToken, loadAccounts, updateAccounts } from "../filesystem/account-store.js"
-import { generateFingerprint, updateFingerprintVersion } from "../../plugin/fingerprint.js"
+import { generateFingerprint, updateFingerprintVersion } from "../antigravity/fingerprint.js"
 import { debugLogToFile } from "../../plugin/debug.js"
 import { formatAccountLabel } from "../../plugin/logging-utils.js"
 

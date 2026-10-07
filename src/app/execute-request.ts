@@ -12,7 +12,7 @@ import {
   type AccountPool,
 } from "../modules/accounts/index.js"
 import { createSyntheticErrorResponse, isEmptyResponseBody } from "../modules/inference/index.js"
-import { EmptyResponseError } from "../plugin/errors.js"
+import { EmptyResponseError } from "../modules/inference/index.js"
 import { AntigravityTokenRefreshError } from "../plugin/token.js"
 import {
   isDebugEnabled,
@@ -31,7 +31,7 @@ import type { AntigravityConfig } from "../adapters/opencode/config/index.js"
 import type { ProjectContextResult } from "../modules/accounts/index.js"
 import type { InferenceApi } from "../modules/inference/index.js"
 import type { AntigravityInferenceClient } from "../adapters/antigravity/inference-client.js"
-import type { Fingerprint } from "../plugin/fingerprint.js"
+import type { Fingerprint } from "../adapters/antigravity/fingerprint.js"
 
 const log = createLogger("engine")
 

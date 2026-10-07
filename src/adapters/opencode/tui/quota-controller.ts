@@ -1,4 +1,4 @@
-import type { QuotaDetailSnapshot, QuotaRefreshOutcome } from "../../../plugin/account-ui-format.js"
+import type { QuotaDetailSnapshot, QuotaRefreshOutcome } from "./account-ui-format.js"
 
 /** Dependencies used by one quota dialog controller. */
 export interface QuotaDialogDeps {
