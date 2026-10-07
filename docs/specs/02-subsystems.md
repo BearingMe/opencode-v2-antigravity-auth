@@ -229,8 +229,7 @@ thought accumulation, Claude index 0, fullText+signature store,
 delta-only dedup via sentBuffer+displayedHashes DJB2, one-shot debug
 inject, `transformThinkingParts`); usageMetadata detection + synthetic
 zero-usage injection on flush. `transformStreamingPayload` is the
-non-streaming variant. `src/plugin/core/streaming/*` retains compatibility
-exports.
+non-streaming variant.
 
 ## 2.11 Recovery (two layers)
 

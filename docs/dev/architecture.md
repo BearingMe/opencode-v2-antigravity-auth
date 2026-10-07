@@ -86,7 +86,6 @@ src/
     ├── auth.ts / token.ts     # Refresh-part packing and provider/cache composition
     ├── verify.ts / verification.ts  # Access verification policy + compatibility exports
     ├── request.ts / request-helpers.ts  # Compatibility APIs and config/debug adapters
-    ├── core/streaming/        # Compatibility exports for inference SSE transformer
     ├── quota.ts               # Antigravity quota refresh/probe adapter composition
     ├── fingerprint.ts / project.ts  # Device fingerprints + project-context composition
     ├── refresh-queue.ts          # Proactive refresh compatibility façade

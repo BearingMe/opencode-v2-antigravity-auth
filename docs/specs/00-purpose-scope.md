@@ -45,8 +45,10 @@ In scope:
 - Request interception, model resolution, payload transforms, and streaming
   (`src/modules/inference/pipeline.ts`, `src/modules/inference/transforms/*`,
   `src/modules/inference/signature-*`, `src/modules/inference/streaming/*`).
-  `src/plugin/request.ts`, `src/plugin/request-helpers.ts`, and
-  `src/plugin/core/streaming/*` retain compatibility APIs and adapter wiring.
+  `src/plugin/request.ts` and `src/plugin/request-helpers.ts` retain plugin
+  request adaptation and helper APIs. The former `src/plugin/core/streaming/*`
+  re-export paths were removed in Step 14; streaming policy is consumed from
+  `modules/inference/`.
   The former `src/plugin/transform/*` re-export paths were removed in Step 14;
   transform policy is consumed from `modules/inference/`.
 - Multi-account pool/selection and persistence policy

@@ -27,36 +27,9 @@ import {
   resolveProjectKey,
   MIN_SIGNATURE_LENGTH,
 } from "../modules/inference/index.js"
-import { createStreamingTransformer, transformSseLine, transformStreamingPayload } from "./core/streaming"
 import { DEFAULT_CONFIG } from "../adapters/opencode/config/index.js"
 import { initializeDebug } from "./debug"
 import * as config from "../adapters/opencode/config/index.js"
-import type { SignatureStore, ThoughtBuffer, StreamingCallbacks, StreamingOptions } from "./core/streaming/types"
-
-/**
- * Creates an in-memory mock signature store for testing.
- */
-function createMockSignatureStore(): SignatureStore {
-  const store = new Map<string, { text: string; signature: string }>()
-  return {
-    get: (key: string) => store.get(key),
-    set: (key: string, value: { text: string; signature: string }) => store.set(key, value),
-    has: (key: string) => store.has(key),
-    delete: (key: string) => store.delete(key),
-  }
-}
-
-/**
- * Creates an in-memory mock thought buffer for testing.
- */
-function createMockThoughtBuffer(): ThoughtBuffer {
-  const buffer = new Map<number, string>()
-  return {
-    get: (idx: number) => buffer.get(idx),
-    set: (idx: number, text: string) => buffer.set(idx, text),
-    clear: () => buffer.clear(),
-  }
-}
 
 /**
  * Builds a message item fixture for contents or messages arrays.
@@ -87,10 +60,6 @@ function createThoughtPart(text: string, options: { signature?: string; thoughtS
   }
   return part
 }
-
-const defaultCallbacks: StreamingCallbacks = {}
-const defaultOptions: StreamingOptions = {}
-const defaultDebugState = { injected: false }
 
 /** Runs one test with the requested keep_thinking configuration. */
 function withKeepThinking<T>(enabled: boolean, fn: () => T): T {
@@ -403,146 +372,6 @@ describe("request.ts", () => {
     it("returns false when thinking blocks are unsigned", () => {
       const messages = [{ role: "assistant", content: [{ type: "thinking", thinking: "no sig" }] }]
       expect(hasSignedThinkingInMessages(messages)).toBe(false)
-    })
-  })
-
-  describe("transformSseLine", () => {
-    /** Transforms a single SSE line with isolated streaming state. */
-    const callTransformSseLine = (line: string) => {
-      const store = createMockSignatureStore()
-      const buffer = createMockThoughtBuffer()
-      const sentBuffer = createMockThoughtBuffer()
-      return transformSseLine(line, store, buffer, sentBuffer, defaultCallbacks, defaultOptions, {
-        ...defaultDebugState,
-      })
-    }
-
-    it("returns empty lines unchanged", () => {
-      expect(callTransformSseLine("")).toBe("")
-      expect(callTransformSseLine("   ")).toBe("   ")
-    })
-
-    it("returns non-data lines unchanged", () => {
-      expect(callTransformSseLine("event: message")).toBe("event: message")
-      expect(callTransformSseLine(": heartbeat")).toBe(": heartbeat")
-    })
-
-    it("handles data: [DONE] unchanged", () => {
-      expect(callTransformSseLine("data: [DONE]")).toBe("data: [DONE]")
-    })
-
-    it("handles invalid JSON gracefully", () => {
-      expect(callTransformSseLine("data: not-json")).toBe("data: not-json")
-      expect(callTransformSseLine("data: {invalid}")).toBe("data: {invalid}")
-    })
-
-    it("passes through valid JSON without thinking parts", () => {
-      const payload = { candidates: [{ content: { parts: [{ text: "hello" }] } }] }
-      const line = `data: ${JSON.stringify(payload)}`
-      const result = callTransformSseLine(line)
-      expect(result).toContain("data:")
-      expect(result).toContain("hello")
-    })
-
-    it("transforms thinking parts in streaming data", () => {
-      const payload = {
-        candidates: [
-          {
-            content: {
-              parts: [{ thought: true, text: "reasoning..." }],
-            },
-          },
-        ],
-      }
-      const line = `data: ${JSON.stringify(payload)}`
-      const result = callTransformSseLine(line)
-      expect(result).toContain("data:")
-    })
-  })
-
-  describe("transformStreamingPayload", () => {
-    it("handles empty string", () => {
-      expect(transformStreamingPayload("")).toBe("")
-    })
-
-    it("handles single line without data prefix", () => {
-      expect(transformStreamingPayload("event: ping")).toBe("event: ping")
-    })
-
-    it("handles multiple lines", () => {
-      const input = "event: message\ndata: [DONE]\n"
-      const result = transformStreamingPayload(input)
-      expect(result).toContain("event: message")
-      expect(result).toContain("data: [DONE]")
-    })
-
-    it("preserves line structure", () => {
-      const input = "line1\nline2\nline3"
-      const result = transformStreamingPayload(input)
-      const lines = result.split("\n")
-      expect(lines.length).toBe(3)
-    })
-  })
-
-  describe("createStreamingTransformer", () => {
-    it("returns a TransformStream", () => {
-      const store = createMockSignatureStore()
-      const transformer = createStreamingTransformer(store, defaultCallbacks)
-      expect(transformer).toBeInstanceOf(TransformStream)
-      expect(transformer.readable).toBeDefined()
-      expect(transformer.writable).toBeDefined()
-    })
-
-    it("accepts optional signatureSessionKey", () => {
-      const store = createMockSignatureStore()
-      const transformer = createStreamingTransformer(store, defaultCallbacks, { signatureSessionKey: "session-key" })
-      expect(transformer).toBeInstanceOf(TransformStream)
-    })
-
-    it("accepts optional debugText", () => {
-      const store = createMockSignatureStore()
-      const transformer = createStreamingTransformer(store, defaultCallbacks, {
-        signatureSessionKey: "session-key",
-        debugText: "debug info",
-      })
-      expect(transformer).toBeInstanceOf(TransformStream)
-    })
-
-    it("accepts cacheSignatures flag", () => {
-      const store = createMockSignatureStore()
-      const transformer = createStreamingTransformer(store, defaultCallbacks, {
-        signatureSessionKey: "session-key",
-        cacheSignatures: true,
-      })
-      expect(transformer).toBeInstanceOf(TransformStream)
-    })
-
-    it("processes chunks through the stream", async () => {
-      const store = createMockSignatureStore()
-      const transformer = createStreamingTransformer(store, defaultCallbacks)
-      const encoder = new TextEncoder()
-      const decoder = new TextDecoder()
-
-      const input = encoder.encode("data: [DONE]\n")
-      const outputChunks: Uint8Array[] = []
-
-      const writer = transformer.writable.getWriter()
-      const reader = transformer.readable.getReader()
-
-      const readPromise = (async () => {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          if (value) outputChunks.push(value)
-        }
-      })()
-
-      await writer.write(input)
-      await writer.close()
-      await readPromise
-
-      const output = outputChunks.map((chunk) => decoder.decode(chunk)).join("")
-      expect(output).toContain("[DONE]")
     })
   })
 

@@ -164,7 +164,6 @@ src/
     ├── auth.ts / token.ts     # Refresh-part packing + unified refresh path
     ├── verify.ts / verification.ts  # Access verification + error helpers
     ├── request.ts / request-helpers.ts  # Transform core + schema/thinking utils
-    ├── core/streaming/        # SSE transformer
     ├── quota.ts               # Antigravity per-model + grouped quota probing
     ├── fingerprint.ts / project.ts  # Device fingerprints + managed project context
     ├── refresh-queue.ts          # Proactive refresh queue composition

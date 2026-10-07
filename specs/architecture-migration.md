@@ -974,6 +974,11 @@ maintained documentation with the completed architecture.
   composition now imports the filesystem adapter directly, and the thought-
   buffer behavior tests live beside the inference-owned implementation; its
   exported buffer factory now has the required API documentation.
+- Removed the unused `src/plugin/core/streaming/` compatibility adapter after
+  moving streaming-helper tests to `modules/inference/streaming/`. The active
+  request path already supplies image processing to inference; no runtime source
+  depended on the old default-image wrapper. Updated the subsystem ownership
+  note to remove its compatibility-export claim.
 
 **Acceptance criteria:**
 
