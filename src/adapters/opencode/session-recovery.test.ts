@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import { Message } from "@opencode/ai"
 import { applyOpenCodeToolResultBatches, createOpenCodeRecoverySessionPort } from "./session-recovery.js"
-import type { PluginClient } from "../../plugin/types.js"
+import type { PluginClient } from "./types.js"
 
 /** Builds a typed client double for the session APIs used by recovery. */
 function createClient(messages: unknown = { data: [] }) {

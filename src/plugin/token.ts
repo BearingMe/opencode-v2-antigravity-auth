@@ -4,11 +4,12 @@ import {
   type RefreshedOAuthToken,
 } from "../adapters/antigravity/token-client.js"
 import { createAccountCredentialRefreshPolicy } from "../modules/accounts/index.js"
-import { calculateTokenExpiry, formatRefreshParts, parseRefreshParts } from "./auth.js"
+import { calculateTokenExpiry, formatRefreshParts, parseRefreshParts } from "../modules/accounts/index.js"
 import { clearCachedAuth, storeCachedAuth } from "./cache.js"
 import { createLogger } from "./logger.js"
 import { invalidateProjectContextCache } from "./project.js"
-import type { OAuthAuthDetails, PluginClient, RefreshParts } from "./types.js"
+import type { AccountOAuthCredential, AccountRefreshParts } from "../modules/accounts/index.js"
+import type { PluginClient } from "../adapters/opencode/types.js"
 
 const log = createLogger("token")
 
@@ -31,8 +32,8 @@ export class AntigravityTokenRefreshError extends Error {
 }
 
 const credentialRefreshPolicy = createAccountCredentialRefreshPolicy<
-  OAuthAuthDetails,
-  RefreshParts,
+  AccountOAuthCredential,
+  AccountRefreshParts,
   RefreshedOAuthToken
 >({
   port: antigravityCredentialRefreshPort,
@@ -60,9 +61,9 @@ const credentialRefreshPolicy = createAccountCredentialRefreshPolicy<
 
 /** Compatibility entry into the unified account credential refresh policy. */
 export function refreshAccessToken(
-  auth: OAuthAuthDetails,
+  auth: AccountOAuthCredential,
   _client: PluginClient,
   _providerId: string,
-): Promise<OAuthAuthDetails | undefined> {
+): Promise<AccountOAuthCredential | undefined> {
   return credentialRefreshPolicy.refresh(auth)
 }

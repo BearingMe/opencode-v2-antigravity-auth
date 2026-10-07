@@ -19,7 +19,7 @@ import type {
   QuotaPresentation,
   QuotaPresentationOptions,
 } from "../modules/accounts/index.js"
-import type { PluginClient } from "./types.js"
+import type { PluginClient } from "../adapters/opencode/types.js"
 import { checkAccountsQuota } from "./quota.js"
 import { verifyAccountAccess } from "./verify.js"
 import { createLogger } from "./logger.js"

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { DEFAULT_CONFIG } from "../adapters/opencode/config/index.js"
-import type { PluginClient } from "./types"
+import type { PluginClient } from "../adapters/opencode/types.js"
 
 vi.mock("../adapters/filesystem/debug-log.js", () => ({
   createDebugFileDestination: vi.fn((enabled: boolean, customLogDir?: string) => ({

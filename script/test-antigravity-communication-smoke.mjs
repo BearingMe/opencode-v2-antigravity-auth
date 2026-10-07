@@ -16,7 +16,7 @@ import { loadManagedProject } from "../dist/src/adapters/antigravity/project-cli
 import { onboardManagedProject } from "../dist/src/plugin/project.js"
 import { refreshOAuthToken } from "../dist/src/adapters/antigravity/token-client.js"
 import { prepareAntigravityRequest } from "../dist/src/plugin/request.js"
-import { formatRefreshParts } from "../dist/src/plugin/auth.js"
+import { formatRefreshParts } from "../dist/src/modules/accounts/index.js"
 import { DEFAULT_CONFIG } from "../dist/src/adapters/opencode/config/schema.js"
 import { executeAntigravityRequest } from "../dist/src/app/composition.js"
 

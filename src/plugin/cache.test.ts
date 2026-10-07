@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { resolveCachedAuth, storeCachedAuth, clearCachedAuth } from "./cache"
-import type { OAuthAuthDetails } from "./types"
+import type { AccountOAuthCredential } from "../modules/accounts/index.js"
 
 /** Builds a synthetic auth snapshot for cache policy tests. */
-function createAuth(overrides: Partial<OAuthAuthDetails> = {}): OAuthAuthDetails {
+function createAuth(overrides: Partial<AccountOAuthCredential> = {}): AccountOAuthCredential {
   return {
     type: "oauth",
     refresh: "refresh-token|project-id",

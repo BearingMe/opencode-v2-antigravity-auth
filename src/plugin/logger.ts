@@ -1,7 +1,7 @@
 import { configureOpenCodeLogging, writeOpenCodeLog } from "../adapters/opencode/logging.js"
 import { createLogger as createPlatformLogger, type Logger } from "../platform/logging/index.js"
 import { isDebugTuiEnabled } from "./debug"
-import type { PluginClient } from "./types"
+import type { PluginClient } from "../adapters/opencode/types.js"
 
 /** Logger interface retained for the existing plugin-facing imports. */
 export type { Logger } from "../platform/logging/index.js"

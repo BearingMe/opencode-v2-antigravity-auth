@@ -4,7 +4,7 @@ import { AccountManager } from "./account-pool"
 import { resolveQuotaGroup } from "../../modules/accounts/index.js"
 import type { ModelFamily, AccountMetadataV3, AccountStorageV4 } from "../../modules/accounts/index.js"
 import { updateAccounts } from "../filesystem/account-store.js"
-import type { OAuthAuthDetails } from "../../plugin/types.js"
+import type { AccountOAuthCredential } from "../../modules/accounts/index.js"
 
 const { writtenStores } = vi.hoisted(() => ({ writtenStores: [] as AccountStorageV4[] }))
 
@@ -100,7 +100,7 @@ describe("AccountManager", () => {
   })
 
   it("treats on-disk storage as source of truth, even when empty", () => {
-    const fallback: OAuthAuthDetails = {
+    const fallback: AccountOAuthCredential = {
       type: "oauth",
       refresh: "r1|p1",
       access: "access",
@@ -290,7 +290,7 @@ describe("AccountManager", () => {
   })
 
   it("attaches fallback access tokens only to the matching stored account", () => {
-    const fallback: OAuthAuthDetails = {
+    const fallback: AccountOAuthCredential = {
       type: "oauth",
       refresh: "r2|p2",
       access: "access-2",

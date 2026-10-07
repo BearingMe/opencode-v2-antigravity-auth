@@ -1,6 +1,6 @@
 import type { LogEntry } from "../../platform/logging/index.js"
 import type { LogLevel } from "../../platform/logging/index.js"
-import type { PluginClient } from "../../plugin/types.js"
+import type { PluginClient } from "./types.js"
 
 const ENV_CONSOLE_LOG = "OPENCODE_ANTIGRAVITY_CONSOLE_LOG"
 

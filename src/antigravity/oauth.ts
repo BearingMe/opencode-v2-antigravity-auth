@@ -1,4 +1,4 @@
-import { calculateTokenExpiry } from "../plugin/auth.js"
+import { calculateTokenExpiry } from "../modules/accounts/index.js"
 import { createLogger } from "../plugin/logger.js"
 import { createOAuthAuthorization, exchangeOAuthAuthorizationCode } from "../adapters/antigravity/oauth-client.js"
 import { antigravityOAuthProjectDiscoveryPort } from "../adapters/antigravity/project-client.js"

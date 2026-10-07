@@ -10,7 +10,7 @@ import { fileRecoveryStorage } from "../filesystem/session-recovery-store.js"
 import { logToast } from "../../plugin/debug.js"
 import { createLogger } from "../../plugin/logger.js"
 import type { AntigravityConfig } from "./config/index.js"
-import type { PluginClient } from "../../plugin/types.js"
+import type { PluginClient } from "./types.js"
 
 /** Converts the V2 session-context message shape to recovery's small record. */
 function normalizeRecoveryMessages(value: unknown): RecoveryConversationMessage[] {

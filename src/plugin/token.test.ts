@@ -4,9 +4,10 @@ import { ANTIGRAVITY_PROVIDER_ID } from "../constants"
 import { clearCachedAuth, resolveCachedAuth, storeCachedAuth } from "./cache"
 import { ensureProjectContext, invalidateProjectContextCache } from "./project"
 import { AntigravityTokenRefreshError, refreshAccessToken } from "./token"
-import type { OAuthAuthDetails, PluginClient } from "./types"
+import type { AccountOAuthCredential } from "../modules/accounts/index.js"
+import type { PluginClient } from "../adapters/opencode/types.js"
 
-const baseAuth: OAuthAuthDetails = {
+const baseAuth: AccountOAuthCredential = {
   type: "oauth",
   refresh: "refresh-token|project-123",
   access: "old-access",

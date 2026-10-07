@@ -1,16 +1,16 @@
-import type { AuthDetails, OAuthAuthDetails, RefreshParts } from "./types"
+import type { AccountOAuthCredential, AccountRefreshParts } from "../index.js"
 
 const ACCESS_TOKEN_EXPIRY_BUFFER_MS = 60 * 1000
 
 /** Narrows a general auth value to the OAuth credential shape. */
-export function isOAuthAuth(auth: AuthDetails): auth is OAuthAuthDetails {
+export function isOAuthAuth(auth: { type: string }): auth is AccountOAuthCredential {
   return auth.type === "oauth"
 }
 
 /**
  * Splits a packed refresh string into its constituent refresh token and project IDs.
  */
-export function parseRefreshParts(refresh: string): RefreshParts {
+export function parseRefreshParts(refresh: string | null | undefined): AccountRefreshParts {
   const [refreshToken = "", projectId = "", managedProjectId = ""] = (refresh ?? "").split("|")
   return {
     refreshToken,
@@ -22,7 +22,7 @@ export function parseRefreshParts(refresh: string): RefreshParts {
 /**
  * Serializes refresh token parts into the stored string format.
  */
-export function formatRefreshParts(parts: RefreshParts): string {
+export function formatRefreshParts(parts: AccountRefreshParts): string {
   const projectSegment = parts.projectId ?? ""
   const base = `${parts.refreshToken}|${projectSegment}`
   return parts.managedProjectId ? `${base}|${parts.managedProjectId}` : base
@@ -31,7 +31,7 @@ export function formatRefreshParts(parts: RefreshParts): string {
 /**
  * Determines whether an access token is expired or missing, with buffer for clock skew.
  */
-export function accessTokenExpired(auth: OAuthAuthDetails): boolean {
+export function accessTokenExpired(auth: AccountOAuthCredential): boolean {
   if (!auth.access || typeof auth.expires !== "number") {
     return true
   }

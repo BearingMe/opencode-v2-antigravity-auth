@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { ProactiveRefreshQueue } from "./refresh-queue"
 import { AccountManager } from "../adapters/opencode/account-pool.js"
 import type { AccountStorageV4 } from "../modules/accounts/index.js"
-import type { PluginClient } from "./types"
+import type { PluginClient } from "../adapters/opencode/types.js"
 
 // Mock PluginClient
 const mockClient: PluginClient = {

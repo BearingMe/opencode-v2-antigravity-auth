@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { isOAuthAuth, parseRefreshParts, formatRefreshParts, accessTokenExpired } from "./auth"
-import type { OAuthAuthDetails, ApiKeyAuthDetails } from "./types"
+import { isOAuthAuth, parseRefreshParts, formatRefreshParts, accessTokenExpired } from "./credentials.js"
+import type { AccountOAuthCredential } from "../index.js"
 
 describe("isOAuthAuth", () => {
   it("returns true for oauth auth type", () => {
-    const auth: OAuthAuthDetails = {
+    const auth: AccountOAuthCredential = {
       type: "oauth",
       refresh: "token|project",
       access: "access-token",
@@ -15,7 +15,7 @@ describe("isOAuthAuth", () => {
   })
 
   it("returns false for api_key auth type", () => {
-    const auth: ApiKeyAuthDetails = {
+    const auth = {
       type: "api_key",
       key: "some-api-key",
     }
@@ -70,7 +70,6 @@ describe("parseRefreshParts", () => {
   })
 
   it("handles undefined/null-like input", () => {
-    // @ts-expect-error - testing edge case
     const result = parseRefreshParts(undefined)
     expect(result).toEqual({
       refreshToken: "",
@@ -136,7 +135,7 @@ describe("accessTokenExpired", () => {
   })
 
   it("returns true when access token is missing", () => {
-    const auth: OAuthAuthDetails = {
+    const auth: AccountOAuthCredential = {
       type: "oauth",
       refresh: "token",
       access: undefined,
@@ -146,7 +145,7 @@ describe("accessTokenExpired", () => {
   })
 
   it("returns true when expires is missing", () => {
-    const auth: OAuthAuthDetails = {
+    const auth: AccountOAuthCredential = {
       type: "oauth",
       refresh: "token",
       access: "access-token",
@@ -156,7 +155,7 @@ describe("accessTokenExpired", () => {
   })
 
   it("returns true when token is expired", () => {
-    const auth: OAuthAuthDetails = {
+    const auth: AccountOAuthCredential = {
       type: "oauth",
       refresh: "token",
       access: "access-token",
@@ -166,7 +165,7 @@ describe("accessTokenExpired", () => {
   })
 
   it("returns true when token expires within buffer period (60 seconds)", () => {
-    const auth: OAuthAuthDetails = {
+    const auth: AccountOAuthCredential = {
       type: "oauth",
       refresh: "token",
       access: "access-token",
@@ -176,7 +175,7 @@ describe("accessTokenExpired", () => {
   })
 
   it("returns false when token is valid and outside buffer period", () => {
-    const auth: OAuthAuthDetails = {
+    const auth: AccountOAuthCredential = {
       type: "oauth",
       refresh: "token",
       access: "access-token",
@@ -186,7 +185,7 @@ describe("accessTokenExpired", () => {
   })
 
   it("returns false just outside the buffer boundary", () => {
-    const auth: OAuthAuthDetails = {
+    const auth: AccountOAuthCredential = {
       type: "oauth",
       refresh: "token",
       access: "access-token",

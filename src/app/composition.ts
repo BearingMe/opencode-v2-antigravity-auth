@@ -1,11 +1,11 @@
 import { createAntigravityInferenceClient } from "../adapters/antigravity/inference-client.js"
 import { openCodeInference } from "../adapters/opencode/inference.js"
 import { ANTIGRAVITY_PROVIDER_ID } from "../constants.js"
-import { accessTokenExpired } from "../plugin/auth.js"
+import { accessTokenExpired } from "../modules/accounts/index.js"
 import { disposeDiskSignatureCache } from "../plugin/cache.js"
 import { ensureProjectContext } from "../plugin/project.js"
 import { refreshAccessToken } from "../plugin/token.js"
-import type { OAuthAuthDetails, PluginClient } from "../plugin/types.js"
+import type { PluginClient } from "../adapters/opencode/types.js"
 import { executeRequest, type EngineRequestOptions, type EngineToastVariant } from "./execute-request.js"
 import type { AccountOAuthCredential } from "../modules/accounts/index.js"
 
@@ -41,7 +41,7 @@ export async function refreshOAuthCredentialUnified<T extends UnifiedOAuthCreden
   client: PluginClient,
   providerId: string,
 ): Promise<T> {
-  const auth: OAuthAuthDetails = {
+  const auth: AccountOAuthCredential = {
     type: "oauth",
     refresh: credential.refresh,
     access: credential.access,

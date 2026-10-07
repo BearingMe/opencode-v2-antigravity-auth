@@ -1,5 +1,5 @@
-import { accessTokenExpired } from "./auth"
-import type { OAuthAuthDetails } from "./types"
+import { accessTokenExpired } from "../modules/accounts/index.js"
+import type { AccountOAuthCredential } from "../modules/accounts/index.js"
 import { configureSignaturePersistence, configureSignatureTextHash } from "../modules/inference/index.js"
 import {
   createSignatureCachePersistence,
@@ -11,7 +11,7 @@ import type { SignatureCacheConfig } from "../adapters/opencode/config/index.js"
 
 configureSignatureTextHash(hashSignatureText)
 
-const authCache = new Map<string, OAuthAuthDetails>()
+const authCache = new Map<string, AccountOAuthCredential>()
 
 /**
  * Produces a stable cache key from a refresh token string.
@@ -24,7 +24,7 @@ function normalizeRefreshKey(refresh?: string): string | undefined {
 /**
  * Returns a cached auth snapshot when available, favoring unexpired tokens.
  */
-export function resolveCachedAuth(auth: OAuthAuthDetails): OAuthAuthDetails {
+export function resolveCachedAuth(auth: AccountOAuthCredential): AccountOAuthCredential {
   const key = normalizeRefreshKey(auth.refresh)
   if (!key) {
     return auth
@@ -52,7 +52,7 @@ export function resolveCachedAuth(auth: OAuthAuthDetails): OAuthAuthDetails {
 /**
  * Stores the latest auth snapshot keyed by refresh token.
  */
-export function storeCachedAuth(auth: OAuthAuthDetails): void {
+export function storeCachedAuth(auth: AccountOAuthCredential): void {
   const key = normalizeRefreshKey(auth.refresh)
   if (!key) {
     return

@@ -9,7 +9,7 @@ import { applyOpenCodeToolResultBatches, createOpenCodeSessionRecovery } from ".
 import { createOpenCodeAccountAdministration } from "./account-administration.js"
 import { ANTIGRAVITY_PROVIDER_ID } from "../../constants.js"
 import { AntigravityAccounts } from "./rpc.js"
-import { formatRefreshParts, isOAuthAuth, parseRefreshParts } from "../../plugin/auth.js"
+import { formatRefreshParts, isOAuthAuth, parseRefreshParts } from "../../modules/accounts/index.js"
 import { loadAccounts } from "../filesystem/account-store.js"
 import {
   MAX_SAVED_ACCOUNTS,
@@ -18,7 +18,8 @@ import {
   type MutationOp,
 } from "../../plugin/account-service.js"
 import { OPENCODE_MODEL_DEFINITIONS } from "./config/models.js"
-import type { OAuthAuthDetails, PluginClient } from "../../plugin/types.js"
+import type { AccountOAuthCredential } from "../../modules/accounts/index.js"
+import type { PluginClient } from "./types.js"
 import { createLogger, initLogger } from "../../plugin/logger.js"
 import { initRuntimeConfig, loadConfig } from "./config/index.js"
 import { AccountManager } from "./account-pool.js"
@@ -102,7 +103,7 @@ export const opencodePlugin = Plugin.define({
   id: PLUGIN_ID,
   /** Initializes host services and registers the Antigravity integration. */
   async setup(ctx) {
-    let currentAuth: OAuthAuthDetails | null = null
+    let currentAuth: AccountOAuthCredential | null = null
     let accountSummary = (await loadAccounts())?.accounts ?? []
     /** Refreshes login-form account text without failing a completed mutation. */
     const refreshAccountSummary = async (): Promise<void> => {
@@ -635,7 +636,7 @@ export const opencodePlugin = Plugin.define({
 /** Adapts the supported host APIs to the structural client used by legacy facades. */
 function makeBridgeClient(
   ctx: Parameters<Parameters<typeof Plugin.define>[0]["setup"]>[0],
-  setAuth: (auth: OAuthAuthDetails) => void,
+  setAuth: (auth: AccountOAuthCredential) => void,
 ): PluginClient {
   const client = {
     app: {
@@ -831,7 +832,7 @@ export async function manageAccounts(
   input: { action: string; index?: number },
   client: PluginClient,
   invalidateFetch: () => void,
-  setAuth: (auth: OAuthAuthDetails) => void,
+  setAuth: (auth: AccountOAuthCredential) => void,
 ): Promise<{ content: string }> {
   const accountAdministration = createOpenCodeAccountAdministration(client, ANTIGRAVITY_PROVIDER_ID)
 

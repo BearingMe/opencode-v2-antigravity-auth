@@ -1050,6 +1050,17 @@ maintained documentation with the completed architecture.
   request smoke (synthetic credentials, mocked HTTP). Oracle and review found
   no blocker. Implementations and existing JSDoc were preserved; Step 14 remains
   open for the remaining legacy paths and installed-host E2E.
+- Moved refresh credential parsing, serialization, expiry, and auth narrowing
+  from `src/plugin/auth.ts` to the public accounts refresh module; moved the
+  host client/model contracts from `src/plugin/types.ts` to the OpenCode
+  adapter, using existing accounts types for refresh and project context.
+  Updated runtime/test consumers and the built-package smoke import. Validation
+  passed: Vitest (75 files / 1,200 tests), native TUI (13 / 164), typecheck,
+  lint, boundary checks and fixtures (7 tests / 22 expectations), changed-file
+  Prettier, `git diff --check`, clean build, and the Antigravity request smoke
+  (synthetic credentials, mocked HTTP). Oracle and review found no remaining
+  blocker; the regression prompt inventory still needs path reconciliation.
+  No installed-host E2E is claimed.
 
 **Acceptance criteria:**
 

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { configureOpenCodeLogging, writeConsoleLog, writeOpenCodeLog } from "./logging"
-import type { PluginClient } from "../../plugin/types"
+import type { PluginClient } from "./types.js"
 
 /** Supplies the minimum complete host client accepted by the legacy plugin boundary. */
 function createPluginClient(appLog: PluginClient["app"]["log"]): PluginClient {

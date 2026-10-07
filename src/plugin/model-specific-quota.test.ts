@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest"
 import { AccountManager } from "../adapters/opencode/account-pool.js"
-import type { OAuthAuthDetails } from "./types"
+import type { AccountOAuthCredential } from "../modules/accounts/index.js"
 
 const MODEL_PRO = "gemini-1.5-pro"
 const MODEL_FLASH = "gemini-1.5-flash"
@@ -18,7 +18,7 @@ function markAntigravityRateLimited(
 
 describe("Model-specific Gemini quota", () => {
   let manager: AccountManager
-  const auth: OAuthAuthDetails = {
+  const auth: AccountOAuthCredential = {
     type: "oauth",
     refresh: "test-refresh",
     access: "test-access",

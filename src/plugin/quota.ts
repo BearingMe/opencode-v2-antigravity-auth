@@ -1,16 +1,17 @@
-import { ANTIGRAVITY_PROVIDER_ID } from "../constants"
+import { ANTIGRAVITY_PROVIDER_ID } from "../constants.js"
 import { checkAccountQuotas, type AccountQuotaProbeResult, type AccountQuotaResult } from "../modules/accounts/index.js"
 import { availableModelsQuotaProbe, groupedQuotaProbe } from "../adapters/antigravity/quota-client.js"
-import { accessTokenExpired, formatRefreshParts, parseRefreshParts } from "./auth"
+import { accessTokenExpired, formatRefreshParts, parseRefreshParts } from "../modules/accounts/index.js"
 import { logQuotaFetch, logQuotaStatus } from "./debug"
 import { ensureProjectContext } from "./project"
 import { refreshAccessToken } from "./token"
 import { getModelFamily } from "../modules/inference/index.js"
-import type { PluginClient, OAuthAuthDetails } from "./types"
+import type { PluginClient } from "../adapters/opencode/types.js"
+import type { AccountOAuthCredential } from "../modules/accounts/index.js"
 import type { AccountMetadataV3, QuotaSummaryGroup } from "../modules/accounts/index.js"
 
 /** Builds the transient OAuth shape used to refresh a stored quota account. */
-function buildAuthFromAccount(account: AccountMetadataV3): OAuthAuthDetails {
+function buildAuthFromAccount(account: AccountMetadataV3): AccountOAuthCredential {
   return {
     type: "oauth",
     refresh: formatRefreshParts({
@@ -24,7 +25,7 @@ function buildAuthFromAccount(account: AccountMetadataV3): OAuthAuthDetails {
 }
 
 /** Copies rotated credential/project values back to a stored quota account. */
-function applyAccountUpdates(account: AccountMetadataV3, auth: OAuthAuthDetails): AccountMetadataV3 | undefined {
+function applyAccountUpdates(account: AccountMetadataV3, auth: AccountOAuthCredential): AccountMetadataV3 | undefined {
   const parts = parseRefreshParts(auth.refresh)
   if (!parts.refreshToken) {
     return undefined

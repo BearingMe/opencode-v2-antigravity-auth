@@ -2,13 +2,17 @@ import { ANTIGRAVITY_DEFAULT_PROJECT_ID } from "../constants.js"
 import { antigravityManagedProjectPort } from "../adapters/antigravity/project-client.js"
 import type { LoadCodeAssistPayload, ManagedProjectDiscovery } from "../adapters/antigravity/project-client.js"
 import { createProjectContextPolicy } from "../modules/accounts/index.js"
-import { formatRefreshParts, parseRefreshParts } from "./auth.js"
+import { formatRefreshParts, parseRefreshParts } from "../modules/accounts/index.js"
 import { createLogger } from "./logger.js"
-import type { OAuthAuthDetails, ProjectContextResult, RefreshParts } from "./types.js"
+import type { AccountOAuthCredential, AccountRefreshParts, ProjectContextResult } from "../modules/accounts/index.js"
 
 const log = createLogger("project")
 
-const projectContextPolicy = createProjectContextPolicy<OAuthAuthDetails, RefreshParts, ManagedProjectDiscovery>({
+const projectContextPolicy = createProjectContextPolicy<
+  AccountOAuthCredential,
+  AccountRefreshParts,
+  ManagedProjectDiscovery
+>({
   port: {
     load: (accessToken, projectId) => antigravityManagedProjectPort.load({ accessToken, projectId, logger: log }),
     startOnboarding: ({ accessToken, tierId, projectId }) =>
@@ -46,6 +50,8 @@ export function onboardManagedProject(
 }
 
 /** Resolves an effective project ID for current auth, caching by refresh credential. */
-export function ensureProjectContext(auth: OAuthAuthDetails): Promise<ProjectContextResult> {
+export function ensureProjectContext(
+  auth: AccountOAuthCredential,
+): Promise<ProjectContextResult<AccountOAuthCredential>> {
   return projectContextPolicy.ensureProjectContext(auth)
 }

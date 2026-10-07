@@ -251,6 +251,13 @@ export type {
   ProjectContextResult,
 } from "./project-context/policy.js"
 export { AccountRefreshQueue, DEFAULT_PROACTIVE_REFRESH_CONFIG } from "./refresh/queue.js"
+export {
+  accessTokenExpired,
+  calculateTokenExpiry,
+  formatRefreshParts,
+  isOAuthAuth,
+  parseRefreshParts,
+} from "./refresh/credentials.js"
 export { createAccountCredentialRefreshPolicy } from "./refresh/policy.js"
 export type {
   AccountCredentialRefreshFailure,

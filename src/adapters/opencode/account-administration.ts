@@ -8,7 +8,7 @@ import {
   saveAccountsReplace,
   updateAccounts,
 } from "../filesystem/account-store.js"
-import type { PluginClient } from "../../plugin/types.js"
+import type { PluginClient } from "./types.js"
 import { checkAccountsQuota } from "../../plugin/quota.js"
 import { verifyAccountAccess } from "../../plugin/verify.js"
 import { createLogger } from "../../plugin/logger.js"

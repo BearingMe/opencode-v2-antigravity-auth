@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { AccountManager } from "../adapters/opencode/account-pool.ts"
-import { formatRefreshParts } from "../plugin/auth.ts"
+import { formatRefreshParts } from "../modules/accounts/index.ts"
 import { DEFAULT_CONFIG } from "../adapters/opencode/config/schema.ts"
 import { ANTIGRAVITY_ENDPOINT_FALLBACKS } from "../constants.ts"
 import { AntigravityTokenRefreshError } from "../plugin/token.ts"
-import type { PluginClient } from "../plugin/types.ts"
+import type { PluginClient } from "../adapters/opencode/types.ts"
 
 const { mockPrepare, mockTransform, mockEnsureProjectContext, mockRefreshAccessToken } = vi.hoisted(() => ({
   mockPrepare: vi.fn(),
