@@ -1,12 +1,6 @@
 import { accessTokenExpired } from "./auth"
 import type { OAuthAuthDetails } from "./types"
-import {
-  cacheSignature,
-  clearSignatureCache,
-  configureSignaturePersistence,
-  configureSignatureTextHash,
-  getCachedSignature,
-} from "../modules/inference/index.js"
+import { configureSignaturePersistence, configureSignatureTextHash } from "../modules/inference/index.js"
 import {
   createSignatureCachePersistence,
   hashSignatureText,
@@ -80,7 +74,7 @@ export function clearCachedAuth(refresh?: string): void {
   }
 }
 
-// Thinking-signature persistence remains a compatibility bridge; cache policy lives in inference.
+// Attach the disk tier here; signature lookup and retention policy stay in inference.
 let signaturePersistence: SignatureCachePersistence | null = null
 
 /** Initializes the filesystem persistence tier when thinking signatures are enabled. */
@@ -91,11 +85,6 @@ export function initDiskSignatureCache(config: SignatureCacheConfig | undefined)
   return signaturePersistence?.cache ?? null
 }
 
-/** Returns the disk-cache instance for legacy diagnostics and tests. */
-export function getDiskSignatureCache(): SignatureCache | null {
-  return signaturePersistence?.cache ?? null
-}
-
 /** Detaches and flushes the configured disk persistence tier. */
 export async function disposeDiskSignatureCache(): Promise<void> {
   const current = signaturePersistence
@@ -103,7 +92,3 @@ export async function disposeDiskSignatureCache(): Promise<void> {
   configureSignaturePersistence(undefined)
   await current?.dispose()
 }
-
-export { cacheSignature, clearSignatureCache, getCachedSignature }
-export { SignatureCache, createSignatureCache } from "../adapters/filesystem/signature-cache-store.js"
-export type { SignatureCacheConfig } from "../adapters/opencode/config/index.js"

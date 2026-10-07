@@ -1003,6 +1003,16 @@ maintained documentation with the completed architecture.
   blocker. No runtime functions or methods changed, so this slice adds no JSDoc
   audit surface. This smoke does not satisfy installed-host E2E; final acceptance
   remains open.
+- Removed the unconsumed disk-cache diagnostic getter and signature-cache
+  re-exports from `src/plugin/cache.ts`. Kept the auth snapshot cache and active
+  initialization/disposal wiring used by the OpenCode adapter and app composition.
+- Verification passed: full Vitest (75 files / 1,200 tests), native TUI (13 / 164),
+  typecheck, lint, boundary checks and fixtures (7 tests / 22 expectations),
+  changed-file Prettier, `git diff --check`, clean build, and the built Antigravity
+  request smoke (synthetic credentials, mocked HTTP). Oracle and review found no
+  blocker. No runtime functions or methods changed, so this slice adds no JSDoc
+  audit surface. The smoke is not installed-host E2E; final acceptance remains
+  open.
 
 **Acceptance criteria:**
 
