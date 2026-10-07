@@ -59,8 +59,8 @@ async function runLoggingSmoke() {
 
   const [{ DEFAULT_CONFIG }, debug, logger] = await Promise.all([
     import("../dist/src/adapters/opencode/config/index.js"),
-    import("../dist/src/plugin/debug.js"),
-    import("../dist/src/plugin/logger.js"),
+    import("../dist/src/adapters/opencode/debug.js"),
+    import("../dist/src/adapters/opencode/logger.js"),
   ])
   disposeDebugLog = debug.disposeDebugLog
 

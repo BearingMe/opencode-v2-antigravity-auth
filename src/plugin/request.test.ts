@@ -28,7 +28,7 @@ import {
   MIN_SIGNATURE_LENGTH,
 } from "../modules/inference/index.js"
 import { DEFAULT_CONFIG } from "../adapters/opencode/config/index.js"
-import { initializeDebug } from "./debug"
+import { initializeDebug } from "../adapters/opencode/debug.js"
 import * as config from "../adapters/opencode/config/index.js"
 
 /**

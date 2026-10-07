@@ -1,5 +1,5 @@
 import { processImageData } from "../adapters/filesystem/image-saver.js"
-import { createLogger } from "./logger"
+import { createLogger } from "../adapters/opencode/logger.js"
 import { getKeepThinking } from "../adapters/opencode/config/index.js"
 import {
   applyToolPairingFixes as applyInferenceToolPairingFixes,

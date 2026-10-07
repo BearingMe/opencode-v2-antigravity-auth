@@ -12,7 +12,7 @@ vi.mock("./cache", () => ({
   invalidatePackage: vi.fn(),
 }))
 
-vi.mock("../../../../plugin/debug.js", () => ({
+vi.mock("../../debug.js", () => ({
   debugLogToFile: vi.fn(),
 }))
 

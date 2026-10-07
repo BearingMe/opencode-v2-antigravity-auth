@@ -1,10 +1,10 @@
-import { configureOpenCodeLogging, writeOpenCodeLog } from "../adapters/opencode/logging.js"
-import { createLogger as createPlatformLogger, type Logger } from "../platform/logging/index.js"
-import { isDebugTuiEnabled } from "./debug"
-import type { PluginClient } from "../adapters/opencode/types.js"
+import { configureOpenCodeLogging, writeOpenCodeLog } from "./logging.js"
+import { createLogger as createPlatformLogger, type Logger } from "../../platform/logging/index.js"
+import { isDebugTuiEnabled } from "./debug.js"
+import type { PluginClient } from "./types.js"
 
-/** Logger interface retained for the existing plugin-facing imports. */
-export type { Logger } from "../platform/logging/index.js"
+/** Shared log contract re-exported for the OpenCode adapter. */
+export type { Logger } from "../../platform/logging/index.js"
 
 /**
  * Initialize the logger with the plugin client.

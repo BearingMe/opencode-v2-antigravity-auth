@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { DEFAULT_CONFIG } from "../adapters/opencode/config/index.js"
-import type { PluginClient } from "../adapters/opencode/types.js"
+import { DEFAULT_CONFIG } from "./config/index.js"
+import type { PluginClient } from "./types.js"
 
-vi.mock("../adapters/filesystem/debug-log.js", () => ({
+vi.mock("../filesystem/debug-log.js", () => ({
   createDebugFileDestination: vi.fn((enabled: boolean, customLogDir?: string) => ({
     filePath: enabled ? `${customLogDir ?? "test-logs"}/antigravity-debug-test.log` : undefined,
     writeLine: vi.fn(),
@@ -30,13 +30,13 @@ describe("logger sink routing", () => {
   })
 
   afterEach(async () => {
-    const { disposeDebugLog } = await import("./debug")
+    const { disposeDebugLog } = await import("./debug.js")
     await disposeDebugLog()
   })
 
   it("routes logs to TUI when debug_tui is enabled without file debug", async () => {
-    const { initializeDebug } = await import("./debug")
-    const { createLogger, initLogger } = await import("./logger")
+    const { initializeDebug } = await import("./debug.js")
+    const { createLogger, initLogger } = await import("./logger.js")
 
     initializeDebug({
       ...DEFAULT_CONFIG,
@@ -61,8 +61,8 @@ describe("logger sink routing", () => {
   })
 
   it("does not route to TUI when only file debug is enabled", async () => {
-    const { initializeDebug } = await import("./debug")
-    const { createLogger, initLogger } = await import("./logger")
+    const { initializeDebug } = await import("./debug.js")
+    const { createLogger, initLogger } = await import("./logger.js")
 
     initializeDebug({
       ...DEFAULT_CONFIG,
@@ -80,8 +80,8 @@ describe("logger sink routing", () => {
   })
 
   it("ignores a rejected host log write without failing the caller", async () => {
-    const { initializeDebug } = await import("./debug")
-    const { createLogger, initLogger } = await import("./logger")
+    const { initializeDebug } = await import("./debug.js")
+    const { createLogger, initLogger } = await import("./logger.js")
     initializeDebug({ ...DEFAULT_CONFIG, debug: false, debug_tui: true })
     initLogger(createPluginClient(vi.fn().mockRejectedValue(new Error("host unavailable"))))
 

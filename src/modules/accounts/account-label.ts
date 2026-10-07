@@ -1,13 +1,9 @@
-/** Writes log arguments through their matching OpenCode console destination. */
-export { writeConsoleLog } from "../adapters/opencode/logging.js"
-export type { LogLevel } from "../platform/logging/index.js"
-
-/** Formats an account label for debug output. */
+/** Formats an account label for account-facing diagnostics. */
 export function formatAccountLabel(email: string | undefined, accountIndex: number): string {
   return email || `Account ${accountIndex + 1}`
 }
 
-/** Formats a selected account or the all-accounts context for debug output. */
+/** Formats a selected account or the all-accounts context for diagnostics. */
 export function formatAccountContextLabel(email: string | undefined, accountIndex: number): string {
   if (email) {
     return email

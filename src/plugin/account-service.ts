@@ -22,7 +22,7 @@ import type {
 import type { PluginClient } from "../adapters/opencode/types.js"
 import { checkAccountsQuota } from "./quota.js"
 import { verifyAccountAccess } from "./verify.js"
-import { createLogger } from "./logger.js"
+import { createLogger } from "../adapters/opencode/logger.js"
 import {
   fingerprintRefreshToken,
   loadAccounts,

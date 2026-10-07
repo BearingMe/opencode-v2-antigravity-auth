@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { formatAccountContextLabel, formatAccountLabel } from "./logging-utils"
+import { formatAccountContextLabel, formatAccountLabel } from "./account-label.js"
 
 describe("format helpers", () => {
   it("formats account labels consistently", () => {

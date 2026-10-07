@@ -7,8 +7,8 @@ import {
 } from "../../modules/accounts/index.js"
 import { fingerprintRefreshToken, loadAccounts, updateAccounts } from "../filesystem/account-store.js"
 import { generateFingerprint, updateFingerprintVersion } from "../antigravity/fingerprint.js"
-import { debugLogToFile } from "../../plugin/debug.js"
-import { formatAccountLabel } from "../../plugin/logging-utils.js"
+import { debugLogToFile } from "./debug.js"
+import { formatAccountLabel } from "../../modules/accounts/index.js"
 
 /** Constructs persistence, identity, and logging dependencies for an OpenCode account pool. */
 function createAccountPoolDependencies(): AccountPoolDependencies {

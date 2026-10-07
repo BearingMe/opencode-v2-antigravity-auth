@@ -18,10 +18,20 @@ import {
   ensureGitignoreSync as ensureConfigGitignoreSync,
 } from "./config-directory.js"
 import type { GitignoreUpdate } from "./config-directory.js"
-import { createLogger } from "../../plugin/logger.js"
 import type { AccountStorageUpdater, SaveAccountsReplaceOptions } from "../../modules/accounts/index.js"
+import type { Logger } from "../../platform/logging/index.js"
 
-const log = createLogger("storage")
+let log: Logger = {
+  debug: () => undefined,
+  info: () => undefined,
+  warn: () => undefined,
+  error: () => undefined,
+}
+
+/** Supplies the host-composed logger used for account-store diagnostics. */
+export function configureAccountStoreLogger(logger: Logger): void {
+  log = logger
+}
 
 const LOCK_OPTIONS = {
   stale: 10000,

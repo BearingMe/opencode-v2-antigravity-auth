@@ -18,8 +18,8 @@ import {
   logAntigravityDebugResponse,
   logCacheStats,
   type AntigravityDebugContext,
-} from "./debug"
-import { createLogger } from "./logger"
+} from "../adapters/opencode/debug.js"
+import { createLogger } from "../adapters/opencode/logger.js"
 
 const log = createLogger("request")
 

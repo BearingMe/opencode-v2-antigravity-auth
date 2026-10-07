@@ -11,7 +11,7 @@
 | OAuth facade    | `src/antigravity/oauth.ts`                                                                                           | Compatibility API for authorize/exchange; delegates endpoint communication to Antigravity adapters                                                                            |
 | Vendor clients  | `src/adapters/antigravity/*`                                                                                         | OAuth/token/project/quota/verification HTTP, headers, endpoint order, timeouts, and response wire parsing                                                                     |
 | Auto-update     | `src/adapters/opencode/hooks/auto-update-checker/*`                                                                  | Root-session npm check, toast or pinned rewrite + cache invalidate                                                                                                            |
-| Core domains    | `src/modules/{accounts,inference,session-recovery}/*`, `src/adapters/{antigravity,filesystem}/*`, `src/plugin/*`     | Account, inference, and recovery policy; vendor and filesystem adapters; plugin auth/request/debug/logging and account composition                                            |
+| Core domains    | `src/modules/{accounts,inference,session-recovery}/*`, `src/adapters/{antigravity,filesystem}/*`, `src/plugin/*`     | Account, inference, and recovery policy; vendor and filesystem adapters; remaining plugin request/auth composition; OpenCode debug and log delivery                           |
 
 ## Dependency direction (normative)
 
@@ -126,7 +126,7 @@ deleteAll/ping`) — the interactive management surface sharing the
 ## Forbidden relationships
 
 - `src/hooks/*` MUST NOT depend on auth/quota/accounts/storage/fingerprint/
-  project. It only uses `plugin/debug.ts :: debugLogToFile`. (Observed,
+  project. It only uses `adapters/opencode/debug.ts :: debugLogToFile`. (Observed,
   promote to SHOULD.)
 - External-origin fetches MUST NOT receive `x-goog-api-key` or
   `authorization` headers (see R-FETCH-SCOPE).

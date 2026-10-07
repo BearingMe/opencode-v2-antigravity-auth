@@ -1,11 +1,11 @@
 import { env } from "node:process"
-import { createDebugFileDestination } from "../adapters/filesystem/debug-log.js"
-import { writeOpenCodeLog } from "../adapters/opencode/logging.js"
-import type { GitignoreUpdate } from "../adapters/filesystem/config-directory.js"
-import { formatBodyPreviewForLog, formatErrorForLog, truncateTextForLog } from "../platform/logging/format.js"
-import { deriveDebugPolicy } from "../platform/logging/policy.js"
-import type { AntigravityConfig } from "../adapters/opencode/config/index.js"
-import { formatAccountContextLabel, formatAccountLabel } from "./logging-utils"
+import { createDebugFileDestination } from "../filesystem/debug-log.js"
+import { writeOpenCodeLog } from "./logging.js"
+import type { GitignoreUpdate } from "../filesystem/config-directory.js"
+import { formatBodyPreviewForLog, formatErrorForLog, truncateTextForLog } from "../../platform/logging/format.js"
+import { deriveDebugPolicy } from "../../platform/logging/policy.js"
+import type { AntigravityConfig } from "./config/index.js"
+import { formatAccountContextLabel, formatAccountLabel } from "../../modules/accounts/index.js"
 
 const MAX_BODY_PREVIEW_CHARS = 12000
 const MAX_BODY_LOG_CHARS = 50000

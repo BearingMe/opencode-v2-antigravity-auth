@@ -1,5 +1,5 @@
 import { AccountRefreshQueue, type ProactiveRefreshConfig } from "../modules/accounts/index.js"
-import { createLogger } from "./logger.js"
+import { createLogger } from "../adapters/opencode/logger.js"
 import type { ManagedAccount } from "../modules/accounts/index.js"
 import { refreshAccessToken } from "./token.js"
 import type { AccountOAuthCredential } from "../modules/accounts/index.js"

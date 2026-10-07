@@ -11,7 +11,7 @@ import {
 import type { PluginClient } from "./types.js"
 import { checkAccountsQuota } from "../../plugin/quota.js"
 import { verifyAccountAccess } from "../../plugin/verify.js"
-import { createLogger } from "../../plugin/logger.js"
+import { createLogger } from "./logger.js"
 
 /** Composes account policy with persistence, quota, and verification adapters. */
 export function createOpenCodeAccountAdministration(

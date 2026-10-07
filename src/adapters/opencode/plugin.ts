@@ -10,7 +10,7 @@ import { createOpenCodeAccountAdministration } from "./account-administration.js
 import { ANTIGRAVITY_PROVIDER_ID } from "../../constants.js"
 import { AntigravityAccounts } from "./rpc.js"
 import { formatRefreshParts, isOAuthAuth, parseRefreshParts } from "../../modules/accounts/index.js"
-import { loadAccounts } from "../filesystem/account-store.js"
+import { configureAccountStoreLogger, loadAccounts } from "../filesystem/account-store.js"
 import {
   MAX_SAVED_ACCOUNTS,
   checkQuota as checkAccountsQuota,
@@ -20,7 +20,7 @@ import {
 import { OPENCODE_MODEL_DEFINITIONS } from "./config/models.js"
 import type { AccountOAuthCredential } from "../../modules/accounts/index.js"
 import type { PluginClient } from "./types.js"
-import { createLogger, initLogger } from "../../plugin/logger.js"
+import { createLogger, initLogger } from "./logger.js"
 import { initRuntimeConfig, loadConfig } from "./config/index.js"
 import { AccountManager } from "./account-pool.js"
 import {
@@ -103,6 +103,7 @@ export const opencodePlugin = Plugin.define({
   id: PLUGIN_ID,
   /** Initializes host services and registers the Antigravity integration. */
   async setup(ctx) {
+    configureAccountStoreLogger(createLogger("storage"))
     let currentAuth: AccountOAuthCredential | null = null
     let accountSummary = (await loadAccounts())?.accounts ?? []
     /** Refreshes login-form account text without failing a completed mutation. */

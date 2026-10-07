@@ -7,8 +7,8 @@ import type {
 } from "../../modules/session-recovery/index.js"
 import { createSessionRecoveryPolicy } from "../../modules/session-recovery/index.js"
 import { fileRecoveryStorage } from "../filesystem/session-recovery-store.js"
-import { logToast } from "../../plugin/debug.js"
-import { createLogger } from "../../plugin/logger.js"
+import { logToast } from "./debug.js"
+import { createLogger } from "./logger.js"
 import type { AntigravityConfig } from "./config/index.js"
 import type { PluginClient } from "./types.js"
 

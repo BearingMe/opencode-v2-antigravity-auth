@@ -295,8 +295,8 @@ thinking_disabled_violation`; gated by `session_recovery` and deduplicates
 - `platform/logging/` owns structured log events, neutral formatting, and
   independent file/TUI flag policy. `adapters/opencode/logging.ts` delivers
   host-panel and optional console events; `adapters/filesystem/debug-log.ts`
-  owns file paths, timestamps, and 25-file retention. The legacy
-  `plugin/debug.ts` keeps Antigravity request/account trace formatting and
+  owns file paths, timestamps, and 25-file retention. The
+  `adapters/opencode/debug.ts` keeps Antigravity request/account trace formatting and
   Authorization masking (12 k preview). `debug` controls file logging only;
   `debug_tui` independently controls the TUI panel
   (`OPENCODE_ANTIGRAVITY_DEBUG` vs `OPENCODE_ANTIGRAVITY_DEBUG_TUI`).

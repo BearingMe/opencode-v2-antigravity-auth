@@ -279,6 +279,7 @@ export * from "./persistence/policy.js"
 export * from "./persistence/service.js"
 export { AccountStoreUnreadableError } from "./persistence/errors.js"
 export { AccountPoolManager, computeSoftQuotaCacheTtlMs, resolveQuotaGroup } from "./account-pool.js"
+export { formatAccountContextLabel, formatAccountLabel } from "./account-label.js"
 export type {
   AccountFingerprint,
   AccountFingerprintVersion,

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { DEFAULT_CONFIG } from "../adapters/opencode/config/index.js"
+import { DEFAULT_CONFIG } from "./config/index.js"
 
-vi.mock("../adapters/filesystem/debug-log.js", () => ({
+vi.mock("../filesystem/debug-log.js", () => ({
   createDebugFileDestination: vi.fn((enabled: boolean, customLogDir?: string) => ({
     filePath: enabled ? `${customLogDir ?? "test-logs"}/antigravity-debug-test.log` : undefined,
     writeLine: vi.fn(),
@@ -22,7 +22,7 @@ describe("debug sink policy", () => {
   })
 
   afterEach(() => {
-    const cleanup = import("./debug").then(({ disposeDebugLog }) => disposeDebugLog())
+    const cleanup = import("./debug.js").then(({ disposeDebugLog }) => disposeDebugLog())
     if (originalDebugEnv === undefined) {
       delete process.env.OPENCODE_ANTIGRAVITY_DEBUG
     } else {
@@ -38,7 +38,7 @@ describe("debug sink policy", () => {
   })
 
   it("keeps debug_tui enabled when file debug is disabled in config", async () => {
-    const { initializeDebug, isDebugEnabled, isDebugTuiEnabled, getLogFilePath } = await import("./debug")
+    const { initializeDebug, isDebugEnabled, isDebugTuiEnabled, getLogFilePath } = await import("./debug.js")
 
     initializeDebug({
       ...DEFAULT_CONFIG,
@@ -55,7 +55,7 @@ describe("debug sink policy", () => {
     process.env.OPENCODE_ANTIGRAVITY_DEBUG = "0"
     process.env.OPENCODE_ANTIGRAVITY_DEBUG_TUI = "1"
 
-    const { isDebugEnabled, isDebugTuiEnabled, getLogFilePath } = await import("./debug")
+    const { isDebugEnabled, isDebugTuiEnabled, getLogFilePath } = await import("./debug.js")
 
     expect(isDebugEnabled()).toBe(false)
     expect(isDebugTuiEnabled()).toBe(true)
@@ -63,7 +63,7 @@ describe("debug sink policy", () => {
   })
 
   it("keeps file debug enabled without TUI when only debug is true", async () => {
-    const { initializeDebug, isDebugEnabled, isDebugTuiEnabled, getLogFilePath } = await import("./debug")
+    const { initializeDebug, isDebugEnabled, isDebugTuiEnabled, getLogFilePath } = await import("./debug.js")
 
     initializeDebug({
       ...DEFAULT_CONFIG,
@@ -78,8 +78,8 @@ describe("debug sink policy", () => {
   })
 
   it("closes the previous file destination when debug is reinitialized", async () => {
-    const { initializeDebug } = await import("./debug")
-    const { createDebugFileDestination } = await import("../adapters/filesystem/debug-log.js")
+    const { initializeDebug } = await import("./debug.js")
+    const { createDebugFileDestination } = await import("../filesystem/debug-log.js")
     vi.mocked(createDebugFileDestination).mockClear()
 
     initializeDebug({ ...DEFAULT_CONFIG, debug: true })

@@ -3,7 +3,7 @@ import { antigravityManagedProjectPort } from "../adapters/antigravity/project-c
 import type { LoadCodeAssistPayload, ManagedProjectDiscovery } from "../adapters/antigravity/project-client.js"
 import { createProjectContextPolicy } from "../modules/accounts/index.js"
 import { formatRefreshParts, parseRefreshParts } from "../modules/accounts/index.js"
-import { createLogger } from "./logger.js"
+import { createLogger } from "../adapters/opencode/logger.js"
 import type { AccountOAuthCredential, AccountRefreshParts, ProjectContextResult } from "../modules/accounts/index.js"
 
 const log = createLogger("project")

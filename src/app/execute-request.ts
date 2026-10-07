@@ -23,9 +23,9 @@ import {
   logResponseBody,
   logModelFamily,
   startAntigravityDebugRequest,
-} from "../plugin/debug.js"
-import type { AntigravityDebugContext } from "../plugin/debug.js"
-import { createLogger } from "../plugin/logger.js"
+} from "../adapters/opencode/debug.js"
+import type { AntigravityDebugContext } from "../adapters/opencode/debug.js"
+import { createLogger } from "../adapters/opencode/logger.js"
 import { extractVerificationErrorDetails } from "../adapters/antigravity/verification-parser.js"
 import type { AntigravityConfig } from "../adapters/opencode/config/index.js"
 import type { ProjectContextResult } from "../modules/accounts/index.js"

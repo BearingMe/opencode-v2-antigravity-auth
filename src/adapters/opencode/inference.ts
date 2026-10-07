@@ -7,7 +7,7 @@ import {
   prepareAntigravityRequest,
   transformAntigravityResponse,
 } from "../../plugin/request.js"
-import type { AntigravityDebugContext } from "../../plugin/debug.js"
+import type { AntigravityDebugContext } from "./debug.js"
 
 /** Inference operations composed with the OpenCode plugin's runtime adapters. */
 export const openCodeInference: InferenceApi<Fingerprint, AntigravityDebugContext> = {

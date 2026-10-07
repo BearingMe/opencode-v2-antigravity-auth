@@ -1061,6 +1061,16 @@ maintained documentation with the completed architecture.
   (synthetic credentials, mocked HTTP). Oracle and review found no remaining
   blocker; the regression prompt inventory still needs path reconciliation.
   No installed-host E2E is claimed.
+- Moved the host logger/debug composition and tests from `src/plugin/` to
+  `adapters/opencode/`, and account-label formatting to `modules/accounts/`.
+  The filesystem account store now receives its logger through a platform
+  contract; all runtime consumers and the built logging smoke use the canonical
+  locations. Updated the current architecture/subsystem references. Verification
+  passed: Vitest (75 files / 1,200 tests), native TUI (13 / 164), typecheck,
+  lint, boundary checks and fixtures (7 tests / 22 expectations), changed-file
+  Prettier, `git diff --check`, clean build, built logging smoke, and account-store
+  smoke. Oracle and review found no blocker. Step 14 remains open for other
+  legacy locations, broad documentation reconciliation, and installed-host E2E.
 
 **Acceptance criteria:**
 
