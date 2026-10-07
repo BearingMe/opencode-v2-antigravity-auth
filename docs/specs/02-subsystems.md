@@ -291,8 +291,10 @@ thinking_disabled_violation`; gated by `session_recovery` and deduplicates
   targets fail closed. Quota controller and built native rendering have
   automated coverage; installed host input/auth/stack integration needs
   `../dev/manual-testing.md`.
-- `version.ts :: initAntigravityVersion` (changelog scrape 5 k chars →
-  fallback; regex `\d+\.\d+\.\d+`; 5 s; `setAntigravityVersion` write-once).
+- `adapters/antigravity/version.ts` owns version discovery and the fallback
+  (changelog scrape 5 k chars → fallback; regex `\d+\.\d+\.\d+`; 5 s;
+  `setAntigravityVersion` write-once); `adapters/opencode/version.ts` binds
+  `initAntigravityVersion` to host logging.
 - `platform/logging/` owns structured log events, neutral formatting, and
   independent file/TUI flag policy. `adapters/opencode/logging.ts` delivers
   host-panel and optional console events; `adapters/filesystem/debug-log.ts`

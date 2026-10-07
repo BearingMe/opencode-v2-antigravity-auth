@@ -63,7 +63,7 @@ src/
 │   ├── config/                # OpenCode config/model registration details
 │   └── hooks/                 # Host event integrations, including update checks
 ├── constants.ts               # Compatibility exports for provider/model constants
-├── adapters/antigravity/oauth.ts # Provider OAuth workflow; host facade is adapters/opencode/oauth.ts
+├── adapters/antigravity/{oauth,version}.ts # Provider OAuth/version; host facades live in adapters/opencode/
 ├── adapters/
 │   ├── antigravity/           # OAuth identity/endpoints/headers and account/inference clients
 │   ├── filesystem/            # Account/recovery/signature stores and debug-file destination
@@ -90,7 +90,7 @@ src/
     ├── fingerprint.ts / project.ts  # Device fingerprints + project-context composition
     ├── refresh-queue.ts          # Proactive refresh host composition
     ├── cache.ts               # Auth cache and signature-persistence composition
-└── debug.ts / logger.ts / logging-utils.ts / version.ts / errors.ts / types.ts
+└── debug.ts / logger.ts / logging-utils.ts / errors.ts / types.ts
 ```
 
 The package-root `src/v2-plugin.ts`, `src/tui.ts`, and `src/rpc.ts` files remain

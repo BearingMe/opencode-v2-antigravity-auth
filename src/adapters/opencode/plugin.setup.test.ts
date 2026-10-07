@@ -93,7 +93,7 @@ vi.mock("../../plugin/verify.js", () => ({
   verifyAccountAccess,
 }))
 
-vi.mock("../../plugin/version.js", () => ({
+vi.mock("./version.js", () => ({
   initAntigravityVersion: vi.fn(async () => undefined),
 }))
 

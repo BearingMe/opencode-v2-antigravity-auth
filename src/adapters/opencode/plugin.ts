@@ -32,7 +32,7 @@ import { getRecoverySuccessToast } from "../../modules/session-recovery/index.js
 import { initDiskSignatureCache } from "../../plugin/cache.js"
 import { createProactiveRefreshQueue, type ProactiveRefreshQueue } from "../../plugin/refresh-queue.js"
 import { initHealthTracker, initTokenTracker } from "../../modules/accounts/index.js"
-import { initAntigravityVersion } from "../../plugin/version.js"
+import { initAntigravityVersion } from "./version.js"
 import { createAutoUpdateCheckerHook } from "./hooks/auto-update-checker/index.js"
 
 const PLUGIN_ID = "opencode-v2-antigravity-auth"

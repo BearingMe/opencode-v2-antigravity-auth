@@ -1081,6 +1081,14 @@ maintained documentation with the completed architecture.
   Antigravity request smoke (synthetic credentials, mocked HTTP). Oracle and
   review found no blocker. This does not satisfy the isolated-profile installed-
   host E2E acceptance.
+- Moved Antigravity version discovery and its tests from `src/plugin/` to
+  `adapters/antigravity/`; an OpenCode facade supplies host logging and preserves
+  startup ordering. Updated runtime/test mocks and the current architecture and
+  subsystem maps. Verification passed: Vitest (75 files / 1,200 tests), native
+  TUI (13 / 164), typecheck, lint, boundary checks and fixtures (7 tests / 22
+  expectations), changed-file Prettier, `git diff --check`, clean build, and the
+  built Antigravity request smoke (synthetic credentials, mocked HTTP). Oracle
+  and review found no remaining code blocker. Installed-host E2E remains open.
 
 **Acceptance criteria:**
 

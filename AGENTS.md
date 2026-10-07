@@ -144,7 +144,7 @@ Git hooks managed via Husky + lint-staged (pre-commit: eslint --fix + prettier) 
 src/
 ├── v2-plugin.ts / tui.ts / rpc.ts / google-sdk.ts # Compatibility entrypoints
 ├── constants.ts               # Endpoints, headers, OAuth identity, model routing
-├── adapters/antigravity/oauth.ts # Provider PKCE authorize/exchange + project discovery
+├── adapters/antigravity/{oauth,version}.ts # Provider OAuth/version workflow; host facades live in opencode/
 ├── app/
 │   ├── composition.ts          # Selects OpenCode, account, inference, and transport adapters
 │   └── execute-request.ts      # Single request execution and retry orchestration
@@ -168,7 +168,7 @@ src/
     ├── fingerprint.ts / project.ts  # Device fingerprints + managed project context
     ├── refresh-queue.ts          # Proactive refresh queue composition
     ├── cache.ts               # Auth cache and signature-persistence composition
-    └── debug.ts / logger.ts / logging-utils.ts / version.ts / errors.ts / types.ts
+    └── remaining composition files (request, account, token, quota, project, verification)
 ```
 
 > Historical: V1 `src/plugin.ts`, `cli.ts`, `server.ts`, `ui/`, and
