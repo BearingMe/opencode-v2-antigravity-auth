@@ -67,8 +67,8 @@ No linter or formatter is configured; style is enforced by convention
 
 ## Known gaps (do not file as regressions)
 
-- No tests in `src/antigravity/`; `script/` E2E is excluded from typecheck
-  and live-endpoint E2E needs real quota.
+- OAuth and provider-client unit tests live under `src/adapters/antigravity/`;
+  `script/` E2E is excluded from typecheck and live-endpoint E2E needs real quota.
 - The full installed host dialog stack, keyboard dispatch, and browser
   lifecycle still require [manual-testing.md](manual-testing.md). Native
   renderer/controller tests do not establish those integration behaviors.

@@ -24,7 +24,7 @@ vi.mock("./plugin/version.js", () => ({
   initAntigravityVersion: vi.fn(async () => undefined),
 }))
 
-vi.mock("./antigravity/oauth.js", () => ({
+vi.mock("./adapters/opencode/oauth.js", () => ({
   authorizeAntigravity: vi.fn(async () => ({ url: "https://accounts.google.com/auth", verifier: "v", projectId: "" })),
   exchangeAntigravity: vi.fn(async () => ({
     type: "success" as const,

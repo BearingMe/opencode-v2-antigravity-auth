@@ -63,7 +63,7 @@ src/
 │   ├── config/                # OpenCode config/model registration details
 │   └── hooks/                 # Host event integrations, including update checks
 ├── constants.ts               # Compatibility exports for provider/model constants
-├── antigravity/oauth.ts       # Compatibility facade for OAuth authorization and exchange
+├── adapters/antigravity/oauth.ts # Provider OAuth workflow; host facade is adapters/opencode/oauth.ts
 ├── adapters/
 │   ├── antigravity/           # OAuth identity/endpoints/headers and account/inference clients
 │   ├── filesystem/            # Account/recovery/signature stores and debug-file destination

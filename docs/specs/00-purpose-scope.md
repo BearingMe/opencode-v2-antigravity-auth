@@ -18,7 +18,7 @@ Evidence: `src/adapters/opencode/plugin.ts :: setup` (V2 bridge),
 `src/app/composition.ts :: executeAntigravityRequest` and
 `src/app/execute-request.ts :: executeRequest` (single native request path),
 `src/constants.ts` (identity/endpoints/headers),
-`src/antigravity/oauth.ts :: authorizeAntigravity / exchangeAntigravity`.
+`src/adapters/opencode/oauth.ts :: authorizeAntigravity / exchangeAntigravity`.
 
 ## Problem solved
 
@@ -37,7 +37,7 @@ Evidence: `src/adapters/opencode/plugin.ts :: setup` (V2 bridge),
 
 In scope:
 
-- OAuth PKCE authorize + code exchange + refresh (`src/antigravity/oauth.ts`,
+- OAuth PKCE authorize + code exchange + refresh (`src/adapters/antigravity/oauth.ts`,
   `src/plugin/token.ts`,
   `src/adapters/opencode/plugin.ts :: refreshOAuthCredential`).
 - Dedicated provider/integration registration without reading or mutating

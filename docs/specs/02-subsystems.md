@@ -2,8 +2,9 @@
 
 ## 2.1 OAuth authorize + exchange — compatibility facade + Antigravity adapter
 
-- `src/antigravity/oauth.ts` preserves the public `authorizeAntigravity` and
-  `exchangeAntigravity` API. OAuth endpoint construction and wire parsing live
+- `src/adapters/opencode/oauth.ts` preserves the public `authorizeAntigravity`
+  and `exchangeAntigravity` API; `src/adapters/antigravity/oauth.ts` owns the
+  provider OAuth workflow. OAuth endpoint construction and wire parsing live
   in `src/adapters/antigravity/oauth-client.ts`; project discovery HTTP lives
   in `project-client.ts`.
 - `authorizeAntigravity(projectId="")` builds

@@ -1071,6 +1071,16 @@ maintained documentation with the completed architecture.
   Prettier, `git diff --check`, clean build, built logging smoke, and account-store
   smoke. Oracle and review found no blocker. Step 14 remains open for other
   legacy locations, broad documentation reconciliation, and installed-host E2E.
+- Moved the Antigravity OAuth workflow and its test into `adapters/antigravity/`
+  and added an OpenCode facade that supplies host logging. The root package still
+  exports `authorizeAntigravity`, `exchangeAntigravity`, and their result types;
+  updated plugin/test/smoke consumers and current architecture references.
+  Verification passed: Vitest (75 files / 1,200 tests), native TUI (13 / 164),
+  typecheck, lint, boundary checks and fixtures (7 tests / 22 expectations),
+  changed-file Prettier, `git diff --check`, clean build, and the built
+  Antigravity request smoke (synthetic credentials, mocked HTTP). Oracle and
+  review found no blocker. This does not satisfy the isolated-profile installed-
+  host E2E acceptance.
 
 **Acceptance criteria:**
 

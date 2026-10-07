@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { exchangeAntigravity } from "./oauth.js"
+import { createAntigravityOAuth } from "./oauth.js"
+
+const { exchangeAntigravity } = createAntigravityOAuth({ warn: vi.fn() })
 
 afterEach(() => {
   vi.unstubAllGlobals()

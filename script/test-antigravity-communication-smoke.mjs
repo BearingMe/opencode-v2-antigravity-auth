@@ -5,7 +5,7 @@ import rootPlugin, {
 } from "opencode-v2-antigravity-auth"
 import tuiPlugin from "opencode-v2-antigravity-auth/tui"
 import { AntigravityAccounts } from "opencode-v2-antigravity-auth/rpc"
-import { authorizeAntigravity, exchangeAntigravity } from "../dist/src/antigravity/oauth.js"
+import { authorizeAntigravity, exchangeAntigravity } from "../dist/src/adapters/opencode/oauth.js"
 import { extractVerificationErrorDetails } from "../dist/src/adapters/antigravity/verification-parser.js"
 import {
   createVerificationProbeRequest,

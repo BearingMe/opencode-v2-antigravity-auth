@@ -97,7 +97,7 @@ vi.mock("../../plugin/version.js", () => ({
   initAntigravityVersion: vi.fn(async () => undefined),
 }))
 
-vi.mock("../../antigravity/oauth.js", () => ({ authorizeAntigravity, exchangeAntigravity }))
+vi.mock("./oauth.js", () => ({ authorizeAntigravity, exchangeAntigravity }))
 vi.mock("../filesystem/account-store.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../filesystem/account-store.js")>()
   return { ...actual, loadAccounts, updateAccounts }

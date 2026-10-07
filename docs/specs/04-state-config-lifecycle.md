@@ -29,7 +29,7 @@ can resurrect deleted accounts.
 
 **Requirement:** All persisted/compared refresh values MUST round-trip
 through `parseRefreshParts / formatRefreshParts`. Code MUST accept the
-2-segment `refresh|project` form (written by `antigravity/oauth.ts`) as
+2-segment `refresh|project` form (written by `adapters/antigravity/oauth.ts`) as
 well as the 3-segment form with `managedProjectId`.
 
 **Status:** Explicit.

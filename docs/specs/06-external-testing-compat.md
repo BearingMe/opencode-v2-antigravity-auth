@@ -205,7 +205,8 @@ invalidateCache` remain exported. New code MUST use
 - Entries: `src/adapters/opencode/plugin.ts`, `src/constants.ts`,
   `src/adapters/antigravity/constants.ts`,
   `src/adapters/opencode/google-sdk.ts`, `src/shims.d.ts`
-- OAuth/account communication: `src/antigravity/oauth.ts`,
+- OAuth/account communication: `src/adapters/opencode/oauth.ts`,
+  `src/adapters/antigravity/oauth.ts`,
   `src/adapters/antigravity/{oauth,token,project,quota,verification}-client.ts`
 - Update: `src/adapters/opencode/hooks/auto-update-checker/{index,checker,cache,constants,
 types,logging}.ts` + `checker.test.ts`, `index.test.ts`
