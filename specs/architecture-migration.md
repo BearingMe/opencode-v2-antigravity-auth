@@ -1013,6 +1013,18 @@ maintained documentation with the completed architecture.
   blocker. No runtime functions or methods changed, so this slice adds no JSDoc
   audit surface. The smoke is not installed-host E2E; final acceptance remains
   open.
+- Removed the unused refresh configuration re-exports from
+  `src/plugin/refresh-queue.ts` and its no-op `setAccountManager` override.
+  Preserved the active host composition and factory; the inherited queue method
+  still attaches the account manager. Reworded the developer architecture entry
+  to describe the file as host composition rather than a compatibility facade.
+- Verification passed: full Vitest (75 files / 1,200 tests), native TUI (13 / 164),
+  typecheck, lint, boundary checks and fixtures (7 tests / 22 expectations),
+  changed-file Prettier, `git diff --check`, clean build, and the built Antigravity
+  request smoke (synthetic credentials, mocked HTTP). Oracle and review found no
+  blocker. The only removed runtime method was a documented pass-through override;
+  no remaining method gained or changed behavior. The smoke is not installed-host
+  E2E; final acceptance remains open.
 
 **Acceptance criteria:**
 

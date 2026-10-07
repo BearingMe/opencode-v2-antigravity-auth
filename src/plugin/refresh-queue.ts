@@ -1,16 +1,12 @@
 import { AccountRefreshQueue, type ProactiveRefreshConfig } from "../modules/accounts/index.js"
 import { createLogger } from "./logger.js"
-import type { AccountPoolManager as AccountManager, ManagedAccount } from "../modules/accounts/index.js"
+import type { ManagedAccount } from "../modules/accounts/index.js"
 import { refreshAccessToken } from "./token.js"
 import type { OAuthAuthDetails, PluginClient } from "./types.js"
 
-/** Re-exports the legacy queue configuration contract. */
-export type { ProactiveRefreshConfig } from "../modules/accounts/index.js"
-export { DEFAULT_PROACTIVE_REFRESH_CONFIG } from "../modules/accounts/index.js"
-
 const log = createLogger("refresh-queue")
 
-/** Host-composed compatibility queue backed by account lifecycle policy. */
+/** Composes account refresh scheduling with the provider token-refresh adapter. */
 export class ProactiveRefreshQueue extends AccountRefreshQueue<ManagedAccount, OAuthAuthDetails> {
   /** Creates a refresh queue using the existing unified token refresh path. */
   constructor(client: PluginClient, providerId: string, config?: Partial<ProactiveRefreshConfig>) {
@@ -23,14 +19,9 @@ export class ProactiveRefreshQueue extends AccountRefreshQueue<ManagedAccount, O
       config,
     )
   }
-
-  /** Attaches the plugin account manager to this queue. */
-  override setAccountManager(manager: AccountManager): void {
-    super.setAccountManager(manager)
-  }
 }
 
-/** Creates a proactive queue while preserving the plugin-facing factory. */
+/** Creates a proactive queue wired to the plugin token-refresh path. */
 export function createProactiveRefreshQueue(
   client: PluginClient,
   providerId: string,
