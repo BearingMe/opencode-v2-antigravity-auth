@@ -40,7 +40,7 @@ platform:WINDOWS|MACOS, pluginType:GEMINI}}` to deduped
 - `accessTokenExpired` uses a 60 s clock-skew buffer. `calculateTokenExpiry
 (requestTimeMs, expiresInSeconds)` defaults 3600 s; NaN/≤0 → immediate
   expiry.
-- `refreshAccessToken` (`src/plugin/token.ts`) is the compatibility entry into
+- `refreshAccessToken` (`src/adapters/opencode/token.ts`) composes the single policy in
   the single policy in `src/modules/accounts/refresh/policy.ts`, which delegates
   the POST to `adapters/antigravity/token-client.ts`, which
   sends `grant_type=refresh_token` with client id/secret and parses varied error
@@ -55,7 +55,7 @@ statusText}` on `!ok`; `invalid_grant` invalidates project cache and clears
   raw loader API.
 - Refresh is unified: `src/app/composition.ts ::
 refreshOAuthCredentialUnified` and the V2 authorize-callback path both go
-  through `src/plugin/token.ts :: refreshAccessToken` (skew handling,
+  through `src/adapters/opencode/token.ts :: refreshAccessToken` (skew handling,
   `invalid_grant` eviction). `src/adapters/opencode/plugin.ts ::
 refreshOAuthCredential` is a thin wrapper that delegates to the unified
   path and persists refresh rotation; new code MUST NOT add a parallel
@@ -194,7 +194,7 @@ retains on-disk tombstones unless `{ clearTombstones: true }` explicitly
 requests a full reset; that reset can replace an unreadable file. Tombstones
 prevent stale saves from restoring deleted account generations.
 
-## 2.8 Fingerprints — `src/plugin/fingerprint.ts`
+## 2.8 Fingerprints — `src/adapters/antigravity/fingerprint.ts`
 
 Per-account `{deviceId UUID, sessionToken 16 B hex, userAgent
 antigravity/{ver} {darwin|win32}/{x64|arm64}, apiClient, clientMetadata

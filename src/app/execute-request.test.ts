@@ -3,7 +3,7 @@ import { AccountManager } from "../adapters/opencode/account-pool.ts"
 import { formatRefreshParts } from "../modules/accounts/index.ts"
 import { DEFAULT_CONFIG } from "../adapters/opencode/config/schema.ts"
 import { ANTIGRAVITY_ENDPOINT_FALLBACKS } from "../constants.ts"
-import { AntigravityTokenRefreshError } from "../plugin/token.ts"
+import { AntigravityTokenRefreshError } from "../adapters/opencode/token.ts"
 import type { PluginClient } from "../adapters/opencode/types.ts"
 
 const { mockPrepare, mockTransform, mockEnsureProjectContext, mockRefreshAccessToken } = vi.hoisted(() => ({
@@ -27,8 +27,8 @@ vi.mock("../adapters/opencode/project.ts", async (importOriginal) => {
   return { ...orig, ensureProjectContext: mockEnsureProjectContext }
 })
 
-vi.mock("../plugin/token.ts", async (importOriginal) => {
-  const orig = await importOriginal<typeof import("../plugin/token.ts")>()
+vi.mock("../adapters/opencode/token.ts", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("../adapters/opencode/token.ts")>()
   return { ...orig, refreshAccessToken: mockRefreshAccessToken }
 })
 

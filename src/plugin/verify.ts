@@ -1,7 +1,7 @@
 import { formatRefreshParts, parseRefreshParts } from "../modules/accounts/index.js"
 import { ensureProjectContext } from "../adapters/opencode/project.js"
 import { prepareAntigravityRequest } from "./request.js"
-import { AntigravityTokenRefreshError, refreshAccessToken } from "./token.js"
+import { AntigravityTokenRefreshError, refreshAccessToken } from "../adapters/opencode/token.js"
 import {
   antigravityAccessVerificationPort,
   createVerificationProbeRequest,

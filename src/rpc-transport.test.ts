@@ -51,7 +51,7 @@ vi.mock("./adapters/opencode/account-pool.js", () => ({
   AccountManager: { loadFromDisk: vi.fn() },
 }))
 
-vi.mock("./plugin/refresh-queue.js", () => ({
+vi.mock("./adapters/opencode/refresh-queue.js", () => ({
   createProactiveRefreshQueue: vi.fn(() => ({ setAccountManager: vi.fn(), start: vi.fn(), stop: vi.fn() })),
 }))
 

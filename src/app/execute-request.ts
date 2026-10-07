@@ -13,7 +13,7 @@ import {
 } from "../modules/accounts/index.js"
 import { createSyntheticErrorResponse, isEmptyResponseBody } from "../modules/inference/index.js"
 import { EmptyResponseError } from "../modules/inference/index.js"
-import { AntigravityTokenRefreshError } from "../plugin/token.js"
+import { AntigravityTokenRefreshError } from "../adapters/opencode/token.js"
 import {
   isDebugEnabled,
   logAccountContext,

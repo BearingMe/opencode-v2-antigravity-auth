@@ -29,8 +29,8 @@ import {
   refreshOAuthCredentialUnified,
 } from "../../app/composition.js"
 import { getRecoverySuccessToast } from "../../modules/session-recovery/index.js"
-import { initDiskSignatureCache } from "../../plugin/cache.js"
-import { createProactiveRefreshQueue, type ProactiveRefreshQueue } from "../../plugin/refresh-queue.js"
+import { initDiskSignatureCache } from "./signature-cache.js"
+import { createProactiveRefreshQueue, type ProactiveRefreshQueue } from "./refresh-queue.js"
 import { initHealthTracker, initTokenTracker } from "../../modules/accounts/index.js"
 import { initAntigravityVersion } from "./version.js"
 import { createAutoUpdateCheckerHook } from "./hooks/auto-update-checker/index.js"

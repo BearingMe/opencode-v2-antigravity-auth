@@ -111,7 +111,7 @@ vi.mock("../../app/composition.js", async (importOriginal) => ({
 vi.mock("./account-pool.js", () => ({
   AccountManager: { loadFromDisk: mockLoadManager },
 }))
-vi.mock("../../plugin/refresh-queue.js", () => ({
+vi.mock("./refresh-queue.js", () => ({
   createProactiveRefreshQueue: mockCreateRefreshQueue,
 }))
 

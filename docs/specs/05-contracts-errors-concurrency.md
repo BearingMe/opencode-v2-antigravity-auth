@@ -44,7 +44,7 @@ enable|disable|select|delete|delete_all` (see F3; out-of-range index is a
 ## Error handling
 
 - `exchangeAntigravity` never throws (`failed{error}` with raw server text).
-- Token refresh is unified: `src/plugin/token.ts :: refreshAccessToken` is
+- Token refresh is unified: `src/adapters/opencode/token.ts :: refreshAccessToken` is
   the single implementation, reached via
   `src/app/composition.ts :: refreshOAuthCredentialUnified` and via
   `src/adapters/opencode/plugin.ts :: refreshOAuthCredential` (thin wrapper preserving the

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { AntigravityTokenRefreshError } from "./token.ts"
+import { AntigravityTokenRefreshError } from "../adapters/opencode/token.ts"
 import type { PluginClient } from "../adapters/opencode/types.ts"
 
 const { mockRefreshAccessToken, mockEnsureProjectContext } = vi.hoisted(() => ({
@@ -7,8 +7,8 @@ const { mockRefreshAccessToken, mockEnsureProjectContext } = vi.hoisted(() => ({
   mockEnsureProjectContext: vi.fn(),
 }))
 
-vi.mock("./token.ts", async (importOriginal) => {
-  const orig = await importOriginal<typeof import("./token.ts")>()
+vi.mock("../adapters/opencode/token.ts", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("../adapters/opencode/token.ts")>()
   return { ...orig, refreshAccessToken: mockRefreshAccessToken }
 })
 

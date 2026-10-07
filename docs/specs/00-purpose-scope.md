@@ -38,7 +38,7 @@ Evidence: `src/adapters/opencode/plugin.ts :: setup` (V2 bridge),
 In scope:
 
 - OAuth PKCE authorize + code exchange + refresh (`src/adapters/antigravity/oauth.ts`,
-  `src/plugin/token.ts`,
+  `src/adapters/opencode/token.ts`,
   `src/adapters/opencode/plugin.ts :: refreshOAuthCredential`).
 - Dedicated provider/integration registration without reading or mutating
   OpenCode's Google provider or sign-in connection.
@@ -54,8 +54,9 @@ In scope:
 - Multi-account pool/selection and persistence policy
   (`src/modules/accounts/account-pool.ts`, `modules/accounts/selection/`,
   `modules/accounts/persistence/`), quota probing, fingerprints, project context
-  (`src/plugin/quota.ts`, `fingerprint.ts`,
-  `project.ts`, `refresh-queue.ts`; persistence through
+  (`src/plugin/quota.ts`, `src/adapters/antigravity/fingerprint.ts`,
+  `src/adapters/{antigravity,opencode}/project.ts`,
+  `src/adapters/opencode/refresh-queue.ts`; persistence through
   `src/adapters/filesystem/account-store.ts`).
 - Recovery (in-flight turn repair + session-error hook), debug file/TUI
   logging split (`debug` vs `debug_tui`), version pinning,

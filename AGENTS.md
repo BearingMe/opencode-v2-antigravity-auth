@@ -160,14 +160,10 @@ src/
 ├── modules/session-recovery/  # Error policy, session repair, and request-time turn repair
 └── plugin/
     ├── account-service.ts     # Shared account store service (tool + RPC backend)
-    ├── auth.ts / token.ts     # Refresh-part packing + unified refresh path
     ├── verify.ts                  # Account verification refresh/probe composition
     ├── request.ts / request-helpers.ts  # Transform core + schema/thinking utils
     ├── quota.ts               # Antigravity per-model + grouped quota probing
-    ├── fingerprint.ts               # Device fingerprint composition
-    ├── refresh-queue.ts          # Proactive refresh queue composition
-    ├── cache.ts               # Auth cache and signature-persistence composition
-    └── remaining composition files (request, account, token, quota, verification)
+    └── remaining compatibility composition (account, quota, request, verification)
 ```
 
 > Historical: V1 `src/plugin.ts`, `cli.ts`, `server.ts`, `ui/`, and

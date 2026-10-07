@@ -259,6 +259,7 @@ export {
   parseRefreshParts,
 } from "./refresh/credentials.js"
 export { createAccountCredentialRefreshPolicy } from "./refresh/policy.js"
+export { clearCachedAuth, resolveCachedAuth, storeCachedAuth } from "./refresh/cache.js"
 export type {
   AccountCredentialRefreshFailure,
   AccountCredentialRefreshPolicyDependencies,

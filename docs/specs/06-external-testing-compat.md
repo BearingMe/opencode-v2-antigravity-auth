@@ -84,7 +84,7 @@ event` transforms. V2 API explicitly "may change before stable".
 - `src/app/execute-request.test.ts`: native-engine tests (routing decision, quota
   fallback, warmup URL, wait formatting, native-enable flag,
   unified-refresh delegation
-  `refreshOAuthCredentialUnified → token.ts :: refreshAccessToken`).
+  `refreshOAuthCredentialUnified → adapters/opencode/token.ts :: refreshAccessToken`).
 - `src/plugin/verify.ts` + `verify.test.ts`:
   `verifyAccountAccess` (blocked→disabled+URL, ok passthrough,
   error-without-disable).
@@ -133,7 +133,7 @@ event` transforms. V2 API explicitly "may change before stable".
 ## Known divergences (normative for reviewers)
 
 1. D-REFRESH-DUAL (unified):
-   `src/plugin/token.ts :: refreshAccessToken`, backed by
+   `src/adapters/opencode/token.ts :: refreshAccessToken`, backed by
    `adapters/antigravity/token-client.ts`
    (skew, `invalid_grant` eviction, project-id preservation, cache store)
    is the single refresh implementation, called via
@@ -210,9 +210,12 @@ invalidateCache` remain exported. New code MUST use
   `src/adapters/antigravity/{oauth,token,project,quota,verification}-client.ts`
 - Update: `src/adapters/opencode/hooks/auto-update-checker/{index,checker,cache,constants,
 types,logging}.ts` + `checker.test.ts`, `index.test.ts`
-- Core: `src/plugin/{auth,token,cache,request,request-helpers,account-service,
-quota,fingerprint,project,refresh-queue,errors,debug,logger,logging-utils,
-verify,verification,version,image-saver,types}.ts`
+- Core provider/host adapters: `src/adapters/antigravity/{oauth,project,version,
+fingerprint,token-client,quota-client,verification-client}.ts` and
+  `src/adapters/opencode/{token,refresh-queue,signature-cache,debug,logger}.ts`
+- Accounts refresh cache: `src/modules/accounts/refresh/cache.ts`
+- Remaining composition: `src/plugin/{request,request-helpers,
+account-service,quota,verify}.ts`
 - Tests: `src/constants.test.ts`, `src/adapters/opencode/plugin.test.ts`,
   `src/adapters/opencode/plugin.accounts.test.ts`,
   `src/adapters/opencode/plugin.setup.test.ts` +

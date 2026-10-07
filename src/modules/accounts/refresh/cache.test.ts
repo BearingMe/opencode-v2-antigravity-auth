@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { resolveCachedAuth, storeCachedAuth, clearCachedAuth } from "./cache"
-import type { AccountOAuthCredential } from "../modules/accounts/index.js"
+import { resolveCachedAuth, storeCachedAuth, clearCachedAuth } from "./cache.js"
+import type { AccountOAuthCredential } from "./policy.js"
 
 /** Builds a synthetic auth snapshot for cache policy tests. */
 function createAuth(overrides: Partial<AccountOAuthCredential> = {}): AccountOAuthCredential {
@@ -9,14 +9,15 @@ function createAuth(overrides: Partial<AccountOAuthCredential> = {}): AccountOAu
     type: "oauth",
     refresh: "refresh-token|project-id",
     access: "access-token",
-    expires: Date.now() + 3600000,
+    expires: 3_600_000,
     ...overrides,
   }
 }
 
 describe("Auth Snapshot Cache", () => {
   beforeEach(() => {
-    vi.useRealTimers()
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
     clearCachedAuth()
   })
 
@@ -49,9 +50,6 @@ describe("Auth Snapshot Cache", () => {
       })
 
       it("returns cached auth when input auth is expired but cached is valid", () => {
-        vi.useFakeTimers()
-        vi.setSystemTime(new Date(0))
-
         const validAuth = createAuth({
           access: "valid-access",
           expires: 3600000, // expires at t=3600000
@@ -69,9 +67,6 @@ describe("Auth Snapshot Cache", () => {
       })
 
       it("returns input auth when both are expired (updates cache)", () => {
-        vi.useFakeTimers()
-        vi.setSystemTime(new Date(0))
-
         const expiredCached = createAuth({
           access: "cached-expired",
           expires: 30000, // expired within buffer

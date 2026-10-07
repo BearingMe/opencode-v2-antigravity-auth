@@ -4,7 +4,7 @@ import { availableModelsQuotaProbe, groupedQuotaProbe } from "../adapters/antigr
 import { accessTokenExpired, formatRefreshParts, parseRefreshParts } from "../modules/accounts/index.js"
 import { logQuotaFetch, logQuotaStatus } from "../adapters/opencode/debug.js"
 import { ensureProjectContext } from "../adapters/opencode/project.js"
-import { refreshAccessToken } from "./token"
+import { refreshAccessToken } from "../adapters/opencode/token.js"
 import { getModelFamily } from "../modules/inference/index.js"
 import type { PluginClient } from "../adapters/opencode/types.js"
 import type { AccountOAuthCredential } from "../modules/accounts/index.js"

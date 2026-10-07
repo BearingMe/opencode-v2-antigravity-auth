@@ -78,12 +78,8 @@ src/
 ├── platform/logging/          # Neutral events, policy, and safe log formatting
 └── plugin/
     ├── account-service.ts     # Account store service used by tool/RPC
-    ├── cache.ts               # Remaining auth-cache composition
-    ├── fingerprint.ts         # Device fingerprint composition
     ├── quota.ts               # Antigravity quota probe composition
-    ├── refresh-queue.ts       # Proactive refresh composition
     ├── request.ts / request-helpers.ts
-    ├── token.ts               # Unified credential-refresh composition
     └── verify.ts              # Account verification probe composition
 ```
 

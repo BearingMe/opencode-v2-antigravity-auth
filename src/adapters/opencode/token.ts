@@ -2,14 +2,14 @@ import {
   OAuthTokenEndpointError,
   antigravityCredentialRefreshPort,
   type RefreshedOAuthToken,
-} from "../adapters/antigravity/token-client.js"
-import { createAccountCredentialRefreshPolicy } from "../modules/accounts/index.js"
-import { calculateTokenExpiry, formatRefreshParts, parseRefreshParts } from "../modules/accounts/index.js"
-import { clearCachedAuth, storeCachedAuth } from "./cache.js"
-import { createLogger } from "../adapters/opencode/logger.js"
-import { invalidateProjectContextCache } from "../adapters/opencode/project.js"
-import type { AccountOAuthCredential, AccountRefreshParts } from "../modules/accounts/index.js"
-import type { PluginClient } from "../adapters/opencode/types.js"
+} from "../antigravity/token-client.js"
+import { createAccountCredentialRefreshPolicy } from "../../modules/accounts/index.js"
+import { calculateTokenExpiry, formatRefreshParts, parseRefreshParts } from "../../modules/accounts/index.js"
+import { clearCachedAuth, storeCachedAuth } from "../../modules/accounts/index.js"
+import { invalidateProjectContextCache } from "./project.js"
+import { createLogger } from "./logger.js"
+import type { AccountOAuthCredential, AccountRefreshParts } from "../../modules/accounts/index.js"
+import type { PluginClient } from "./types.js"
 
 const log = createLogger("token")
 

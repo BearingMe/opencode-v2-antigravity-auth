@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-const { refreshAccessToken, ensureProjectContext } = vi.hoisted(() => ({
+const { refreshAccessToken, ensureProjectContext, invalidateProjectContextCache } = vi.hoisted(() => ({
   refreshAccessToken: vi.fn(),
   ensureProjectContext: vi.fn(),
+  invalidateProjectContextCache: vi.fn(),
 }))
 
-vi.mock("./token.js", () => ({ refreshAccessToken }))
-vi.mock("../adapters/opencode/project.js", () => ({ ensureProjectContext }))
+vi.mock("../adapters/opencode/token.js", () => ({ refreshAccessToken }))
+vi.mock("../adapters/opencode/project.js", () => ({ ensureProjectContext, invalidateProjectContextCache }))
 
 import { checkAccountsQuota } from "./quota.js"
 
