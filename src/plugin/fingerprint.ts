@@ -56,18 +56,22 @@ export interface FingerprintHeaders {
 const PLATFORM_CHOICES = ["darwin", "win32"] as const
 type PlatformChoice = (typeof PLATFORM_CHOICES)[number]
 
+/** Selects one value from a fixed fingerprint option list. */
 function randomFrom<T>(arr: readonly T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]!
 }
 
+/** Maps a Node platform identifier to Antigravity's display label. */
 function platformToDisplayName(platform: string): "WINDOWS" | "MACOS" {
   return platform === "win32" ? "WINDOWS" : "MACOS"
 }
 
+/** Creates a unique device identifier for a fingerprint. */
 function generateDeviceId(): string {
   return crypto.randomUUID()
 }
 
+/** Creates the session token used by a fingerprint. */
 function generateSessionToken(): string {
   return crypto.randomBytes(16).toString("hex")
 }

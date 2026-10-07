@@ -61,10 +61,12 @@ export function AccountListDialogView(props: AccountListDialogProps) {
     })
   }
 
+  /** Returns accounts matching the current search query. */
   const filtered = () =>
     accountList().filter((account) =>
       `${account.email} ${account.description}`.toLowerCase().includes(query().trim().toLowerCase()),
     )
+  /** Resolves the account at the current selection, if one exists. */
   const selectedAccount = () => filtered()[selected()]
   /** Moves the selected row and scrolls it into view. */
   const move = (delta: number) => {

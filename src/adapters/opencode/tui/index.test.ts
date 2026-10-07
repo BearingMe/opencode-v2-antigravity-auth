@@ -109,6 +109,7 @@ function createHarness(options: {
   const listViews: Array<AccountListDialogProps> = []
   const missingViews: Array<MissingAccountDialogProps> = []
   let activeClose: (() => void) | undefined
+  /** Closes the active dialog and clears its stored close callback. */
   const dismiss = () => {
     const close = activeClose
     activeClose = undefined

@@ -2,6 +2,7 @@ import type { AuthDetails, OAuthAuthDetails, RefreshParts } from "./types"
 
 const ACCESS_TOKEN_EXPIRY_BUFFER_MS = 60 * 1000
 
+/** Narrows a general auth value to the OAuth credential shape. */
 export function isOAuthAuth(auth: AuthDetails): auth is OAuthAuthDetails {
   return auth.type === "oauth"
 }

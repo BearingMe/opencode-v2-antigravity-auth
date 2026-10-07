@@ -9,14 +9,17 @@ import {
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
+/** Builds one user message containing a text part. */
 function userMsg(text: string) {
   return { role: "user", parts: [{ text }] }
 }
 
+/** Builds one model message containing a text part. */
 function modelMsg(text: string) {
   return { role: "model", parts: [{ text }] }
 }
 
+/** Builds a model message with a thinking part followed by text. */
 function modelWithThinking(text: string) {
   return {
     role: "model",
@@ -24,6 +27,7 @@ function modelWithThinking(text: string) {
   }
 }
 
+/** Builds a model message with one tool call. */
 function modelWithToolCall(name = "myTool") {
   return {
     role: "model",
@@ -31,6 +35,7 @@ function modelWithToolCall(name = "myTool") {
   }
 }
 
+/** Builds a model message with thinking followed by a tool call. */
 function modelWithThinkingAndToolCall(name = "myTool") {
   return {
     role: "model",
@@ -38,6 +43,7 @@ function modelWithThinkingAndToolCall(name = "myTool") {
   }
 }
 
+/** Builds a user message containing the matching tool result. */
 function toolResultMsg(name = "myTool") {
   return {
     role: "user",

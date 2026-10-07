@@ -1221,6 +1221,7 @@ export class AccountPoolManager implements AccountPool<ManagedAccount> {
       // Selection cursors stay service-owned; only clamp them to the
       // merged membership.
       const activeIndex = merged.length > 0 ? Math.min(Math.max(current.activeIndex, 0), merged.length - 1) : 0
+      /** Clamps one family cursor to the merged account membership. */
       const clampFamily = (value: number | undefined): number =>
         merged.length > 0 ? Math.min(Math.max(value ?? activeIndex, 0), merged.length - 1) : 0
       const storage: AccountStorageV4 = {

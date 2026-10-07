@@ -9,11 +9,13 @@ const VERSION_REGEX = /\d+\.\d+\.\d+/
 
 type VersionSource = "api" | "changelog" | "fallback"
 
+/** Extracts the first semantic-version triple from provider text. */
 function parseVersion(text: string): string | null {
   const match = text.match(VERSION_REGEX)
   return match ? match[0] : null
 }
 
+/** Fetches a version source, returning null when the endpoint is unavailable. */
 async function tryFetchVersion(url: string, maxChars?: number): Promise<string | null> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)

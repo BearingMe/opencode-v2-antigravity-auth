@@ -66,12 +66,14 @@ import plugin from "./v2-plugin.js"
  */
 const transportCodec = Schema.toCodecJson(Schema.Struct({ output: Schema.Unknown }))
 
+/** Encodes a handler result through the host's JSON transport schema. */
 function encodeTransport(output: unknown): unknown {
   return Schema.encodeSync(transportCodec)({ output })
 }
 
 type RpcHandlers = Record<string, (input: never) => Promise<unknown>>
 
+/** Seeds account data containing optional and hostile values for RPC checks. */
 function seedSparseStore(): void {
   loadAccounts.mockResolvedValue({
     version: 4,
@@ -116,12 +118,14 @@ describe("Antigravity RPC transport", () => {
   let handlers: RpcHandlers
   let cleanup: (() => void) | void
 
+  /** Invokes a registered account RPC handler with one input value. */
   const call = async (name: keyof typeof AntigravityAccounts.methods, input: unknown): Promise<unknown> => {
     const handler = handlers[name]
     if (!handler) throw new Error(`missing RPC handler: ${name}`)
     return handler(input as never)
   }
 
+  /** Checks a serialized RPC result for credential-bearing internal fields. */
   const scanSecrets = (value: unknown): void => {
     const text = JSON.stringify(value)
     expect(text).not.toContain("secret-refresh-token")

@@ -113,10 +113,12 @@ function isThinkingCapableModel(model: string): boolean {
   return lower.includes("thinking") || lower.includes("gemini-3") || lower.includes("gemini-2.5")
 }
 
+/** Recognizes Gemini 3 Pro model identifiers. */
 function isGemini3ProModel(model: string): boolean {
   return GEMINI_3_PRO_REGEX.test(model)
 }
 
+/** Recognizes Gemini 3 Flash model identifiers. */
 function isGemini3FlashModel(model: string): boolean {
   return GEMINI_3_FLASH_REGEX.test(model)
 }

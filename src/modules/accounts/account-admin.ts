@@ -241,6 +241,7 @@ function remapFamilyCursorsAfterDelete(
   nextActiveIndex: number,
   length: number,
 ): { claude: number; gemini: number } {
+  /** Shifts one family cursor around the removed account index. */
   const remap = (cursor: number): number => {
     if (cursor === removedIndex) return nextActiveIndex
     if (cursor > removedIndex) return cursor - 1

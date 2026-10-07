@@ -383,8 +383,10 @@ describe("appendClaudeThinkingHint", () => {
 })
 
 describe("normalizeClaudeTools", () => {
+  /** Keeps schema values unchanged when the test isolates tool conversion. */
   const identityClean = (schema: unknown) => schema as Record<string, unknown>
 
+  /** Removes schema metadata handled by the production cleaner. */
   const realClean = (schema: unknown): Record<string, unknown> => {
     if (!schema || typeof schema !== "object") return {}
     const cleaned = { ...(schema as Record<string, unknown>) }
@@ -671,6 +673,7 @@ describe("normalizeClaudeTools", () => {
 })
 
 describe("applyClaudeTransforms", () => {
+  /** Keeps schema values unchanged while testing Claude transform wiring. */
   const mockCleanJSONSchema = (schema: unknown) => schema as Record<string, unknown>
 
   it("applies tool config for all Claude models", () => {

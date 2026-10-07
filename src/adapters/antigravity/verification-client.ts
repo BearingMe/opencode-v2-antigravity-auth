@@ -38,6 +38,7 @@ export async function sendVerificationProbe(
 ): Promise<VerificationProbeResponse> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  /** Forwards caller cancellation to the bounded verification probe. */
   const abort = () => controller.abort(init.signal?.reason)
   init.signal?.addEventListener("abort", abort, { once: true })
   if (init.signal?.aborted) abort()

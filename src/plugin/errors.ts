@@ -11,6 +11,7 @@ export class EmptyResponseError extends Error {
   readonly model: string
   readonly attempts: number
 
+  /** Creates an empty-response error with the failed request context. */
   constructor(provider: string, model: string, attempts: number, message?: string) {
     super(
       message ??
@@ -31,6 +32,7 @@ export class ToolIdMismatchError extends Error {
   readonly expectedIds: string[]
   readonly foundIds: string[]
 
+  /** Creates a tool-ID mismatch error with the observed identifiers. */
   constructor(expectedIds: string[], foundIds: string[], message?: string) {
     super(message ?? `Tool ID mismatch: expected [${expectedIds.join(", ")}] but found [${foundIds.join(", ")}]`)
     this.name = "ToolIdMismatchError"

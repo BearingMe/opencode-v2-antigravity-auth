@@ -48,14 +48,22 @@ const accountAdmin = createAccountAdmin({
   warn: quotaCacheWarn,
 })
 
+/** Reads the service list through the account-admin test fixture. */
 const listAccounts = () => accountAdmin.list()
+/** Runs the fixture service's quota check without host arguments. */
 const checkQuota = (_client?: unknown, _providerId?: string) => accountAdmin.checkQuota()
+/** Builds quota presentation through the account-admin test fixture. */
 const getQuotaPresentation = (_client?: unknown, options?: QuotaPresentationOptions) => accountAdmin.quota(options)
+/** Verifies a target through the account-admin test fixture. */
 const verifyAccount = (target: AccountTarget, _client?: unknown, _providerId?: string) => accountAdmin.verify(target)
+/** Applies a mutation through the account-admin test fixture. */
 const mutateAccount = (...args: Parameters<typeof accountAdmin.mutate>) => accountAdmin.mutate(...args)
+/** Deletes all accounts through the account-admin test fixture. */
 const deleteAllAccounts = () => accountAdmin.deleteAll()
+/** Persists an OAuth account through the account-admin test fixture. */
 const persistOAuthAccount = (...args: Parameters<typeof accountAdmin.persistOAuthAccount>) =>
   accountAdmin.persistOAuthAccount(...args)
+/** Persists a refresh rotation through the account-admin test fixture. */
 const persistRefreshRotation = (...args: Parameters<typeof accountAdmin.persistRefreshRotation>) =>
   accountAdmin.persistRefreshRotation(...args)
 
@@ -111,6 +119,7 @@ function storage(
   }
 }
 
+/** Builds two stored accounts with distinct durable identities. */
 const baseAccounts = () => [
   account({ id: "acc-one", email: "one@example.com", refreshToken: "token-one" }),
   account({ id: "acc-two", email: "two@example.com", refreshToken: "token-two" }),

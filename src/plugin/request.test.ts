@@ -111,6 +111,7 @@ describe("request.ts", () => {
   })
 
   describe("conversation cache identity", () => {
+    /** Makes the conversation seed visible in expected session keys. */
     const hashSeed = (seed: string) => `hash:${seed}`
 
     it("prefers a supplied conversation id", () => {

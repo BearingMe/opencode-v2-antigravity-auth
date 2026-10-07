@@ -11,15 +11,18 @@ export interface AccountOneLinerInput {
 const FULL_BLOCK = "█"
 const EMPTY_BLOCK = "░"
 
+/** Accepts only finite quota fractions in the normalized 0–1 range. */
 function isUsableFraction(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1
 }
 
+/** Formats a quota bar and percentage for one account. */
 export function renderQuotaBar(fraction: number | null | undefined, width = 12): string {
   const { bar, percentage } = quotaBarParts(fraction, width)
   return `${bar} ${percentage}`
 }
 
+/** Splits a quota fraction into its bar glyphs and percentage label. */
 export function quotaBarParts(fraction: number | null | undefined, width = 12): { bar: string; percentage: string } {
   const safeWidth = Number.isInteger(width) && width > 0 ? width : 12
   if (!isUsableFraction(fraction)) return { bar: EMPTY_BLOCK.repeat(safeWidth), percentage: "unknown" }
@@ -29,6 +32,7 @@ export function quotaBarParts(fraction: number | null | undefined, width = 12): 
   return { bar: `${FULL_BLOCK.repeat(filled)}${EMPTY_BLOCK.repeat(empty)}`, percentage: `${pct}%` }
 }
 
+/** Formats a reset timestamp relative to an injectable current time. */
 export function formatResetCountdown(resetTime: number | null | undefined, now: number = Date.now()): string {
   if (typeof resetTime !== "number" || !Number.isFinite(resetTime)) return "reset unknown"
   const diff = resetTime - now
@@ -42,6 +46,7 @@ export function formatResetCountdown(resetTime: number | null | undefined, now: 
   return "resets in <1m"
 }
 
+/** Summarizes an account's selected, enabled, quota, and verification states. */
 export function formatAccountOneLiner(account: AccountOneLinerInput): string {
   const email = account.email.trim() === "" ? "Unnamed account" : account.email
   const tags: Array<string> = []
@@ -119,6 +124,7 @@ const QUOTA_GROUP_LABELS: Record<string, string> = {
   "gemini-flash": "Gemini Flash",
 }
 
+/** Builds the compact per-model quota rows shown in the account interface. */
 export function quotaInfoRows(groups: Record<string, QuotaRowGroup>): Array<QuotaInfoRow> {
   return QUOTA_GROUP_KEYS.map((key) => {
     const entry = groups[key] ?? { remainingFraction: null, resetTime: null }
@@ -142,6 +148,7 @@ export interface QuotaDetailSnapshot {
 export type QuotaRefreshOutcome =
   { ok: true; entry: QuotaDetailSnapshot } | { ok: false; reason: "missing" | "failed"; invalidResponse: boolean }
 
+/** Formats a quota snapshot as readable detail lines. */
 export function quotaDetailLines(snapshot: QuotaDetailSnapshot): Array<string> {
   const checked = snapshot.checkedAt === null ? "never checked" : new Date(snapshot.checkedAt).toLocaleString()
   return [

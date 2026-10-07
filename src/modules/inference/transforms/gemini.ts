@@ -435,6 +435,7 @@ function isWebSearchTool(tool: Record<string, unknown>): boolean {
   return false
 }
 
+/** Converts supported tool formats to Gemini declarations and preserves native tools. */
 export function wrapToolsAsFunctionDeclarations(payload: RequestPayload): WrapToolsResult {
   if (!Array.isArray(payload.tools) || payload.tools.length === 0) {
     return { wrappedFunctionCount: 0, passthroughToolCount: 0 }

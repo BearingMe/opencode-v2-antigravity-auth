@@ -5,6 +5,7 @@ import type { PluginClient } from "../../plugin/types.js"
 const ENV_CONSOLE_LOG = "OPENCODE_ANTIGRAVITY_CONSOLE_LOG"
 
 let client: PluginClient | null = null
+/** Defaults host TUI logging off until configuration supplies its preference. */
 let tuiLoggingEnabled: () => boolean = () => false
 
 /** Configures the OpenCode-bound destinations without coupling them to logger creation. */

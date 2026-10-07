@@ -7,6 +7,7 @@ export interface AntigravityInferenceClient {
 /** Creates the Antigravity inference transport around the runtime fetch implementation. */
 export function createAntigravityInferenceClient(fetchImpl: typeof fetch = fetch): AntigravityInferenceClient {
   return {
+    /** Sends the prepared request through the supplied fetch implementation. */
     send(input, init) {
       return fetchImpl(input, init)
     },

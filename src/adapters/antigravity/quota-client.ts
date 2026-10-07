@@ -59,6 +59,7 @@ async function fetchWithTimeout<T>(
 ): Promise<T> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  /** Forwards caller cancellation to the timeout-bounded request. */
   const abort = () => controller.abort(signal?.reason)
   signal?.addEventListener("abort", abort, { once: true })
   if (signal?.aborted) abort()

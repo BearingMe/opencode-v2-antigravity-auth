@@ -132,7 +132,9 @@ export function normalizeClaudeTools(
   const functionDeclarations: unknown[] = []
   const passthroughTools: unknown[] = []
 
+  /** Normalizes one tool schema and records when a placeholder was needed. */
   const normalizeSchema = (schema: unknown): Record<string, unknown> => {
+    /** Supplies a valid object schema when the provider schema is absent. */
     const createPlaceholderSchema = (base: Record<string, unknown> = {}): Record<string, unknown> => ({
       ...base,
       type: "object",
@@ -184,6 +186,7 @@ export function normalizeClaudeTools(
   ;(payload.tools as unknown[]).forEach((tool: unknown) => {
     const t = tool as Record<string, unknown>
 
+    /** Resolves the supported tool shapes into one Claude declaration. */
     const pushDeclaration = (decl: Record<string, unknown> | undefined, source: string): void => {
       const schema =
         decl?.parameters ||

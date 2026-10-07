@@ -56,6 +56,7 @@ async function seedStore(accounts: AccountMetadataV3[]): Promise<void> {
   }))
 }
 
+/** Builds the two persisted accounts used by tombstone scenarios. */
 const baseSeed = () => [
   seedAccount({ id: "acc-one", email: "one@example.com", refreshToken: "token-one" }),
   seedAccount({ id: "acc-two", email: "two@example.com", refreshToken: "token-two" }),

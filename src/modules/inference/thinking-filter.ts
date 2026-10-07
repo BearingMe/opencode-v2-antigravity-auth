@@ -504,6 +504,7 @@ export function deepFilterThinkingBlocks(
 ): unknown {
   const visited = new WeakSet<object>()
 
+  /** Recursively visits nested provider envelopes once. */
   const walk = (value: unknown): void => {
     if (!value || typeof value !== "object") {
       return

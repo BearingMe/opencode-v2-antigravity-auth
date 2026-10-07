@@ -41,6 +41,7 @@ import {
   resetEngineStateForTests,
 } from "./execute-request.ts"
 
+/** Creates the minimal host client used by request-execution tests. */
 function makeClient(): PluginClient {
   return {
     tui: { showToast: vi.fn(async () => ({ data: undefined })) },
@@ -48,6 +49,7 @@ function makeClient(): PluginClient {
   } as unknown as PluginClient
 }
 
+/** Builds an account manager initialized with the supplied OAuth entries. */
 function makeManager(entries: Array<{ refreshToken: string; access?: string; expires?: number }>): AccountManager {
   const authFallback = {
     type: "oauth" as const,

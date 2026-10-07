@@ -300,6 +300,7 @@ export function createStreamingTransformer(
   let hasSeenUsageMetadata = false
 
   return new TransformStream({
+    /** Buffers partial lines and transforms each complete SSE event. */
     transform(chunk, controller) {
       buffer += decoder.decode(chunk, { stream: true })
 
@@ -324,6 +325,7 @@ export function createStreamingTransformer(
         controller.enqueue(encoder.encode(transformedLine + "\n"))
       }
     },
+    /** Flushes the final partial event and supplies missing usage metadata. */
     flush(controller) {
       buffer += decoder.decode()
 

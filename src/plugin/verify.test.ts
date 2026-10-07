@@ -19,6 +19,7 @@ vi.mock("./project.ts", async (importOriginal) => {
 
 import { verifyAccountAccess } from "./verify.ts"
 
+/** Creates the minimal OpenCode client needed by account verification tests. */
 function makeClient(): PluginClient {
   return {
     tui: { showToast: vi.fn(async () => ({ data: undefined })) },

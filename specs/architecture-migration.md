@@ -1025,6 +1025,21 @@ maintained documentation with the completed architecture.
   blocker. The only removed runtime method was a documented pass-through override;
   no remaining method gained or changed behavior. The smoke is not installed-host
   E2E; final acceptance remains open.
+- Completed the runtime JSDoc audit across `src/`, adding concise documentation
+  for previously undocumented named helpers and methods, including test-fixture
+  helpers. The AST-assisted audit found no remaining undocumented named runtime
+  function/method candidates; reactive accessors and single-use callbacks were
+  retained as local callbacks. Oracle identified and reviewed a wording fix to
+  avoid implying deep-copy isolation in the cross-model sanitizer.
+- Verification passed: full Vitest (75 files / 1,200 tests), native TUI (13 / 164),
+  typecheck, lint, boundary checks and fixtures (7 tests / 22 expectations),
+  changed-source Prettier, `git diff --check`, clean build, and the built Antigravity
+  request smoke (synthetic credentials, mocked HTTP). Oracle and review found no
+  remaining blocker. A broader `prettier --check src` reports formatting drift in
+  seven untouched files (`constants.test.ts`, `account-ui-format.test.ts`,
+  `errors.test.ts`, `image-saver.ts`, `types.ts`, `version.test.ts`, and
+  `shims.d.ts`); no unrelated formatting edits were made. The smoke is not
+  installed-host E2E; final acceptance remains open.
 
 **Acceptance criteria:**
 

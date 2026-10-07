@@ -470,6 +470,7 @@ export function extractUsageMetadata(body: AntigravityApiBody): AntigravityUsage
   }
 
   const asRecord = usage as Record<string, unknown>
+  /** Accepts only finite numeric usage counters. */
   const toNumber = (value: unknown): number | undefined =>
     typeof value === "number" && Number.isFinite(value) ? value : undefined
 
@@ -537,6 +538,7 @@ export function rewriteAntigravityPreviewAccessError(
   }
 }
 
+/** Limits preview-access errors to 404 responses for Antigravity models. */
 function needsPreviewAccessOverride(status: number, body: AntigravityApiBody, requestedModel?: string): boolean {
   if (status !== 404) {
     return false
@@ -550,6 +552,7 @@ function needsPreviewAccessOverride(status: number, body: AntigravityApiBody, re
   return isAntigravityModel(errorMessage)
 }
 
+/** Recognizes Antigravity model names from the request or provider message. */
 function isAntigravityModel(target?: string): boolean {
   if (!target) {
     return false
@@ -666,6 +669,7 @@ export interface StreamingChunkCounter {
   hasContent: () => boolean
 }
 
+/** Counts meaningful chunks observed while consuming one SSE response. */
 export function createStreamingChunkCounter(): StreamingChunkCounter {
   let count = 0
   const hasRealContent = false

@@ -18,16 +18,19 @@ export interface SanitizationResult {
 const GEMINI_SIGNATURE_FIELDS = ["thoughtSignature", "thinkingMetadata"] as const
 const CLAUDE_SIGNATURE_FIELDS = ["signature"] as const
 
+/** Identifies whether a provider model uses Claude or Gemini semantics. */
 export function getModelFamily(model: string): ModelFamily {
   if (isClaudeModel(model)) return "claude"
   if (isGeminiModel(model)) return "gemini"
   return "unknown"
 }
 
+/** Narrows non-array objects for the provider payload walkers. */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
+/** Removes Gemini signature fields while optionally retaining unrelated metadata. */
 export function stripGeminiThinkingMetadata(
   part: Record<string, unknown>,
   preserveNonSignature = true,
@@ -69,6 +72,7 @@ export function stripGeminiThinkingMetadata(
   return { part, stripped }
 }
 
+/** Removes Claude thinking signatures from one content part. */
 export function stripClaudeThinkingFields(part: Record<string, unknown>): {
   part: Record<string, unknown>
   stripped: number
@@ -94,6 +98,7 @@ export function stripClaudeThinkingFields(part: Record<string, unknown>): {
   return { part, stripped }
 }
 
+/** Copies and sanitizes one content part for the target model family. */
 function sanitizePart(
   part: unknown,
   targetFamily: ModelFamily,
@@ -117,6 +122,7 @@ function sanitizePart(
   return { part: partObj, stripped: totalStripped }
 }
 
+/** Sanitizes a part list and totals the removed signature fields. */
 function sanitizeParts(
   parts: unknown[],
   targetFamily: ModelFamily,
@@ -133,6 +139,7 @@ function sanitizeParts(
   return { parts: sanitizedParts, stripped: totalStripped }
 }
 
+/** Sanitizes Gemini contents and totals the removed signature fields. */
 function sanitizeContents(
   contents: unknown[],
   targetFamily: ModelFamily,
@@ -157,6 +164,7 @@ function sanitizeContents(
   return { contents: sanitizedContents, stripped: totalStripped }
 }
 
+/** Sanitizes Anthropic messages and totals the removed signature fields. */
 function sanitizeMessages(
   messages: unknown[],
   targetFamily: ModelFamily,
@@ -181,6 +189,7 @@ function sanitizeMessages(
   return { messages: sanitizedMessages, stripped: totalStripped }
 }
 
+/** Recursively removes cross-provider signatures from supported request envelopes. */
 export function deepSanitizeCrossModelMetadata(
   obj: unknown,
   targetFamily: ModelFamily,
@@ -227,6 +236,7 @@ export function deepSanitizeCrossModelMetadata(
   return { obj: result, stripped: totalStripped }
 }
 
+/** Sanitizes one payload and reports whether any signatures were removed. */
 export function sanitizeCrossModelPayload(payload: unknown, options: SanitizerOptions): SanitizationResult {
   const targetFamily = getModelFamily(options.targetModel)
 
@@ -248,6 +258,7 @@ export function sanitizeCrossModelPayload(payload: unknown, options: SanitizerOp
   }
 }
 
+/** Removes cross-provider signatures in place and returns the number removed. */
 export function sanitizeCrossModelPayloadInPlace(payload: Record<string, unknown>, options: SanitizerOptions): number {
   const targetFamily = getModelFamily(options.targetModel)
 
@@ -258,6 +269,7 @@ export function sanitizeCrossModelPayloadInPlace(payload: Record<string, unknown
   const preserveNonSignature = options.preserveNonSignatureMetadata ?? true
   let totalStripped = 0
 
+  /** Sanitizes each supported part list without allocating a replacement array. */
   const sanitizePartsInPlace = (parts: unknown[]): void => {
     for (const part of parts) {
       if (!isPlainObject(part)) continue

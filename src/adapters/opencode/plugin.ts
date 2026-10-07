@@ -100,6 +100,7 @@ export type ChildSessionTracker = ReturnType<typeof createChildSessionTracker>
 
 export const opencodePlugin = Plugin.define({
   id: PLUGIN_ID,
+  /** Initializes host services and registers the Antigravity integration. */
   async setup(ctx) {
     let currentAuth: OAuthAuthDetails | null = null
     let accountSummary = (await loadAccounts())?.accounts ?? []

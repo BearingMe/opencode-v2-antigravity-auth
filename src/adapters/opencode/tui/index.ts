@@ -264,6 +264,7 @@ export const opencodeTuiPlugin = Plugin.define({
       if (disposed) return
       const acknowledged = await new Promise<boolean>((resolve) => {
         let settled = false
+        /** Resolves the notice once and clears its close handler. */
         const settle = (value: boolean) => {
           if (settled) return
           settled = true
