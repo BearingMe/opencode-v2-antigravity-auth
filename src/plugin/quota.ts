@@ -1,18 +1,6 @@
 import { ANTIGRAVITY_PROVIDER_ID } from "../constants"
-import {
-  aggregateAccountQuota,
-  checkAccountQuotas,
-  type AccountQuotaGroup,
-  type AccountQuotaGroupSummary,
-  type AccountQuotaProbeResult,
-  type AccountQuotaResult,
-  type AccountQuotaSummary,
-} from "../modules/accounts/index.js"
-import {
-  availableModelsQuotaProbe,
-  groupedQuotaProbe,
-  parseQuotaSummaryResponse,
-} from "../adapters/antigravity/quota-client.js"
+import { checkAccountQuotas, type AccountQuotaProbeResult, type AccountQuotaResult } from "../modules/accounts/index.js"
+import { availableModelsQuotaProbe, groupedQuotaProbe } from "../adapters/antigravity/quota-client.js"
 import { accessTokenExpired, formatRefreshParts, parseRefreshParts } from "./auth"
 import { logQuotaFetch, logQuotaStatus } from "./debug"
 import { ensureProjectContext } from "./project"
@@ -20,13 +8,6 @@ import { refreshAccessToken } from "./token"
 import { getModelFamily } from "../modules/inference/index.js"
 import type { PluginClient, OAuthAuthDetails } from "./types"
 import type { AccountMetadataV3, QuotaSummaryGroup } from "../modules/accounts/index.js"
-
-/** Compatibility aliases retained for plugin consumers of the quota API. */
-export type QuotaGroup = AccountQuotaGroup
-export type QuotaGroupSummary = AccountQuotaGroupSummary
-export type QuotaSummary = AccountQuotaSummary
-export type AccountQuotaStatus = AccountQuotaResult["status"]
-export type { AccountQuotaResult }
 
 /** Builds the transient OAuth shape used to refresh a stored quota account. */
 function buildAuthFromAccount(account: AccountMetadataV3): OAuthAuthDetails {
@@ -41,9 +22,6 @@ function buildAuthFromAccount(account: AccountMetadataV3): OAuthAuthDetails {
     expires: undefined,
   }
 }
-
-/** Compatibility export for the adapter's grouped quota response parser. */
-export { parseQuotaSummaryResponse }
 
 /** Copies rotated credential/project values back to a stored quota account. */
 function applyAccountUpdates(account: AccountMetadataV3, auth: OAuthAuthDetails): AccountMetadataV3 | undefined {

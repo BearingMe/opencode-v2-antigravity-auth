@@ -99,6 +99,9 @@ event` transforms. V2 API explicitly "may change before stable".
 - Antigravity communication clients have isolated mocked-HTTP tests under
   `src/adapters/antigravity/`; the built-package smoke is
   `bun run test:antigravity:smoke`.
+- `src/adapters/antigravity/quota-client.test.ts` covers model and grouped
+  summary wire parsing; `src/plugin/quota.test.ts` covers the composed probes,
+  including supplementary-probe failure and caller cancellation.
 - Gaps: `script/` E2E is excluded from
   typecheck and live-endpoint E2E needs real quota.
   `adapters/opencode/tui/index.ts` pure gates (`isInvalidRpcResponse`,
