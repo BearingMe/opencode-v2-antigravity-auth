@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { ANTIGRAVITY_PROVIDER_ID } from "../../constants"
+import { ANTIGRAVITY_PROVIDER_ID } from "./constants.js"
 import { clearCachedAuth, resolveCachedAuth, storeCachedAuth } from "../../modules/accounts/index.js"
 import { ensureProjectContext, invalidateProjectContextCache } from "./project.js"
 import { AntigravityTokenRefreshError, refreshAccessToken } from "./token"

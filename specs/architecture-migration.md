@@ -232,8 +232,9 @@ has no imports back into higher layers.
 ### Baseline contracts and formats
 
 - Package exports: `.`, `./tui`, and `./rpc`; root `index.ts` also re-exports
-  OAuth functions/types. `src/google-sdk.ts` has a separate runtime URL used by
-  the host hook and must remain isolated from the plugin entrypoint.
+  OAuth functions/types. At baseline, `src/google-sdk.ts` supplied the separate
+  runtime URL used by the host hook. Step 14 moved that isolated module under
+  `adapters/opencode/` and removed the unused root re-export.
 - Account persistence is JSON schema v4 with v1→v4 load migrations, POSIX file
   mode `0600`, a 10-account cap, single-lock replace transactions, packed refresh
   values accepting two and three segments, and bounded generation-aware
@@ -1165,21 +1166,40 @@ maintained documentation with the completed architecture.
   already contained a non-canonical tool result before the plugin hook, so
   plugin-inserted recovery is not established. Root `specs/` is retained until
   the remaining acceptance criteria are resolved.
+- Final architecture audit removed the active root constants facade and the
+  unused root Google SDK re-export. Provider identity now belongs to the
+  OpenCode adapter; Antigravity and inference consumers use their owning
+  constants directly, while the runtime SDK URL remains isolated at
+  `adapters/opencode/google-sdk.ts`. Moved randomized-header coverage beside the
+  Antigravity adapter, replaced lucky trials with controlled cases for all three
+  supported platforms, and removed runtime-only `HeaderSet` type tests. Updated
+  current architecture/testing references and the stale regression prompt;
+  documented a Windows disposable-profile setup and verified its paths with
+  OpenCode 2.0.18 `debug paths`, then removed the temporary profile.
+- Verification passed: `bun run test` (75 files / 1,197 tests),
+  `bun run test:tui` (clean build / 13 tests / 164 expectations), typecheck,
+  lint, boundary check and fixtures (7 tests / 22 expectations), all five
+  built-package smokes, E2E regression dry-run (11 tests listed), package
+  dry-run (467 files; declared entrypoints and adapter SDK present, removed root
+  shim absent), changed-file Prettier, and `git diff --check`. Oracle and review
+  found no blocking findings. No runtime functions or methods changed; the new
+  provider constant is documented. Installed-host UI/RPC, live request, natural
+  dangling-call recovery, unload, and cleanup remain unverified and mandatory.
 
 **Acceptance criteria:**
 
-- [ ] Ownership matches the target; no unexplained legacy implementation remains.
-- [ ] Temporary compatibility paths and boundary exemptions are removed.
-- [ ] Boundary checks pass; no deep cross-module or module-to-adapter imports.
-- [ ] Every runtime function/method has appropriate JSDoc.
-- [ ] Full suites, typecheck, clean build, lint, and entrypoint checks pass.
-- [ ] Required behavioral suites gate normal CI.
+- [x] Ownership matches the target; no unexplained legacy implementation remains.
+- [x] Temporary compatibility paths and boundary exemptions are removed.
+- [x] Boundary checks pass; no deep cross-module or module-to-adapter imports.
+- [x] Every runtime function/method has appropriate JSDoc.
+- [x] Full suites, typecheck, clean build, lint, and entrypoint checks pass.
+- [x] Required behavioral suites gate normal CI.
 - [ ] Final installed-host and live request smoke pass against a verified
       disposable config, data, and state profile. Cover account UI/RPC
       mutations, successful model routing, naturally dangling-call recovery,
       fresh-session behavior, clean plugin unload, and profile cleanup without
       touching the normal account store.
-- [ ] Oracle/review confirm dependency graph and behavior-preservation evidence.
+- [x] Oracle/review confirm dependency graph and behavior-preservation evidence.
 
 ## Execution rules
 

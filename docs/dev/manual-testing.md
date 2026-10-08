@@ -223,6 +223,48 @@ does not isolate those paths. The recent checks are functional observations,
 not evidence for this isolated-host gate. The user reports that the account
 store is fine and add/remove/enable/disable work normally.
 
+For a Windows run, use a fresh PowerShell window and set a unique profile before
+login. These overrides were checked with OpenCode 2.0.18 using
+`opencode debug paths`; confirm every printed path except `home` is under
+`$isolatedRoot` before continuing:
+
+```powershell
+$tempRoot = $env:TEMP
+$isolatedRoot = Join-Path $tempRoot ("opencode-antigravity-e2e-" + [guid]::NewGuid().ToString("N"))
+$env:OPENCODE_CONFIG_DIR = Join-Path $isolatedRoot "config"
+$env:XDG_CONFIG_HOME = $env:OPENCODE_CONFIG_DIR
+$env:XDG_DATA_HOME = Join-Path $isolatedRoot "data"
+$env:XDG_STATE_HOME = Join-Path $isolatedRoot "state"
+$env:XDG_CACHE_HOME = Join-Path $isolatedRoot "cache"
+$env:OPENCODE_DB = Join-Path $env:XDG_DATA_HOME "opencode.db"
+$env:APPDATA = Join-Path $isolatedRoot "appdata"
+$env:LOCALAPPDATA = Join-Path $isolatedRoot "local-appdata"
+$env:TEMP = Join-Path $isolatedRoot "temp"
+$env:TMP = $env:TEMP
+New-Item -ItemType Directory -Force -Path @(
+  $env:OPENCODE_CONFIG_DIR, $env:XDG_DATA_HOME, $env:XDG_STATE_HOME,
+  $env:XDG_CACHE_HOME, $env:APPDATA, $env:LOCALAPPDATA, $env:TEMP
+) | Out-Null
+opencode debug paths
+```
+
+Keep this PowerShell window and its environment for login and every test run.
+Create `$env:OPENCODE_CONFIG_DIR\opencode.json` with a `plugins` entry pointing
+to the absolute repository root so the profile loads this built checkout rather
+than a globally installed copy. Run `opencode --standalone` from this window.
+After all OpenCode processes exit, verify the profile root is a direct child of
+the original temp directory and remove only that root:
+
+```powershell
+if ([IO.Path]::GetFullPath((Split-Path -Parent $isolatedRoot)) -ne [IO.Path]::GetFullPath($tempRoot)) {
+  throw "Refusing to remove a profile outside the temp directory"
+}
+Remove-Item -LiteralPath $isolatedRoot -Recurse -Force
+```
+
+Close the test PowerShell window after cleanup so later commands do not inherit
+the removed profile paths.
+
 - [ ] Start with no accounts and verify `/antigravity` opens the login alert;
 
   Esc dismisses it. Then add the disposable account and verify the populated

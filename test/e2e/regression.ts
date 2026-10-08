@@ -189,7 +189,7 @@ const HEAVY_TESTS: MultiTurnTest[] = [
       { prompt: "Use lsp_diagnostics on src/adapters/opencode/token.ts", model: GEMINI_FLASH },
       { prompt: "Read vitest.config.ts completely", model: CLAUDE_SONNET },
       { prompt: "Run: git status --short | head -5", model: GEMINI_FLASH },
-      { prompt: "Read src/constants.ts completely", model: CLAUDE_SONNET },
+      { prompt: "Read src/adapters/antigravity/constants.ts completely", model: CLAUDE_SONNET },
       { prompt: "Run: echo 'final checkpoint' && echo 'all done'", model: GEMINI_FLASH },
       { prompt: "Summarize this entire conversation in 5 bullet points", model: CLAUDE_SONNET },
     ],

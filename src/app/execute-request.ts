@@ -1,4 +1,4 @@
-import { ANTIGRAVITY_ENDPOINT_FALLBACKS } from "../constants.js"
+import { ANTIGRAVITY_ENDPOINT_FALLBACKS } from "../adapters/antigravity/constants.js"
 import {
   AccountPoolManager as AccountManager,
   calculateBackoffMs,

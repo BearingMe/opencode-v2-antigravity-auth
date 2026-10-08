@@ -58,9 +58,10 @@ event` transforms. V2 API explicitly "may change before stable".
 
 ## Testing guarantees (from analysis)
 
-- `constants.test.ts`: Gemini-CLI header pin; static CLI headers regardless
-  of model; antigravity UA format / platform alignment / never-linux;
-  `HeaderSet` optionality.
+- `adapters/antigravity/constants.test.ts`: deterministic randomized-header
+  combinations and platform/metadata alignment; `adapters/antigravity/version.test.ts`
+  covers the fallback version in headers. Type-only `HeaderSet` contracts are
+  not runtime tests.
 - `adapters/opencode/plugin.test.ts`: plugin id/setup; `normalizeFetchBody` behaviors;
   destination/path validation; callback-parsing behaviors.
 - `adapters/opencode/plugin.accounts.test.ts`: delete-reselect, out-of-range no-write,
@@ -199,7 +200,8 @@ invalidateCache` remain exported. New code MUST use
 
 ## References (repository evidence)
 
-- Entries: `src/adapters/opencode/plugin.ts`, `src/constants.ts`,
+- Entries: `src/adapters/opencode/plugin.ts`,
+  `src/adapters/opencode/constants.ts`,
   `src/adapters/antigravity/constants.ts`,
   `src/adapters/opencode/google-sdk.ts`, `src/shims.d.ts`
 - OAuth/account communication: `src/adapters/opencode/oauth.ts`,
@@ -213,7 +215,8 @@ fingerprint,token-client,quota-client,verification-client}.ts` and
 - Accounts refresh cache: `src/modules/accounts/refresh/cache.ts`
 - Host composition: `src/adapters/opencode/{account-service,request,
 request-helpers}.ts`
-- Tests: `src/constants.test.ts`, `src/adapters/opencode/plugin.test.ts`,
+- Tests: `src/adapters/antigravity/constants.test.ts`,
+  `src/adapters/opencode/plugin.test.ts`,
   `src/adapters/opencode/plugin.accounts.test.ts`,
   `src/adapters/opencode/plugin.setup.test.ts` +
   colocated tests under each owning `src/` module/adapter

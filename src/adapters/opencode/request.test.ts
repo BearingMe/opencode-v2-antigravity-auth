@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest"
-import { SKIP_THOUGHT_SIGNATURE } from "../../constants"
+import { SKIP_THOUGHT_SIGNATURE } from "../../modules/inference/index.js"
 import {
   prepareAntigravityRequest,
   transformAntigravityResponse,

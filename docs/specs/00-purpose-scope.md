@@ -17,7 +17,8 @@ plugin's ownership.
 Evidence: `src/adapters/opencode/plugin.ts :: setup` (V2 bridge),
 `src/app/composition.ts :: executeAntigravityRequest` and
 `src/app/execute-request.ts :: executeRequest` (single native request path),
-`src/constants.ts` (identity/endpoints/headers),
+`src/adapters/opencode/constants.ts` (provider identity) and
+`src/adapters/antigravity/constants.ts` (OAuth identity/endpoints/headers),
 `src/adapters/opencode/oauth.ts :: authorizeAntigravity / exchangeAntigravity`.
 
 ## Problem solved
@@ -89,7 +90,7 @@ Non-goals:
   loop in `src/app/execute-request.ts`;
   `verifyAccountAccess` lives in `src/adapters/opencode/verification.ts`.
 - AI-SDK shim: `src/adapters/opencode/google-sdk.ts :: createGoogle` re-export.
-  `src/google-sdk.ts` remains a compatibility re-export. Models MUST
+  The plugin's SDK URL targets this isolated adapter module directly. Models MUST
   point at `aisdk:<ANTIGRAVITY_SDK>` (the `./google-sdk.js` URL), never
   directly at `@ai-sdk/google`, so the `aisdk.hook("sdk")` bridge cannot be
   bypassed.

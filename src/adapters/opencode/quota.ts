@@ -1,4 +1,4 @@
-import { ANTIGRAVITY_PROVIDER_ID } from "../../constants.js"
+import { ANTIGRAVITY_PROVIDER_ID } from "./constants.js"
 import {
   checkAccountQuotas,
   type AccountQuotaProbeResult,

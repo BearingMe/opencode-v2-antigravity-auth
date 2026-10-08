@@ -12,8 +12,9 @@ behavioral requirements remain in `docs/specs/00-07`.
 
 1. Do not test private/internal helpers through `__testExports`. The request
    adapter tests exercise exported behavior; do not add a test-only API.
-2. Do not write runtime tests for TypeScript types. Audit the `HeaderSet` cases
-   in `src/constants.test.ts`; use typechecking/type tests for type contracts.
+2. Do not write runtime tests for TypeScript types. The former runtime
+   `HeaderSet` checks were removed; use typechecking or compile-time type tests
+   for type contracts.
 3. Do not test language/runtime guarantees. Audit generic Error inheritance,
    throw/catch, and trivial assigned-field cases in `src/modules/inference/errors.test.ts`.
 4. Do not test constructor plumbing unless it is behavior. Assigned fields and
@@ -60,7 +61,8 @@ behavioral requirements remain in `docs/specs/00-07`.
     independently; use isolated reruns to investigate pollution or flakes.
 20. Do not leave important automated suites outside normal CI. Vitest currently
     includes `src/**/*.test.{ts,tsx}`; native `test/tui/tui-quota-render.test.ts` uses
-    `bun run test:tui`. It must gate PRs too; plan step 3 owns closing that gap.
+    `bun run test:tui`, which gates PRs in `.github/workflows/test.yml` and runs
+    with a clean package build.
 
 ## Review and fault-detection value
 

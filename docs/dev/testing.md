@@ -20,8 +20,9 @@ formatting (see `AGENTS.md`).
 
 ## What is covered
 
-- `constants.test.ts`: Antigravity UA format/platform alignment/never-Linux
-  and header-set optionality.
+- `adapters/antigravity/constants.test.ts`: deterministic coverage of the
+  supported Antigravity UA/platform-metadata combinations and required headers.
+  Type-only `HeaderSet` properties are left to TypeScript checking.
 - `adapters/opencode/plugin.test.ts`: plugin id/setup, `normalizeFetchBody` behaviors,
   destination/path validation, OAuth callback parsing.
 - `adapters/opencode/plugin.accounts.test.ts`: delete-reselect, out-of-range no-write,

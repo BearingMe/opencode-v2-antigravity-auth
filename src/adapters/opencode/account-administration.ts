@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { ANTIGRAVITY_PROVIDER_ID } from "../../constants.js"
+import { ANTIGRAVITY_PROVIDER_ID } from "./constants.js"
 import { createAccountAdmin, type AccountAdminService } from "../../modules/accounts/index.js"
 import {
   fingerprintRefreshToken,

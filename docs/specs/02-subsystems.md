@@ -275,14 +275,14 @@ thinking_disabled_violation`; gated by `session_recovery` and deduplicates
   repair), OAuth dedupe/cap enforcement, and refresh-rotation persistence.
 - `modules/accounts/quota/`: quota aggregation/check policy, redacted internal
   results, cache snapshots, per-account timeout and credential-free quota
-  presentation. The plugin compatibility façade validates the host RPC quota
-  schema separately. Cache writes remain matched to the checked account
+  presentation. The OpenCode account-service adapter validates the host RPC
+  quota schema separately. Cache writes remain matched to the checked account
   generation and retain newer/last-good readings.
 - `modules/accounts/verification/` persists verification outcomes; Antigravity
   request and response behavior remains in its adapter.
 - `modules/accounts/refresh/` owns unified credential refresh and proactive
-  queue scheduling. `v2-plugin.ts` still stops/replaces the queue and manager
-  on account/auth changes.
+  queue scheduling. `adapters/opencode/plugin.ts` stops/replaces the queue and
+  manager on account/auth changes.
 - `adapters/opencode/account-service.ts`: OpenCode tool/RPC compatibility facade.
   It no longer owns admin policy. The module service returns credential-free
   results separately from RPC/TUI schemas and presentation.

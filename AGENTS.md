@@ -152,8 +152,9 @@ Git hooks managed via Husky + lint-staged (pre-commit: eslint --fix + prettier) 
 
 ```
 src/
-├── v2-plugin.ts / tui.ts / rpc.ts / google-sdk.ts # Compatibility entrypoints
-├── constants.ts               # Endpoints, headers, OAuth identity, model routing
+├── v2-plugin.ts / tui.ts / rpc.ts                 # Compatibility entrypoints
+├── adapters/antigravity/constants.ts # Provider OAuth and wire constants
+├── adapters/opencode/constants.ts    # OpenCode provider identifiers
 ├── adapters/antigravity/{oauth,project,version}.ts # Provider OAuth/project/version composition
 ├── app/
 │   ├── composition.ts          # Selects OpenCode, account, inference, and transport adapters

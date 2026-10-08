@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto"
-import { ANTIGRAVITY_ENDPOINT, getRandomizedHeaders } from "../../constants.js"
+import { ANTIGRAVITY_ENDPOINT, getRandomizedHeaders } from "../antigravity/constants.js"
 import {
   createInferencePipeline,
   type InferenceRequestOptions,

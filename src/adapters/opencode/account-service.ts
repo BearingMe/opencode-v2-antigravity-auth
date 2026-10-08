@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { z } from "zod"
-import { ANTIGRAVITY_PROVIDER_ID } from "../../constants.js"
+import { ANTIGRAVITY_PROVIDER_ID } from "./constants.js"
 import {
   createAccountAdmin,
   ensureAccountIds as ensureIds,

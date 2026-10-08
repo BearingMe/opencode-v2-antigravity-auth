@@ -1,6 +1,6 @@
 import { createAntigravityInferenceClient } from "../adapters/antigravity/inference-client.js"
 import { openCodeInference } from "../adapters/opencode/inference.js"
-import { ANTIGRAVITY_PROVIDER_ID } from "../constants.js"
+import { ANTIGRAVITY_PROVIDER_ID } from "../adapters/opencode/constants.js"
 import { accessTokenExpired } from "../modules/accounts/index.js"
 import { disposeDiskSignatureCache } from "../adapters/opencode/signature-cache.js"
 import { ensureProjectContext } from "../adapters/opencode/project.js"
