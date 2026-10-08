@@ -639,7 +639,7 @@ The status is metadata; `refresh` is an action; `ctrl+r` is its binding.
 ```text
 Antigravity quota                                      esc
 
-bearingme001@gmail.com
+user@example.invalid
 
 Gemini models                                  Flash, Pro
 Weekly      ███████████░░░░░  66.03%                18h 51m
