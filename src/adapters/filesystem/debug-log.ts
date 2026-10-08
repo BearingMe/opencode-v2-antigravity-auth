@@ -1,4 +1,5 @@
-import { createWriteStream, mkdirSync, readdirSync, statSync, unlinkSync } from "node:fs"
+import { constants } from "node:fs"
+import { createWriteStream, fchmodSync, mkdirSync, openSync, readdirSync, statSync, unlinkSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { env } from "node:process"
@@ -18,7 +19,18 @@ function createTimestampedFileWriter(filePath?: string): Pick<DebugFileDestinati
   if (!filePath) return { writeLine: () => {}, close: async () => {} }
 
   try {
-    const stream = createWriteStream(filePath, { flags: "a" })
+    let stream: ReturnType<typeof createWriteStream>
+    if (process.platform === "win32") {
+      stream = createWriteStream(filePath, { flags: "a", mode: 0o600 })
+    } else {
+      const fd = openSync(
+        filePath,
+        constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW,
+        0o600,
+      )
+      fchmodSync(fd, 0o600)
+      stream = createWriteStream(filePath, { fd, autoClose: true })
+    }
     stream.on("error", () => {
       // Debug output is best effort and must not interfere with inference.
     })

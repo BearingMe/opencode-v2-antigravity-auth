@@ -74,6 +74,11 @@ Antigravity across the account pool.
 | `log_dir`     | OS default    | Custom directory for debug logs. Env: `OPENCODE_ANTIGRAVITY_LOG_DIR=/path/to/logs`.                                                                                                                                                                                                                |
 | `auto_update` | `true`        | Version check with toast; rewrites a pinned install when applicable. Never installs packages itself. Known limitation: the checker still reads the legacy `plugin` (singular) config key and queries npm dist-tags, so with local-path installs (and until the fork is published) it stays silent. |
 
+Debug logs can include request and response content. Keep debug logging off
+unless troubleshooting, and treat generated logs as sensitive local data.
+On POSIX systems, log files are created with owner-only permissions; Windows
+uses the permissions inherited from the configured log directory.
+
 ## Advanced (defaults are fine for most users)
 
 | Option                                                                                           | Default                                                                  |

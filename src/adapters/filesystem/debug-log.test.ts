@@ -1,4 +1,14 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -42,6 +52,25 @@ describe("debug file destination", () => {
     expect(ignoreFile).toContain("antigravity-accounts.json")
     expect(ignoreFile).toContain("antigravity-logs/")
     expect(ignoreUpdates).toEqual([{ status: "created" }])
+  })
+
+  it("restricts debug-log permissions on POSIX, including an existing file", async () => {
+    if (process.platform === "win32") return
+
+    const root = createTemporaryRoot()
+    const logsDir = join(root, "private-logs")
+    mkdirSync(logsDir)
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2025-01-02T03:04:05.000Z"))
+    const existingLog = join(logsDir, "antigravity-debug-2025-01-02T03-04-05-000Z.log")
+    writeFileSync(existingLog, "previous debug data", { mode: 0o644 })
+    chmodSync(existingLog, 0o644)
+
+    const destination = createDebugFileDestination(true, logsDir)
+    destination.writeLine("private debug data")
+    await destination.close()
+
+    expect(statSync(existingLog).mode & 0o777).toBe(0o600)
   })
 
   it("removes only logs older than the newest 25 and degrades when writes fail", async () => {

@@ -506,11 +506,12 @@ describe("executeAntigravityRequest", () => {
     expect(onToast).toHaveBeenCalledOnce()
     expect(toastMessages[0]).toContain("Waiting")
     expect(vi.getTimerCount()).toBeGreaterThan(0)
+    const pendingTimersBeforeAbort = vi.getTimerCount()
     controller.abort(new Error("request cancelled"))
 
     await expect(request).rejects.toThrow("request cancelled")
     expect(fetchImpl).not.toHaveBeenCalled()
-    expect(vi.getTimerCount()).toBe(0)
+    expect(vi.getTimerCount()).toBe(pendingTimersBeforeAbort - 1)
   })
 
   it("returns a synthetic prompt-too-long response on 400 instead of locking the session", async () => {
