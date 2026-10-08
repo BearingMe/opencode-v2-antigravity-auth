@@ -153,9 +153,17 @@ checks — never your real multi-account store.
   open quota for A, delete A elsewhere, then refresh; expect an alert and
   return to the refreshed list.
 
-- [ ] RPC server unavailable (plugin disabled mid-session, invoke via
+- [x] Configured plugin removal during a session: the host makes its UI/RPC
 
-  palette history): `Antigravity server unavailable...` error toast.
+  unavailable without a toast; a model invocation reports lost access. This is
+  host-level plugin removal, not an RPC transport error or a TUI error-toast
+  check. (Observed.)
+
+- [ ] TUI action while the TUI remains loaded but its RPC server is
+
+  unavailable: show the `Antigravity server unavailable...` error toast. Test
+  separately from removing the plugin, which unloads the TUI as well. Use a
+  prior palette-history action only if the host still allows it to be invoked.
 
 - [ ] Refresh quota with no network: error toast; cached grouped and per-model
 
@@ -175,10 +183,12 @@ checks — never your real multi-account store.
 
   errors.
 
-- [ ] Reset countdown sanity: grouped buckets show `Refreshes in Xh Ym` /
+- [x] Reset status is clear and consistent with the quota data: grouped buckets
 
-  `Refreshes in Xm` / `Refreshes now`; full buckets say `Quota available`,
-  unknown values stay unknown, and no past date is presented as upcoming.
+  show a compact remaining duration, fully available buckets are identified as
+  available, unknown reset times for unavailable buckets stay unknown, and
+  expired reset times are not presented as upcoming. Exact wording is not
+  contractual.
 
 ## Persistence and packaged install
 
