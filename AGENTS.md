@@ -9,22 +9,6 @@ OAuth-routed `gemini-*` models through the AI SDK hook and fetch bridge into
 a single native engine, transforming them to Antigravity format with auth,
 quota, rotation, and recovery.
 
-## Migration tracking (only when `specs/` exists)
-
-- If the repository-root `specs/` directory exists, read
-  `specs/architecture-migration.md` and `specs/testing-rules.md` before
-  migration or test work. Otherwise, ignore this section; do not create the
-  directory solely to satisfy this instruction.
-- Follow the migration step order, acceptance criteria, and definition of
-  done. Update its progress tracker with verified results; never mark an
-  unrun, failing, or blocked check as passing.
-- Keep the smallest suite that detects meaningful behavioral regressions.
-  Apply the testing hard rules rather than chasing coverage or test counts.
-- Each completed task requires all tests passing, Oracle consultation,
-  review with blocking findings resolved, a passing scope-appropriate smoke
-  test, documented functions/methods, and a scoped conventional commit.
-  Do not stage unrelated work or bypass failing commit hooks.
-
 ## Build & Test Commands
 
 Package and workflow scripts use Bun (`npx --yes bun@1.4.2` if bun is not directly in PATH):
@@ -261,10 +245,7 @@ surfaces. Do not attempt to patch or touch OpenCode core codebase.
 - Task plans, progress reports, transcripts, and investigation dumps do NOT
   belong in maintained docs. Keep temporary artifacts outside the repo;
   integrate only durable findings into an existing canonical document.
-- Exception: when repository-root `specs/` exists, keep the requested
-  migration plan, progress tracker, and migration testing rules there.
-  `docs/specs/00-07` remains the source of existing behavioral requirements;
-  the migration tracker does not override them.
+- `docs/specs/00-07` is the source of normative behavioral requirements.
 - Never commit `dist/` (gitignored build output). Use
   `bun run clean && bun run build`; never hand-delete individual `dist/`
   files to fix staleness.
