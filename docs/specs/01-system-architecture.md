@@ -107,7 +107,7 @@ diagnostics are supplied or handled by the request boundary.
   streaming paths are compatibility adapters.
 - `antigravity_accounts` tool (`src/adapters/opencode/plugin.ts :: manageAccounts`,
   backed by `src/modules/accounts/account-admin.ts` through the compatibility
-  facade in `src/plugin/account-service.ts`).
+  facade in `src/adapters/opencode/account-service.ts`).
   No search tool is registered; the D-SEARCH-MUTEX guard in
   `src/modules/inference/transforms/gemini.ts` keeps the D-SEARCH-MUTEX guard
   for SDK-supplied search tools.

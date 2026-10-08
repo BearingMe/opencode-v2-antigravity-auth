@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto"
 import { z } from "zod"
-import { ANTIGRAVITY_PROVIDER_ID } from "../constants.js"
+import { ANTIGRAVITY_PROVIDER_ID } from "../../constants.js"
 import {
   createAccountAdmin,
   ensureAccountIds as ensureIds,
   LEGACY_TOOL_SELECT_UPDATES_BOTH_FAMILIES,
   MAX_SAVED_ACCOUNTS,
   toAccountList as projectAccountList,
-} from "../modules/accounts/index.js"
+} from "../../modules/accounts/index.js"
 import type {
   AccountMetadataV3,
   AccountSummary,
@@ -18,18 +18,18 @@ import type {
   QuotaCheckOutcome,
   QuotaPresentation,
   QuotaPresentationOptions,
-} from "../modules/accounts/index.js"
-import type { PluginClient } from "../adapters/opencode/types.js"
-import { checkAccountsQuota } from "../adapters/opencode/quota.js"
-import { verifyAccountAccess } from "../adapters/opencode/verification.js"
-import { createLogger } from "../adapters/opencode/logger.js"
+} from "../../modules/accounts/index.js"
+import type { PluginClient } from "./types.js"
+import { checkAccountsQuota } from "./quota.js"
+import { verifyAccountAccess } from "./verification.js"
+import { createLogger } from "./logger.js"
 import {
   fingerprintRefreshToken,
   loadAccounts,
   saveAccounts,
   saveAccountsReplace,
   updateAccounts,
-} from "../adapters/filesystem/account-store.js"
+} from "../filesystem/account-store.js"
 
 const log = createLogger("account-service")
 
@@ -124,9 +124,9 @@ export type {
   QuotaPresentation,
   QuotaPresentationOptions,
   AccountQuotaResult,
-} from "../modules/accounts/index.js"
-export type { AccountMetadataV3, AccountStorageV4 } from "../modules/accounts/index.js"
-export { fingerprintRefreshToken } from "../adapters/filesystem/account-store.js"
+} from "../../modules/accounts/index.js"
+export type { AccountMetadataV3, AccountStorageV4 } from "../../modules/accounts/index.js"
+export { fingerprintRefreshToken } from "../filesystem/account-store.js"
 
 /** Verification states presented in account summaries. */
 export type VerificationStatus = AccountSummary["verificationStatus"]
@@ -166,7 +166,7 @@ export function toAccountList(storage: AccountStorageV4) {
 }
 
 /** Resolves account targets with the domain's fail-closed identity rules. */
-export { resolveAccountTarget } from "../modules/accounts/index.js"
+export { resolveAccountTarget } from "../../modules/accounts/index.js"
 
 /** Lists credential-free summaries from persisted account state. */
 export function listAccounts() {

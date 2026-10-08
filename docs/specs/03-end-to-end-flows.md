@@ -21,7 +21,7 @@ The method declares one required selection field (no Skip option).
 4. `exchangeAntigravity(code, state)` → validate state → token POST →
    userinfo GET → `loadCodeAssist` project discovery → packed
    `refresh|project`.
-5. `persistOAuthAccount(result, "add")` (`src/plugin/account-service.ts`;
+5. `persistOAuthAccount(result, "add")` (`src/adapters/opencode/account-service.ts`;
    dedupe by refresh token or case-insensitive email, cap 10,
    single-lock replace write + per-family index) → `currentAuth` set, native
    manager reset.

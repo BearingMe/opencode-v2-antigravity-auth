@@ -16,7 +16,7 @@ import {
   checkQuota as checkAccountsQuota,
   persistRefreshRotation,
   type MutationOp,
-} from "../../plugin/account-service.js"
+} from "./account-service.js"
 import { OPENCODE_MODEL_DEFINITIONS } from "./config/models.js"
 import type { AccountOAuthCredential } from "../../modules/accounts/index.js"
 import type { PluginClient } from "./types.js"

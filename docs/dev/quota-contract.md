@@ -77,8 +77,8 @@ store does not fall back to the pre-check account pool.
 | -------------------------------- | ------------------------------------------ | -------------------------------------------------------------------- |
 | Per-model fetch timeout          | 10 s (`FETCH_TIMEOUT_MS`)                  | `fetchAvailableModels` in `src/adapters/antigravity/quota-client.ts` |
 | Grouped-summary fetch timeout    | 5 s (`SUMMARY_FETCH_TIMEOUT_MS`)           | `fetchQuotaSummary` in `src/adapters/antigravity/quota-client.ts`    |
-| Per-account presentation timeout | `timeoutMs`, clamped 1–30 s (default 12 s) | `boundedTimeout` in `src/plugin/account-service.ts`                  |
-| Staleness threshold              | `staleAfterMs` (default 15 min)            | `getQuotaPresentation` in `src/plugin/account-service.ts`            |
+| Per-account presentation timeout | `timeoutMs`, clamped 1–30 s (default 12 s) | `boundedTimeout` in `src/modules/accounts/quota/policy.ts`           |
+| Staleness threshold              | `staleAfterMs` (default 15 min)            | `getQuotaPresentation` in `src/modules/accounts/quota/policy.ts`     |
 
 Timed-out accounts resolve to `undefined` and surface as `error` (or cached
 fallback) without failing the whole refresh.

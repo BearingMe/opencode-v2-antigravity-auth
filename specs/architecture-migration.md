@@ -175,10 +175,10 @@ the receiving boundary exists; their current path remains legacy-by-location.
 | `src/hooks/auto-update-checker/{cache,checker,constants,index,logging,types}.ts`                                                                                                                               | `adapters/opencode/hooks/`; host event/toast integration remains here, with generic logging routed through its boundary.                                                                                                                                                                                                                   |
 | `src/plugin/config/{index,loader,models,schema,updater}.ts`                                                                                                                                                    | `adapters/opencode/config/`; host config-file and provider/model registration details stay at the host boundary. Pass validated config values into modules rather than importing host APIs there.                                                                                                                                          |
 | `src/plugin/accounts.ts`, `src/plugin/rotation.ts`                                                                                                                                                             | `modules/accounts/account-pool.ts` and `modules/accounts/selection/`; separate pool membership from selection/health policy.                                                                                                                                                                                                               |
-| `src/plugin/account-service.ts`                                                                                                                                                                                | Split account administration, target resolution, DTO construction, and persistence policy into `modules/accounts/account-admin.ts`; keep RPC/TUI delivery in `adapters/opencode/`. Do not move its host client dependency into the module.                                                                                                 |
+| `src/adapters/opencode/account-service.ts`                                                                                                                                                                     | Account administration, target resolution, DTO construction, and persistence policy live in `modules/accounts/account-admin.ts`; keep OpenCode tool/RPC delivery and host client dependencies in `adapters/opencode/`.                                                                                                                     |
 | `src/modules/accounts/refresh/{credentials,policy}.ts`                                                                                                                                                         | Keep refresh-part packing and account types in the accounts contract, separate from vendor token exchange.                                                                                                                                                                                                                                 |
 | `src/adapters/opencode/refresh-queue.ts`                                                                                                                                                                       | `modules/accounts/refresh/` owns scheduling policy; OpenCode composition binds it to token refresh and host logging.                                                                                                                                                                                                                       |
-| `src/adapters/opencode/quota.ts`, quota portions of `src/plugin/account-service.ts`                                                                                                                            | Keep quota aggregation/check policy in `modules/accounts/quota/`, provider wire work in `adapters/antigravity/quota-client.ts`, and host-bound refresh/probe composition in `adapters/opencode/quota.ts`.                                                                                                                                  |
+| `src/adapters/opencode/{account-service,quota}.ts`                                                                                                                                                             | Keep quota aggregation/check policy in `modules/accounts/quota/`, provider wire work in `adapters/antigravity/quota-client.ts`, and host-bound refresh/probe composition in `adapters/opencode/quota.ts`.                                                                                                                                  |
 | `src/adapters/opencode/verification.ts`, `src/plugin/verification.ts`                                                                                                                                          | Keep persisted verification outcomes/policy in `modules/accounts/verification/`; provider parsing/network calls in the Antigravity adapter; compose refresh/project/probe behavior in `adapters/opencode/verification.ts`.                                                                                                                 |
 | `src/plugin/engine.ts`                                                                                                                                                                                         | Split the current router: cross-module retries/warmup/coordination to `app/execute-request.ts`, account selection/quota/refresh policy to `modules/accounts/`, request/response work to `modules/inference/`, Antigravity calls to `adapters/antigravity/`, and host toasts to `adapters/opencode/`. Preserve one active route throughout. |
 | Account storage schema, migrations, dedupe, replace/tombstone rules in `src/plugin/storage.ts`                                                                                                                 | `modules/accounts/persistence/`; the storage contract and invariants stay with accounts.                                                                                                                                                                                                                                                   |
@@ -268,9 +268,11 @@ has no imports back into higher layers.
   checks. Some cases also assert DTO behavior, but serialization scans are not
   structural allowlist assertions. At the DTO boundary, assert credential fields
   are absent and only intended safe fields can cross; keep string scans secondary.
-- `src/plugin/account-service.test.ts` mocks several internal modules. As ports
-  emerge, prefer testing account behavior through public contracts and mock
-  external persistence/network/host boundaries, not internal call choreography.
+- Current account behavior coverage is split between
+  `modules/accounts/account-admin.test.ts` (policy through injected ports) and
+  `adapters/opencode/account-service.test.ts` (filesystem tombstone integration).
+  Keep mocks at external persistence/network/host boundaries, not internal call
+  choreography.
 - The five largest named suites are `request-helpers.test.ts` (64,157 bytes),
   `accounts.test.ts` (58,311), `gemini.test.ts` (51,747),
   `account-service.test.ts` (49,858), and `request.test.ts` (43,944). Split them
@@ -1123,6 +1125,17 @@ maintained documentation with the completed architecture.
   the built Antigravity communication smoke (synthetic credentials, mocked
   HTTP). Oracle and review found no blocker. Remaining legacy composition and
   isolated-profile installed-host acceptance keep Step 14 open.
+- Moved the account-service facade and tombstone integration test from
+  `src/plugin/` to `adapters/opencode/`, rewired the server entry and updated
+  maintained source maps. Account-admin policy and persistence remain in their
+  modules/adapters; the OpenCode facade still binds those dependencies for the
+  tool/RPC surfaces. Verification passed: Vitest (75 files / 1,200 tests), native
+  TUI (13 / 164), typecheck, lint, boundary checks and fixtures (7 tests / 22
+  expectations), changed-file Prettier, `git diff --check`, clean build, and the
+  built Antigravity communication smoke (synthetic credentials, mocked HTTP).
+  Oracle identified a stale quota-contract location, which was corrected and
+  confirmed; review found no code blocker. Remaining request compatibility
+  files and isolated-profile installed-host acceptance keep Step 14 open.
 
 **Acceptance criteria:**
 

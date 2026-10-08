@@ -283,7 +283,7 @@ thinking_disabled_violation`; gated by `session_recovery` and deduplicates
 - `modules/accounts/refresh/` owns unified credential refresh and proactive
   queue scheduling. `v2-plugin.ts` still stops/replaces the queue and manager
   on account/auth changes.
-- `plugin/account-service.ts`: compatibility façade for existing imports.
+- `adapters/opencode/account-service.ts`: OpenCode tool/RPC compatibility facade.
   It no longer owns admin policy. The module service returns credential-free
   results separately from RPC/TUI schemas and presentation.
 - `AccountSummary` and `QuotaPresentation` remain credential-free contracts;

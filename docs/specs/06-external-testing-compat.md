@@ -108,7 +108,7 @@ event` transforms. V2 API explicitly "may change before stable".
   `isStaleMutate`) and the `rpc.ts` transport codec mirror are unit-covered
   (`adapters/opencode/tui/index.test.ts`,
   `rpc-transport.test.ts`); the full dialog/toast flow has no automated
-  coverage by design. `src/plugin/account-service.ts`
+  coverage by design. `src/adapters/opencode/account-service.ts`
   quota-presentation semantics are specified in `../dev/quota-contract.md`
   (null-vs-0, failed-refresh-keeps-cache, timeout-partial).
 

@@ -2,16 +2,16 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { AccountManager } from "../adapters/opencode/account-pool.js"
+import { AccountManager } from "./account-pool.js"
 import { deleteAllAccounts, mutateAccount, persistOAuthAccount } from "./account-service.js"
-import { fingerprintRefreshToken } from "../adapters/filesystem/account-store.js"
+import { fingerprintRefreshToken } from "../filesystem/account-store.js"
 import {
   tombstoneForAccount,
   addTombstones,
   MAX_TOMBSTONES,
   type AccountMetadataV3,
   type AccountStorageV4,
-} from "../modules/accounts/index.js"
+} from "../../modules/accounts/index.js"
 import {
   AccountStoreUnreadableError,
   getStoragePath,
@@ -19,7 +19,7 @@ import {
   saveAccounts,
   saveAccountsReplace,
   updateAccounts,
-} from "../adapters/filesystem/account-store.js"
+} from "../filesystem/account-store.js"
 
 let configDir = ""
 
