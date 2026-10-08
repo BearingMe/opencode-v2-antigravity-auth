@@ -1,6 +1,6 @@
 # Antigravity OAuth Plugin for OpenCode V2
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
 
 Authenticate OpenCode V2 against **Antigravity** (Google's IDE backend) via
 OAuth and use Antigravity quota for `gemini-3` / `claude-4.6` models with
@@ -18,10 +18,10 @@ session recovery included.
 > `AntigravityAccounts` RPC. Server plugins have no toast API, so TUI toasts
 > are emitted as plugin logs.
 
-> **Not yet published.** `opencode-v2-antigravity-auth` is not on npm yet —
-> install from a local path (below) until the first release. The
-> `auto_update` checker queries npm dist-tags, so it stays silent until the
-> package is published.
+> **First release in preparation.** `opencode-v2-antigravity-auth@0.1.0` is
+> not on npm yet. Use a local path below until the package is published; after
+> release, use the registry entry shown below. The `auto_update` checker queries
+> npm dist-tags and stays silent until publication.
 
 ## What you get
 
@@ -52,9 +52,17 @@ config (`~/.config/opencode/opencode.json` or `opencode.jsonc`):
 }
 ```
 
-Local paths, `file://` URLs, and (once published) registry packages with
-optional `@version` pins are all accepted. The V2 key is `plugins`
-(plural).
+Once `0.1.0` is published, replace the local path with a pinned registry entry:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-v2-antigravity-auth@0.1.0"],
+}
+```
+
+Local paths, `file://` URLs, and registry packages with optional `@version`
+pins are accepted. The V2 key is `plugins` (plural).
 
 ```bash
 opencode auth login   # one account per run; repeat to add more (max 10)

@@ -9,9 +9,9 @@
 
 ## Add the plugin
 
-> **Not yet published.** Until the first npm release, install from a local
-> checkout. In your OpenCode config (`~/.config/opencode/opencode.json` or
-> `opencode.jsonc`):
+> **First release in preparation.** Version `0.1.0` is not on npm yet. Until
+> publication, install from a local checkout. In your OpenCode config
+> (`~/.config/opencode/opencode.json` or `opencode.jsonc`):
 
 ```jsonc
 {
@@ -20,9 +20,14 @@
 }
 ```
 
-Local paths and `file://` URLs work; registry packages with optional
-`@version` pins will work once published. After the first release this
-becomes `"plugins": ["opencode-v2-antigravity-auth@latest"]`.
+Once `0.1.0` is published, use the pinned registry entry:
+
+```json
+"plugins": ["opencode-v2-antigravity-auth@0.1.0"]
+```
+
+You can use `@latest` instead if you prefer automatic updates. Local paths and
+`file://` URLs continue to work for development.
 
 > OpenCode V2 uses the `plugins` (plural) key. `plugin` (singular) is not
 > valid V2 configuration.

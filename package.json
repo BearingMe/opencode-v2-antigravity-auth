@@ -46,7 +46,7 @@
   "files": [
     "dist/",
     "README.md",
-    "LICENSE"
+    "LICENSE.md"
   ],
   "scripts": {
     "clean": "node -e \"import{rmSync}from'node:fs';rmSync('dist',{recursive:true,force:true})\"",
