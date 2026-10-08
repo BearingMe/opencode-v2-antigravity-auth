@@ -58,9 +58,9 @@ async function runLoggingSmoke() {
   mkdirSync(configDir, { recursive: true })
 
   const [{ DEFAULT_CONFIG }, debug, logger] = await Promise.all([
-    import("../dist/src/adapters/opencode/config/index.js"),
-    import("../dist/src/adapters/opencode/debug.js"),
-    import("../dist/src/adapters/opencode/logger.js"),
+    import("../../dist/src/adapters/opencode/config/index.js"),
+    import("../../dist/src/adapters/opencode/debug.js"),
+    import("../../dist/src/adapters/opencode/logger.js"),
   ])
   disposeDebugLog = debug.disposeDebugLog
 

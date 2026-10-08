@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { checkArchitecture } from "./check-boundaries"
+import { checkArchitecture } from "../../scripts/check-boundaries.ts"
 
 const fixtureRoots: string[] = []
 
@@ -159,7 +159,7 @@ describe("architecture boundary checker", () => {
       "src/modules/accounts/index.ts": "",
       "src/modules/accounts/internal.ts": "export const internal = true",
     })
-    const scriptPath = fileURLToPath(new URL("./check-boundaries.ts", import.meta.url))
+    const scriptPath = fileURLToPath(new URL("../../scripts/check-boundaries.ts", import.meta.url))
     const result = spawnSync(process.execPath, [scriptPath, "--root", root], { encoding: "utf8" })
 
     expect(result.status).toBe(1)

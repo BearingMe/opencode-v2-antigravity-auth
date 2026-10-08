@@ -38,7 +38,7 @@ formatting (see `AGENTS.md`).
   replacement, and unload regressions.
 - `adapters/opencode/tui/quota-controller.test.ts`: overlap protection, returned error status,
   unexpected rejection/retry, late-result disposal, and navigation outcomes.
-- `test/tui-quota-render.test.ts`: native Bun/OpenTUI rendering of the built
+- `test/tui/tui-quota-render.test.ts`: native Bun/OpenTUI rendering of the built
   account list verifies single-cell dot colors, the shared legend/login hint,
   disabled text fallback, search/no-match, readable light-theme input colors,
   selection, and Esc. Missing-account notice rendering and Enter/Esc commands
@@ -69,7 +69,9 @@ formatting (see `AGENTS.md`).
 ## Known gaps (do not file as regressions)
 
 - OAuth and provider-client unit tests live under `src/adapters/antigravity/`;
-  `script/` E2E is excluded from typecheck and live-endpoint E2E needs real quota.
+  tooling under `scripts/` and live scripts under `test/e2e/` are excluded from
+  typecheck, and endpoint tests need real quota. Synthetic built-package checks
+  live under `test/smoke/`.
 - The full installed host dialog stack, keyboard dispatch, and browser
   lifecycle still require [manual-testing.md](manual-testing.md). Native
   renderer/controller tests do not establish those integration behaviors.

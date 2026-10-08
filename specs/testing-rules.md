@@ -59,7 +59,7 @@ behavioral requirements remain in `docs/specs/00-07`.
 19. Do not depend on execution order or leftover state. Tests must run
     independently; use isolated reruns to investigate pollution or flakes.
 20. Do not leave important automated suites outside normal CI. Vitest currently
-    includes `src/**/*.test.{ts,tsx}`; native `test/tui-quota-render.test.ts` uses
+    includes `src/**/*.test.{ts,tsx}`; native `test/tui/tui-quota-render.test.ts` uses
     `bun run test:tui`. It must gate PRs too; plan step 3 owns closing that gap.
 
 ## Review and fault-detection value

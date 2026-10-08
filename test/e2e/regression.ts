@@ -514,8 +514,8 @@ Tests:
     - stress-50-turn-endurance (51 turns, endurance test)
 
 Usage:
-  bun run script/test-regression.ts [options]
-  (or: npx tsx script/test-regression.ts [options])
+  bun run test/e2e/regression.ts [options]
+  (or: npx tsx test/e2e/regression.ts [options])
 
 Options:
   --sanity              Run sanity tests only (quick)
@@ -526,9 +526,9 @@ Options:
   --help, -h            Show this help
 
 Examples:
-  bun run script/test-regression.ts --sanity
-  bun run script/test-regression.ts --heavy
-  bun run script/test-regression.ts --test stress-20-turn-recovery
+  bun run test/e2e/regression.ts --sanity
+  bun run test/e2e/regression.ts --heavy
+  bun run test/e2e/regression.ts --test stress-20-turn-recovery
 `)
 }
 

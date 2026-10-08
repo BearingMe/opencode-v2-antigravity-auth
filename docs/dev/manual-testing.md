@@ -257,7 +257,7 @@ store is fine and add/remove/enable/disable work normally.
 
 ### Capture the interrupted-call context
 
-The optional read-only probes in `script/step-13-observer/` report tool-call IDs,
+The optional read-only probes in `test/e2e/recovery-observer/` report tool-call IDs,
 matching result counts, and whether the canonical cancellation result is present.
 They do not log prompts or tool output, are not loaded automatically, and stay
 inactive unless `STEP13_RECOVERY_PROBE=1` is set in the host process. When
@@ -270,8 +270,8 @@ The file contains opaque session/tool-call IDs; treat it as local test data.
    directories:
 
    ```powershell
-    $before = (Resolve-Path .\script\step-13-observer\before).Path.Replace('\', '/')
-    $after = (Resolve-Path .\script\step-13-observer\after).Path.Replace('\', '/')
+     $before = (Resolve-Path .\test\e2e\recovery-observer\before).Path.Replace('\', '/')
+     $after = (Resolve-Path .\test\e2e\recovery-observer\after).Path.Replace('\', '/')
     $before
     $after
    ```

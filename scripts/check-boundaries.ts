@@ -234,7 +234,7 @@ function isPublicModuleFile(root: string, targetPath: string, moduleName: string
 
 /** Returns the legacy exceptions declared for the current migration checkpoint. */
 function readExceptions(root: string): BoundaryException[] {
-  const exceptionsPath = join(root, "script/boundary-exceptions.json")
+  const exceptionsPath = join(root, "scripts/boundary-exceptions.json")
   if (!existsSync(exceptionsPath)) return []
 
   const parsed: unknown = JSON.parse(readFileSync(exceptionsPath, "utf8"))
@@ -263,7 +263,7 @@ function readExceptions(root: string): BoundaryException[] {
 
 /** Reads exact, temporary runtime-cycle exceptions from the migration manifest. */
 function readCycleExceptions(root: string): BoundaryCycleException[] {
-  const exceptionsPath = join(root, "script/boundary-cycle-exceptions.json")
+  const exceptionsPath = join(root, "scripts/boundary-cycle-exceptions.json")
   if (!existsSync(exceptionsPath)) return []
 
   const parsed: unknown = JSON.parse(readFileSync(exceptionsPath, "utf8"))

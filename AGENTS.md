@@ -46,6 +46,16 @@ bun run format                       # Format with Prettier
 bun run format:check                 # Verify formatting with Prettier
 ```
 
+## Repository Layout
+
+- `src/`: runtime, with behavioral tests colocated under the owning modules.
+- `test/`: shared setup, native TUI tests, package smokes, live E2E scripts, and
+  recovery-observer fixtures.
+- `scripts/`: build/schema tasks, architecture-boundary checker, and standalone
+  quota diagnostic.
+- `docs/specs/`: maintained normative behavior. Root `specs/` is the temporary
+  migration tracker and remains until its acceptance criteria are complete.
+
 Git hooks managed via Husky + lint-staged (pre-commit: eslint --fix + prettier) and commitlint (commit-msg: conventional commits).
 
 ## TypeScript Configuration
@@ -82,7 +92,7 @@ Git hooks managed via Husky + lint-staged (pre-commit: eslint --fix + prettier) 
 - `PascalCase` for types, interfaces, classes, enums
 - `UPPER_SNAKE_CASE` for constants
 - `kebab-case` for file names (e.g., `request-helpers.ts`, `account-pool.ts`)
-- Test files: `*.test.ts` colocated with source
+- Test files: `*.test.ts`; runtime tests are colocated with source.
 
 ### Types
 
@@ -234,7 +244,9 @@ surfaces. Do not attempt to patch or touch OpenCode core codebase.
 
 - Framework: **Vitest 3** with native ESM
 - Config: `vitest.config.ts`
-- Tests colocated: `*.test.ts` next to the owning source under `src/`
+- Runtime tests: `*.test.ts` next to the owning source under `src/`.
+- Cross-cutting tests and smokes live under `test/`; repository tooling lives
+  under `scripts/`.
 - Use `describe`/`it`/`expect` — standard Vitest API
 - Mock with `vi.fn()`, `vi.spyOn()`, `vi.mock()`
 - The full `/antigravity` dialog/toast flow has no automated coverage by

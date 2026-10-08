@@ -100,8 +100,8 @@ function printHelp(): void {
 E2E Model Test Script
 
 Usage:
-  bun run script/test-models.ts [options]
-  (or: npx tsx script/test-models.ts [options])
+  bun run test/e2e/models.ts [options]
+  (or: npx tsx test/e2e/models.ts [options])
 
 Options:
   --model <model>      Test specific model
@@ -111,9 +111,9 @@ Options:
   --help, -h           Show this help
 
 Examples:
-  bun run script/test-models.ts --dry-run
-  bun run script/test-models.ts --model antigravity/antigravity-gemini-3.8-flash
-  bun run script/test-models.ts --category antigravity-claude
+  bun run test/e2e/models.ts --dry-run
+  bun run test/e2e/models.ts --model antigravity/antigravity-gemini-3.8-flash
+  bun run test/e2e/models.ts --category antigravity-claude
 `)
 }
 

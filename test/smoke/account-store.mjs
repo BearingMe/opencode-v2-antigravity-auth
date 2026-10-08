@@ -10,8 +10,8 @@ const previousConfigDir = process.env.OPENCODE_CONFIG_DIR
 /** Runs account persistence against a synthetic legacy and current store. */
 async function runAccountStoreSmoke() {
   process.env.OPENCODE_CONFIG_DIR = configDir
-  const storage = await import("../dist/src/adapters/filesystem/account-store.js")
-  const { addTombstones, tombstoneForAccount } = await import("../dist/src/modules/accounts/index.js")
+  const storage = await import("../../dist/src/adapters/filesystem/account-store.js")
+  const { addTombstones, tombstoneForAccount } = await import("../../dist/src/modules/accounts/index.js")
 
   assert.equal(await storage.loadAccounts(), null, "a missing account store should stay absent on load")
 
@@ -36,7 +36,7 @@ async function runAccountStoreSmoke() {
   assert.equal(migrated?.accounts[0]?.email, "smoke@example.invalid")
   assert.equal(JSON.parse(readFileSync(storePath, "utf8")).version, 4, "the migration should persist")
 
-  const { AccountManager } = await import("../dist/src/adapters/opencode/account-pool.js")
+  const { AccountManager } = await import("../../dist/src/adapters/opencode/account-pool.js")
   const manager = await AccountManager.loadFromDisk()
   assert.equal(manager.getCurrentOrNextForFamily("gemini", undefined, "sticky")?.index, 0)
   const usedAt = Date.now()

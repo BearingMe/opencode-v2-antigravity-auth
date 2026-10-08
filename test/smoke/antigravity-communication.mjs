@@ -5,20 +5,20 @@ import rootPlugin, {
 } from "opencode-v2-antigravity-auth"
 import tuiPlugin from "opencode-v2-antigravity-auth/tui"
 import { AntigravityAccounts } from "opencode-v2-antigravity-auth/rpc"
-import { authorizeAntigravity, exchangeAntigravity } from "../dist/src/adapters/opencode/oauth.js"
-import { extractVerificationErrorDetails } from "../dist/src/adapters/antigravity/verification-parser.js"
+import { authorizeAntigravity, exchangeAntigravity } from "../../dist/src/adapters/opencode/oauth.js"
+import { extractVerificationErrorDetails } from "../../dist/src/adapters/antigravity/verification-parser.js"
 import {
   createVerificationProbeRequest,
   sendVerificationProbe,
-} from "../dist/src/adapters/antigravity/verification-client.js"
-import { fetchAvailableModels, fetchQuotaSummary } from "../dist/src/adapters/antigravity/quota-client.js"
-import { loadManagedProject } from "../dist/src/adapters/antigravity/project-client.js"
-import { onboardManagedProject } from "../dist/src/adapters/opencode/project.js"
-import { refreshOAuthToken } from "../dist/src/adapters/antigravity/token-client.js"
-import { prepareAntigravityRequest } from "../dist/src/adapters/opencode/request.js"
-import { formatRefreshParts } from "../dist/src/modules/accounts/index.js"
-import { DEFAULT_CONFIG } from "../dist/src/adapters/opencode/config/schema.js"
-import { executeAntigravityRequest } from "../dist/src/app/composition.js"
+} from "../../dist/src/adapters/antigravity/verification-client.js"
+import { fetchAvailableModels, fetchQuotaSummary } from "../../dist/src/adapters/antigravity/quota-client.js"
+import { loadManagedProject } from "../../dist/src/adapters/antigravity/project-client.js"
+import { onboardManagedProject } from "../../dist/src/adapters/opencode/project.js"
+import { refreshOAuthToken } from "../../dist/src/adapters/antigravity/token-client.js"
+import { prepareAntigravityRequest } from "../../dist/src/adapters/opencode/request.js"
+import { formatRefreshParts } from "../../dist/src/modules/accounts/index.js"
+import { DEFAULT_CONFIG } from "../../dist/src/adapters/opencode/config/schema.js"
+import { executeAntigravityRequest } from "../../dist/src/app/composition.js"
 
 /** Exercises built Antigravity clients using synthetic OAuth data and mocked HTTP. */
 async function main() {
@@ -27,7 +27,7 @@ async function main() {
   assert.equal(AntigravityAccounts.id, "antigravity-accounts")
   assert.equal(typeof publicAuthorizeAntigravity, "function")
   assert.equal(typeof publicExchangeAntigravity, "function")
-  const sdkUrl = new URL("./google-sdk.js", new URL("../dist/src/adapters/opencode/plugin.js", import.meta.url))
+  const sdkUrl = new URL("./google-sdk.js", new URL("../../dist/src/adapters/opencode/plugin.js", import.meta.url))
   assert.equal(typeof (await import(sdkUrl.href)).createGoogle, "function")
 
   const originalFetch = globalThis.fetch

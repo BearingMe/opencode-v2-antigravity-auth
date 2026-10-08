@@ -34,5 +34,5 @@ allowance.
 
 The repository currently has no legacy boundary exceptions. If a later migration
 requires one, keep it exact to its source/target pair and record its removal
-checkpoint in `script/boundary-exceptions.json`. Runtime cycles have no current
+checkpoint in `scripts/boundary-exceptions.json`. Runtime cycles have no current
 allowances.

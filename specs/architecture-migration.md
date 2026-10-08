@@ -199,8 +199,8 @@ must not be interpreted as active implementations.
 | `src/plugin/types.ts` (remaining types)                                                                                                                                   | Split by ownership: host client surfaces to `adapters/opencode/`, account/auth contracts to `modules/accounts/`, inference/request/streaming contracts to `modules/inference/`, and recovery message contracts to `modules/session-recovery/`.                                                                                             |
 
 The repository-root `index.ts` remains the package facade because package.json
-publishes it; it is outside `src/` and is not a module. Build scripts and
-`script/build-tui.mjs` remain package tooling. Preserve package exports `.`,
+publishes it; it is outside `src/` and is not a module. Build and repository
+tooling live under `scripts/`. Preserve package exports `.`,
 `./tui`, `./rpc`, and the named OAuth/type re-exports from `index.ts`.
 
 ### Proposed dependency direction
@@ -1151,6 +1151,20 @@ maintained documentation with the completed architecture.
   `src/antigravity/` directories; only `adapters/`, `app/`, `modules/`, and
   `platform/` remain as `src/` implementation folders. Isolated-profile
   installed-host acceptance remains open.
+- Consolidated the old `script/` directory: build/schema/boundary tools now live
+  in `scripts/`; the native TUI test, boundary-check tests, package smokes, live
+  E2E scripts, and recovery observer live under `test/`. Removed the stale Pi
+  runner/auth setup files tied to the removed triage workflow, while retaining
+  the documented standalone quota diagnostic. Updated package commands, test
+  references, README/AGENTS guidance, and the disposable profile's observer
+  paths. Verification passed: full Vitest (75 files / 1,200 tests), native TUI
+  (13 / 164), typecheck, lint, boundary checks and fixtures (7 / 22), clean
+  package build, all five package smokes, schema-build invocation, E2E dry-run/
+  help, targeted Prettier, and `git diff --check`. Installed-host acceptance
+  remains open: the account UI has no manual Select action, and observer records
+  already contained a non-canonical tool result before the plugin hook, so
+  plugin-inserted recovery is not established. Root `specs/` is retained until
+  the remaining acceptance criteria are resolved.
 
 **Acceptance criteria:**
 

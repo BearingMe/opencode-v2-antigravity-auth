@@ -1,8 +1,8 @@
 import assert from "node:assert/strict"
 import { Message } from "@opencode/ai"
 
-const { createSessionRecoveryPolicy } = await import("../dist/src/modules/session-recovery/index.js")
-const { applyOpenCodeToolResultBatches } = await import("../dist/src/adapters/opencode/session-recovery.js")
+const { createSessionRecoveryPolicy } = await import("../../dist/src/modules/session-recovery/index.js")
+const { applyOpenCodeToolResultBatches } = await import("../../dist/src/adapters/opencode/session-recovery.js")
 const events = []
 const ports = {
   storage: {

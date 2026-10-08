@@ -99,7 +99,7 @@ event` transforms. V2 API explicitly "may change before stable".
 - `src/adapters/antigravity/quota-client.test.ts` covers model and grouped
   summary wire parsing; `src/adapters/opencode/quota.test.ts` covers the composed probes,
   including supplementary-probe failure and caller cancellation.
-- Gaps: `script/` E2E is excluded from
+- Gaps: `test/e2e/` live scripts are excluded from
   typecheck and live-endpoint E2E needs real quota.
   `adapters/opencode/tui/index.ts` pure gates (`isInvalidRpcResponse`,
   `isStaleMutate`) and the `rpc.ts` transport codec mirror are unit-covered

@@ -10,8 +10,8 @@ const previousConfigDir = process.env.OPENCODE_CONFIG_DIR
 async function runAccountAdminSmoke() {
   process.env.OPENCODE_CONFIG_DIR = configDir
   const { createOpenCodeAccountAdministration } =
-    await import("../dist/src/adapters/opencode/account-administration.js")
-  const { loadAccounts } = await import("../dist/src/adapters/filesystem/account-store.js")
+    await import("../../dist/src/adapters/opencode/account-administration.js")
+  const { loadAccounts } = await import("../../dist/src/adapters/filesystem/account-store.js")
   const administration = createOpenCodeAccountAdministration()
 
   await administration.persistOAuth(

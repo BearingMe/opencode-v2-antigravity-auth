@@ -63,9 +63,9 @@ Rules:
   Teardown disposes without
   reopening menus; late results cannot update a closed view. Enabled state
   comes from the quota response and is retained across refreshes.
-- `script/build-tui.mjs` compiles JSX through the OpenTUI Solid transform
+- `scripts/build-tui.mjs` compiles JSX through the OpenTUI Solid transform
   and externalizes all imports. tsc's automatic JSX emit alone evaluates
-  dynamic props eagerly. `test/tui-quota-render.test.ts` uses Bun's native
+  dynamic props eagerly. `test/tui/tui-quota-render.test.ts` uses Bun's native
   renderer to verify the built artifact's loading, bar updates, failure
   retention, full-width/aligned rows, host-constrained sizing, resizing,
   narrow layout, and disposal. It does not replace an installed
