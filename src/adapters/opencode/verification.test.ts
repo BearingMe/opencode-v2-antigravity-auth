@@ -1,23 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { AntigravityTokenRefreshError } from "../adapters/opencode/token.ts"
-import type { PluginClient } from "../adapters/opencode/types.ts"
+import { AntigravityTokenRefreshError } from "./token.ts"
+import type { PluginClient } from "./types.ts"
 
 const { mockRefreshAccessToken, mockEnsureProjectContext } = vi.hoisted(() => ({
   mockRefreshAccessToken: vi.fn(),
   mockEnsureProjectContext: vi.fn(),
 }))
 
-vi.mock("../adapters/opencode/token.ts", async (importOriginal) => {
-  const orig = await importOriginal<typeof import("../adapters/opencode/token.ts")>()
+vi.mock("./token.ts", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("./token.ts")>()
   return { ...orig, refreshAccessToken: mockRefreshAccessToken }
 })
 
-vi.mock("../adapters/opencode/project.js", async (importOriginal) => {
-  const orig = await importOriginal<typeof import("../adapters/opencode/project.js")>()
+vi.mock("./project.js", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("./project.js")>()
   return { ...orig, ensureProjectContext: mockEnsureProjectContext }
 })
 
-import { verifyAccountAccess } from "./verify.ts"
+import { verifyAccountAccess } from "./verification.ts"
 
 /** Creates the minimal OpenCode client needed by account verification tests. */
 function makeClient(): PluginClient {

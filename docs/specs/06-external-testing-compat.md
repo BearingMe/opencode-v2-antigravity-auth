@@ -85,7 +85,7 @@ event` transforms. V2 API explicitly "may change before stable".
   fallback, warmup URL, wait formatting, native-enable flag,
   unified-refresh delegation
   `refreshOAuthCredentialUnified → adapters/opencode/token.ts :: refreshAccessToken`).
-- `src/plugin/verify.ts` + `verify.test.ts`:
+- `src/adapters/opencode/verification.ts` + `verification.test.ts`:
   `verifyAccountAccess` (blocked→disabled+URL, ok passthrough,
   error-without-disable).
 - `src/adapters/antigravity/verification-parser.ts` +
@@ -100,7 +100,7 @@ event` transforms. V2 API explicitly "may change before stable".
   `src/adapters/antigravity/`; the built-package smoke is
   `bun run test:antigravity:smoke`.
 - `src/adapters/antigravity/quota-client.test.ts` covers model and grouped
-  summary wire parsing; `src/plugin/quota.test.ts` covers the composed probes,
+  summary wire parsing; `src/adapters/opencode/quota.test.ts` covers the composed probes,
   including supplementary-probe failure and caller cancellation.
 - Gaps: `script/` E2E is excluded from
   typecheck and live-endpoint E2E needs real quota.
@@ -215,7 +215,7 @@ fingerprint,token-client,quota-client,verification-client}.ts` and
   `src/adapters/opencode/{token,refresh-queue,signature-cache,debug,logger}.ts`
 - Accounts refresh cache: `src/modules/accounts/refresh/cache.ts`
 - Remaining composition: `src/plugin/{request,request-helpers,
-account-service,quota,verify}.ts`
+account-service}.ts`
 - Tests: `src/constants.test.ts`, `src/adapters/opencode/plugin.test.ts`,
   `src/adapters/opencode/plugin.accounts.test.ts`,
   `src/adapters/opencode/plugin.setup.test.ts` +

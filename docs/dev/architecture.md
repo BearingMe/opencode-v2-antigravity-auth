@@ -59,6 +59,8 @@ src/
 │   ├── filesystem/            # Account/recovery/signature stores and debug-file destination
 │   └── opencode/              # Host lifecycle, logging, facades, RPC, and TUI
 │       ├── plugin.ts          # V2 registration and host lifecycle wiring
+│       ├── token.ts / quota.ts / verification.ts
+│       ├── project.ts / refresh-queue.ts / signature-cache.ts
 │       ├── google-sdk.ts      # Isolated AI SDK hook-routing module
 │       ├── tui/               # /antigravity dialog UI and controller
 │       ├── config/            # OpenCode config/model registration details
@@ -78,9 +80,8 @@ src/
 ├── platform/logging/          # Neutral events, policy, and safe log formatting
 └── plugin/
     ├── account-service.ts     # Account store service used by tool/RPC
-    ├── quota.ts               # Antigravity quota probe composition
     ├── request.ts / request-helpers.ts
-    └── verify.ts              # Account verification probe composition
+    └── remaining request/account-tool compatibility composition
 ```
 
 The package-root `src/v2-plugin.ts`, `src/tui.ts`, and `src/rpc.ts` files remain

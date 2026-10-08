@@ -153,6 +153,8 @@ src/
 │   └── opencode/
 │       ├── plugin.ts          # V2 server registration and host lifecycle wiring
 │       ├── account-pool.ts    # OpenCode/filesystem dependencies for the account pool
+│       ├── token.ts / quota.ts / verification.ts # Host-bound provider compositions
+│       ├── project.ts / refresh-queue.ts / signature-cache.ts
 │       ├── rpc.ts             # Credential-free AntigravityAccounts contract
 │       ├── tui/               # /antigravity host dialogs and controller
 │       ├── config/            # OpenCode config, model registration, and settings
@@ -160,10 +162,8 @@ src/
 ├── modules/session-recovery/  # Error policy, session repair, and request-time turn repair
 └── plugin/
     ├── account-service.ts     # Shared account store service (tool + RPC backend)
-    ├── verify.ts                  # Account verification refresh/probe composition
     ├── request.ts / request-helpers.ts  # Transform core + schema/thinking utils
-    ├── quota.ts               # Antigravity per-model + grouped quota probing
-    └── remaining compatibility composition (account, quota, request, verification)
+    └── remaining request and account-tool compatibility composition
 ```
 
 > Historical: V1 `src/plugin.ts`, `cli.ts`, `server.ts`, `ui/`, and

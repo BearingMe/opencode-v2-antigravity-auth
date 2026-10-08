@@ -6,8 +6,8 @@ const { refreshAccessToken, ensureProjectContext, invalidateProjectContextCache 
   invalidateProjectContextCache: vi.fn(),
 }))
 
-vi.mock("../adapters/opencode/token.js", () => ({ refreshAccessToken }))
-vi.mock("../adapters/opencode/project.js", () => ({ ensureProjectContext, invalidateProjectContextCache }))
+vi.mock("./token.js", () => ({ refreshAccessToken }))
+vi.mock("./project.js", () => ({ ensureProjectContext, invalidateProjectContextCache }))
 
 import { checkAccountsQuota } from "./quota.js"
 

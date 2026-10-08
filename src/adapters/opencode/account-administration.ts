@@ -9,8 +9,8 @@ import {
   updateAccounts,
 } from "../filesystem/account-store.js"
 import type { PluginClient } from "./types.js"
-import { checkAccountsQuota } from "../../plugin/quota.js"
-import { verifyAccountAccess } from "../../plugin/verify.js"
+import { checkAccountsQuota } from "./quota.js"
+import { verifyAccountAccess } from "./verification.js"
 import { createLogger } from "./logger.js"
 
 /** Composes account policy with persistence, quota, and verification adapters. */

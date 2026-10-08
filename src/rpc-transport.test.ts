@@ -16,7 +16,7 @@ updateAccounts.mockImplementation(async (updater: (current: unknown) => { storag
   return result
 })
 
-vi.mock("./plugin/verify.js", () => ({
+vi.mock("./adapters/opencode/verification.js", () => ({
   verifyAccountAccess,
 }))
 

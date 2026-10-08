@@ -22,8 +22,8 @@ vi.mock("../../adapters/filesystem/account-store.js", async (importOriginal) => 
   // file-backed load/update paths are faked.
   return { ...actual, loadAccounts, updateAccounts }
 })
-vi.mock("../../plugin/quota.js", () => ({ checkAccountsQuota }))
-vi.mock("../../plugin/verify.js", () => ({ verifyAccountAccess }))
+vi.mock("../../adapters/opencode/quota.js", () => ({ checkAccountsQuota }))
+vi.mock("../../adapters/opencode/verification.js", () => ({ verifyAccountAccess }))
 
 import { manageAccounts } from "../../v2-plugin.js"
 import { createAccountAdmin, MAX_SAVED_ACCOUNTS, resolveAccountTarget } from "./index.js"

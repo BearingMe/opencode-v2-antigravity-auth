@@ -54,7 +54,7 @@ In scope:
 - Multi-account pool/selection and persistence policy
   (`src/modules/accounts/account-pool.ts`, `modules/accounts/selection/`,
   `modules/accounts/persistence/`), quota probing, fingerprints, project context
-  (`src/plugin/quota.ts`, `src/adapters/antigravity/fingerprint.ts`,
+  (`src/adapters/opencode/quota.ts`, `src/adapters/antigravity/fingerprint.ts`,
   `src/adapters/{antigravity,opencode}/project.ts`,
   `src/adapters/opencode/refresh-queue.ts`; persistence through
   `src/adapters/filesystem/account-store.ts`).
@@ -87,7 +87,7 @@ Non-goals:
   `src/v2-plugin.ts` remains a compatibility re-export. Routing lives in
   `src/app/composition.ts :: executeAntigravityRequest`, with the execution
   loop in `src/app/execute-request.ts`;
-  `verifyAccountAccess` lives in `src/plugin/verify.ts`.
+  `verifyAccountAccess` lives in `src/adapters/opencode/verification.ts`.
 - AI-SDK shim: `src/adapters/opencode/google-sdk.ts :: createGoogle` re-export.
   `src/google-sdk.ts` remains a compatibility re-export. Models MUST
   point at `aisdk:<ANTIGRAVITY_SDK>` (the `./google-sdk.js` URL), never

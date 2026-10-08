@@ -1,14 +1,18 @@
-import { ANTIGRAVITY_PROVIDER_ID } from "../constants.js"
-import { checkAccountQuotas, type AccountQuotaProbeResult, type AccountQuotaResult } from "../modules/accounts/index.js"
-import { availableModelsQuotaProbe, groupedQuotaProbe } from "../adapters/antigravity/quota-client.js"
-import { accessTokenExpired, formatRefreshParts, parseRefreshParts } from "../modules/accounts/index.js"
-import { logQuotaFetch, logQuotaStatus } from "../adapters/opencode/debug.js"
-import { ensureProjectContext } from "../adapters/opencode/project.js"
-import { refreshAccessToken } from "../adapters/opencode/token.js"
-import { getModelFamily } from "../modules/inference/index.js"
-import type { PluginClient } from "../adapters/opencode/types.js"
-import type { AccountOAuthCredential } from "../modules/accounts/index.js"
-import type { AccountMetadataV3, QuotaSummaryGroup } from "../modules/accounts/index.js"
+import { ANTIGRAVITY_PROVIDER_ID } from "../../constants.js"
+import {
+  checkAccountQuotas,
+  type AccountQuotaProbeResult,
+  type AccountQuotaResult,
+} from "../../modules/accounts/index.js"
+import { availableModelsQuotaProbe, groupedQuotaProbe } from "../antigravity/quota-client.js"
+import { accessTokenExpired, formatRefreshParts, parseRefreshParts } from "../../modules/accounts/index.js"
+import { logQuotaFetch, logQuotaStatus } from "./debug.js"
+import { ensureProjectContext } from "./project.js"
+import { refreshAccessToken } from "./token.js"
+import { getModelFamily } from "../../modules/inference/index.js"
+import type { PluginClient } from "./types.js"
+import type { AccountOAuthCredential } from "../../modules/accounts/index.js"
+import type { AccountMetadataV3, QuotaSummaryGroup } from "../../modules/accounts/index.js"
 
 /** Builds the transient OAuth shape used to refresh a stored quota account. */
 function buildAuthFromAccount(account: AccountMetadataV3): AccountOAuthCredential {

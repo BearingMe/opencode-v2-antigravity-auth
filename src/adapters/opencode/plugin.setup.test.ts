@@ -89,7 +89,7 @@ updateAccounts.mockImplementation(
   },
 )
 
-vi.mock("../../plugin/verify.js", () => ({
+vi.mock("./verification.js", () => ({
   verifyAccountAccess,
 }))
 

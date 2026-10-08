@@ -1,13 +1,13 @@
-import { formatRefreshParts, parseRefreshParts } from "../modules/accounts/index.js"
-import { ensureProjectContext } from "../adapters/opencode/project.js"
-import { prepareAntigravityRequest } from "./request.js"
-import { AntigravityTokenRefreshError, refreshAccessToken } from "../adapters/opencode/token.js"
+import { formatRefreshParts, parseRefreshParts } from "../../modules/accounts/index.js"
+import { ensureProjectContext } from "./project.js"
+import { prepareAntigravityRequest } from "../../plugin/request.js"
+import { AntigravityTokenRefreshError, refreshAccessToken } from "./token.js"
 import {
   antigravityAccessVerificationPort,
   createVerificationProbeRequest,
-} from "../adapters/antigravity/verification-client.js"
-import { extractVerificationErrorDetails } from "../adapters/antigravity/verification-parser.js"
-import type { PluginClient } from "../adapters/opencode/types.js"
+} from "../antigravity/verification-client.js"
+import { extractVerificationErrorDetails } from "../antigravity/verification-parser.js"
+import type { PluginClient } from "./types.js"
 
 /** Account-facing result after mapping provider verification requirements. */
 export type VerificationProbeResult = {

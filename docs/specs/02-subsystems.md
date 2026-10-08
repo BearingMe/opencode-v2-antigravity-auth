@@ -40,8 +40,8 @@ platform:WINDOWS|MACOS, pluginType:GEMINI}}` to deduped
 - `accessTokenExpired` uses a 60 s clock-skew buffer. `calculateTokenExpiry
 (requestTimeMs, expiresInSeconds)` defaults 3600 s; NaN/≤0 → immediate
   expiry.
-- `refreshAccessToken` (`src/adapters/opencode/token.ts`) composes the single policy in
-  the single policy in `src/modules/accounts/refresh/policy.ts`, which delegates
+- `refreshAccessToken` (`src/adapters/opencode/token.ts`) composes the policy in
+  `src/modules/accounts/refresh/policy.ts`, which delegates
   the POST to `adapters/antigravity/token-client.ts`, which
   sends `grant_type=refresh_token` with client id/secret and parses varied error
   shapes, throws `AntigravityTokenRefreshError{code,description,status,
@@ -224,7 +224,9 @@ dedup; managed short-circuit; else load→onboard FREE→fallback
 `projectId`→`ANTIGRAVITY_DEFAULT_PROJECT_ID`; caches under new key).
 `invalidateProjectContextCache` on `invalid_grant`/rotation. Verification
 HTTP/body parsing is owned by `adapters/antigravity/verification-client.ts`
-and `verification-parser.ts`; `plugin/verify.ts` retains account outcome policy.
+and `verification-parser.ts`; `adapters/opencode/verification.ts` composes the
+probe with token/project services, while persisted eligibility policy remains in
+`modules/accounts/verification/`.
 
 ## 2.10 Streaming — `src/modules/inference/streaming/transformer.ts`
 

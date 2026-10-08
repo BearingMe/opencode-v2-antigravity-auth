@@ -20,8 +20,8 @@ import type {
   QuotaPresentationOptions,
 } from "../modules/accounts/index.js"
 import type { PluginClient } from "../adapters/opencode/types.js"
-import { checkAccountsQuota } from "./quota.js"
-import { verifyAccountAccess } from "./verify.js"
+import { checkAccountsQuota } from "../adapters/opencode/quota.js"
+import { verifyAccountAccess } from "../adapters/opencode/verification.js"
 import { createLogger } from "../adapters/opencode/logger.js"
 import {
   fingerprintRefreshToken,

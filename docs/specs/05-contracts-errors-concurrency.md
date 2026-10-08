@@ -9,7 +9,7 @@
   `refreshOAuthCredentialUnified`, `disposeAntigravityRuntimeResources`
   (`src/app/composition.ts`); `executeAntigravityRequest` is the composition
   entry and delegates to `src/app/execute-request.ts`; `verifyAccountAccess`
-  (`src/plugin/verify.ts`).
+  (`src/adapters/opencode/verification.ts`).
 - Fetch scope rule (R-FETCH-SCOPE): the interceptor MUST only route
   absolute http(s) URLs on `generativelanguage.googleapis.com` matching
   `^/v1(beta)?/models/[^/]+:(generateContent|streamGenerateContent|
