@@ -42,7 +42,7 @@ mutation target (fail closed).
 
 - Removed accounts leave credential-free tombstones (`removedAccounts`):
   durable `id` when known, refresh-token fingerprint, normalized email,
-  `removedAt`. Matching is generation-aware (`storage.ts ::
+  `removedAt`. Matching is generation-aware (`modules/accounts/persistence/policy.ts ::
 tombstoneMatchesAccount`): equal ids match only with a corroborating
   token fingerprint or email; equal token fingerprints always match (the
   credential identifies itself across the pre-id upgrade path); email alone
@@ -58,7 +58,7 @@ tombstoneMatchesAccount`): equal ids match only with a corroborating
 
 ## Credential source
 
-`getAuth()` in `src/v2-plugin.ts` resolves the active host `antigravity`
+`getAuth()` in `src/adapters/opencode/plugin.ts` resolves the active host `antigravity`
 connection first, then the in-memory `currentAuth`, then the selected saved
 account. It never reads OpenCode's `google` connection. This integration only
 registers the plugin's own OAuth method; a non-OAuth active Antigravity

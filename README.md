@@ -113,6 +113,14 @@ remain in place. Verified Gemini preview aliases remain supported.
 - Normative specs: `docs/specs/00-07` (agent/reviewer source of truth)
 - [Changelog](CHANGELOG.md)
 
+## Development
+
+Runtime tests stay beside their source under `src/`. Cross-cutting tests and
+smokes live under `test/`; build and repository tooling lives under `scripts/`.
+Run `bun run test`, `bun run test:tui`, `bun run typecheck`, and `bun run lint`
+before submitting changes. See [developer testing](docs/dev/testing.md) for
+the suites and live-test requirements.
+
 ## Compatibility
 
 - Works alongside other plugins (oh-my-opencode, DCP). With oh-my-opencode,

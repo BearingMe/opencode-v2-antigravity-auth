@@ -4,8 +4,8 @@
 
 Trigger: `opencode auth login` (select Antigravity; one account per command,
 up to 10 saved accounts; rerun the command to add another).
-Participants: V2 `antigravity` / `antigravity-oauth` pre-authorization form → `antigravity/oauth.ts` →
-`storage.ts` (via `account-service.ts`) → `project.ts` → `quota.ts`.
+Participants: V2 `antigravity` / `antigravity-oauth` pre-authorization form → `adapters/opencode/oauth.ts` →
+`adapters/filesystem/account-store.ts` (via `account-service.ts`) → `project.ts` → `quota.ts`.
 The method declares one required selection field (no Skip option).
 
 1. The form shows saved pool state (`N/10`, disabled markers) and the
@@ -21,7 +21,7 @@ The method declares one required selection field (no Skip option).
 4. `exchangeAntigravity(code, state)` → validate state → token POST →
    userinfo GET → `loadCodeAssist` project discovery → packed
    `refresh|project`.
-5. `persistOAuthAccount(result, "add")` (`src/plugin/account-service.ts`;
+5. `persistOAuthAccount(result, "add")` (`src/adapters/opencode/account-service.ts`;
    dedupe by refresh token or case-insensitive email, cap 10,
    single-lock replace write + per-family index) → `currentAuth` set, native
    manager reset.
@@ -37,9 +37,11 @@ failure tolerated; project failure tolerated to empty-project (deferred).
 
 Trigger: SDK call to `generativelanguage.googleapis.com/v1*/models/*:
 (generateContent|streamGenerateContent|countTokens)`.
-Participants: V2 `antigravityFetch` → `normalizeFetchBody` → native engine
-`executeAntigravityRequest` (`src/plugin/engine.ts`, sole router) → `accounts → token → project → request → fetch(Antigravity) →
-streaming transformer`.
+Participants: V2 `antigravityFetch` → `normalizeFetchBody` → application
+composition `executeAntigravityRequest` → `executeRequest`
+(`src/app/execute-request.ts`, sole request path) →
+`accounts → token → project → modules/inference/pipeline.ts` →
+`adapters/antigravity/inference-client.ts` → inference streaming transformer.
 
 1. V2: `requireOAuthAuth`; reject non-model GL paths; strip credentials for
    external origins and direct-fetch.
@@ -78,9 +80,13 @@ records without disabling; always persists + invalidates fetch.
 (a) In-request: `needsThinkingRecovery` → `closeToolLoopForThinking`
 → synthetic model + user turns → request proceeds without
 `Invalid signature` 400s.
-(b) Session-error: `session.error` → `detectErrorType` →
-`handleSessionRecovery` (tool_result inject / thinking prepend/strip) →
-optional `auto_resume` continue + success toast.
+(b) Tool-result preflight: the provider-agnostic V2 `context` hook finds
+dangling assistant tool calls and inserts cancelled `Message.tool` results in
+the outgoing model history. (c) Session-error: `session.error` →
+`detectErrorType` → `handleSessionRecovery` (thinking prepend/strip) → optional
+`auto_resume` continue + success toast. The context repair does not persist
+those synthetic tool results because V2 exposes no structured prompt-input
+API.
 
 ## F5 — Auto-update check
 

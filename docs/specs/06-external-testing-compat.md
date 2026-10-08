@@ -58,46 +58,55 @@ event` transforms. V2 API explicitly "may change before stable".
 
 ## Testing guarantees (from analysis)
 
-- `constants.test.ts`: Gemini-CLI header pin; static CLI headers regardless
-  of model; antigravity UA format / platform alignment / never-linux;
-  `HeaderSet` optionality.
-- `v2-plugin.test.ts`: plugin id/setup; `normalizeFetchBody` behaviors;
+- `adapters/antigravity/constants.test.ts`: deterministic randomized-header
+  combinations and platform/metadata alignment; `adapters/antigravity/version.test.ts`
+  covers the fallback version in headers. Type-only `HeaderSet` contracts are
+  not runtime tests.
+- `adapters/opencode/plugin.test.ts`: plugin id/setup; `normalizeFetchBody` behaviors;
   destination/path validation; callback-parsing behaviors.
-- `v2-plugin.accounts.test.ts`: delete-reselect, out-of-range no-write,
+- `adapters/opencode/plugin.accounts.test.ts`: delete-reselect, out-of-range no-write,
   list purity, blocked→disabled+URL, ok passthrough, error-without-disable.
-- `v2-plugin.setup.test.ts`: full mocked V2 setup (registration, label,
+- `adapters/opencode/plugin.setup.test.ts`: full mocked V2 setup (registration, label,
   API-key passthrough, unauthenticated throw, authorize→persist, SDK route
   - `apiKey="antigravity-oauth"`, loader-missing/reject errors, decoded
     JSON body to routed fetch, per-session child tracker with duplicate-safe
     behavior at capacity).
-- `plugin/*` + subdirs: colocated Vitest files covering model
-  resolution, schema sanitization, cross-model sanitizer, quota fallback
-  (antigravity-first), rotation/hybrid selection, recovery,
-  thinking-recovery, token, storage (v1–v4, tombstones, replace semantics),
-  account-service presentation, account-ui-format, cache, debug/logger —
-  see `02-subsystems` and code refs (`request.test.ts`,
-  `model-resolver.test.ts`, `rotation.test.ts`, `quota-fallback.test.ts`,
-  `antigravity-account-rotation.test.ts`, `cross-model-integration.test.ts`).
-- `src/plugin/engine.test.ts`: native-engine tests (routing decision, quota
+- `adapters/opencode/` tests cover request composition, account-service
+  persistence integration, quota/verification probes, account-pool rotation,
+  TUI/RPC, config, logging, and host setup. Policy tests live with
+  `modules/accounts/` and `modules/inference/`, including model resolution,
+  schema/cross-model sanitization, quota aggregation, selection, streaming, and
+  signature handling.
+- `modules/session-recovery/` and `adapters/opencode/session-recovery.test.ts`:
+  in-request repair policy and session-error recovery behavior.
+- `src/app/execute-request.test.ts`: native-engine tests (routing decision, quota
   fallback, warmup URL, wait formatting, native-enable flag,
   unified-refresh delegation
-  `refreshOAuthCredentialUnified → token.ts :: refreshAccessToken`).
-- `src/plugin/verify.ts` + `verify.test.ts`:
+  `refreshOAuthCredentialUnified → adapters/opencode/token.ts :: refreshAccessToken`).
+- `src/adapters/opencode/verification.ts` + `verification.test.ts`:
   `verifyAccountAccess` (blocked→disabled+URL, ok passthrough,
   error-without-disable).
-- `src/plugin/verification.ts` + `verification.test.ts`: shared
-  verification-error helpers (URL normalization, error-detail extraction).
+- `src/adapters/antigravity/verification-parser.ts` +
+  `verification-parser.test.ts`: shared verification-error helpers (URL
+  normalization, error-detail extraction).
 - No search tool or search module remains; endpoint orderings are PROD→DAILY
   load, DAILY→PROD fallback.
-- `hooks/auto-update-checker`: `checker.test.ts` (config/JSONC/entry
+- `adapters/opencode/hooks/auto-update-checker`: `checker.test.ts` (config/JSONC/entry
   forms), `index.test.ts` (prerelease skip, toast-only mode,
   once-per-instance, child ignore, local-dev warning; fake timers).
-- Gaps: NO tests in `src/antigravity/`; `script/` E2E is excluded from
-  typecheck and live-endpoint E2E needs real quota. `src/tui.ts` pure gates
-  (`isInvalidRpcResponse`, `isStaleMutate`) and the `rpc.ts` transport codec
-  mirror are unit-covered (`tui-behavior.test.ts`,
+- Antigravity communication clients have isolated mocked-HTTP tests under
+  `src/adapters/antigravity/`; the built-package smoke is
+  `bun run test:antigravity:smoke`.
+- `src/adapters/antigravity/quota-client.test.ts` covers model and grouped
+  summary wire parsing; `src/adapters/opencode/quota.test.ts` covers the composed probes,
+  including supplementary-probe failure and caller cancellation.
+- Gaps: `test/e2e/` live scripts are excluded from
+  typecheck and live-endpoint E2E needs real quota.
+  `adapters/opencode/tui/index.ts` pure gates (`isInvalidRpcResponse`,
+  `isStaleMutate`) and the `rpc.ts` transport codec mirror are unit-covered
+  (`adapters/opencode/tui/index.test.ts`,
   `rpc-transport.test.ts`); the full dialog/toast flow has no automated
-  coverage by design. `src/plugin/account-service.ts`
+  coverage by design. `src/adapters/opencode/account-service.ts`
   quota-presentation semantics are specified in `../dev/quota-contract.md`
   (null-vs-0, failed-refresh-keeps-cache, timeout-partial).
 
@@ -122,11 +131,13 @@ event` transforms. V2 API explicitly "may change before stable".
 ## Known divergences (normative for reviewers)
 
 1. D-REFRESH-DUAL (unified):
-   `src/plugin/token.ts :: refreshAccessToken`
+   `src/adapters/opencode/token.ts :: refreshAccessToken`, backed by
+   `adapters/antigravity/token-client.ts`
    (skew, `invalid_grant` eviction, project-id preservation, cache store)
    is the single refresh implementation, called via
-   `src/plugin/engine.ts :: refreshOAuthCredentialUnified` and the V2
-   authorize-callback path. `src/v2-plugin.ts :: refreshOAuthCredential`
+   `src/app/composition.ts :: refreshOAuthCredentialUnified` and the V2
+   authorize-callback path.
+   `src/adapters/opencode/plugin.ts :: refreshOAuthCredential`
    remains only as a thin compatibility wrapper. Edits MUST NOT widen the
    gap again.
 2. D-REFRESH-SEGMENTS: `oauth.exchangeAntigravity` writes 2-segment
@@ -139,8 +150,8 @@ event` transforms. V2 API explicitly "may change before stable".
    integration and saved account pool. Changes to OpenCode's Google
    integration or connection MUST NOT affect Antigravity routing.
 4. D-SEARCH-MUTEX: `googleSearch + functionDeclarations` are mutually
-   exclusive on Gemini — `web_search` is dropped with `console.warn` when
-   functions exist. Reviewers MUST NOT "fix" this by sending both.
+   exclusive on Gemini — `web_search` is dropped with a request-boundary warning
+   when functions exist. Reviewers MUST NOT "fix" this by sending both.
 5. D-QUOTA-FAIL-OPEN: soft-quota gates fail OPEN on stale/missing cache
    (fail-closed only when all-over with valid resetTime). Deliberate
    availability bias; changing to fail-closed needs product decision.
@@ -148,14 +159,14 @@ event` transforms. V2 API explicitly "may change before stable".
 invalidateCache` remain exported. New code MUST use
    `getAntigravityHeaders() / getAntigravityVersion() / invalidatePackage()`.
 7. D-RETRY-GLOBAL (observed limitation): `ctx.session.hook("retry")` in
-   `src/v2-plugin.ts` is provider-agnostic — any session whose error
+   `src/adapters/opencode/plugin.ts` is provider-agnostic — any session whose error
    matches `detectErrorType` patterns (tool_result_missing / thinking
    errors) triggers abort + synthetic prompt + toast, including non-Google
    sessions (e.g. Codex). Auth and fetch paths are Google-scoped; only the
    recovery hook crosses that boundary. Do not assume recovery is
    Google-only; narrowing it needs product decision.
 8. D-SECRET-COMMITTED (accepted risk): the Antigravity OAuth `client_secret`
-   is committed in `src/constants.ts` (CLI-spoof requirement) and duplicated
+   is committed in `src/adapters/antigravity/constants.ts` (CLI-spoof requirement) and duplicated
    in `scripts/check-quota.mjs`. Rotation means changing both; scripts
    SHOULD import from a single source rather than re-hardcoding.
 9. Header contract (Explicit): `x-goog-user-project` MUST be
@@ -189,20 +200,26 @@ invalidateCache` remain exported. New code MUST use
 
 ## References (repository evidence)
 
-- Entries: `src/v2-plugin.ts`, `src/constants.ts`,
-  `src/google-sdk.ts`, `src/shims.d.ts`
-- OAuth: `src/antigravity/oauth.ts`
-- Update: `src/hooks/auto-update-checker/{index,checker,cache,constants,
+- Entries: `src/adapters/opencode/plugin.ts`,
+  `src/adapters/opencode/constants.ts`,
+  `src/adapters/antigravity/constants.ts`,
+  `src/adapters/opencode/google-sdk.ts`, `src/shims.d.ts`
+- OAuth/account communication: `src/adapters/opencode/oauth.ts`,
+  `src/adapters/antigravity/oauth.ts`,
+  `src/adapters/antigravity/{oauth,token,project,quota,verification}-client.ts`
+- Update: `src/adapters/opencode/hooks/auto-update-checker/{index,checker,cache,constants,
 types,logging}.ts` + `checker.test.ts`, `index.test.ts`
-- Core: `src/plugin/{auth,token,cache,request,request-helpers,accounts,
-account-service,rotation,quota,storage,fingerprint,project,refresh-queue,
-recovery,thinking-recovery,errors,debug,logger,logging-utils,verify,
-verification,version,image-saver,types}.ts`
-- Subdirs: `src/plugin/{cache,config,core:streaming,recovery,stores,
-transform}/*`
-- Tests: `src/constants.test.ts`, `src/v2-plugin.test.ts`,
-  `src/v2-plugin.accounts.test.ts`, `src/v2-plugin.setup.test.ts` +
-  colocated `src/plugin/**/*.test.ts`
+- Core provider/host adapters: `src/adapters/antigravity/{oauth,project,version,
+fingerprint,token-client,quota-client,verification-client}.ts` and
+  `src/adapters/opencode/{token,refresh-queue,signature-cache,debug,logger}.ts`
+- Accounts refresh cache: `src/modules/accounts/refresh/cache.ts`
+- Host composition: `src/adapters/opencode/{account-service,request,
+request-helpers}.ts`
+- Tests: `src/adapters/antigravity/constants.test.ts`,
+  `src/adapters/opencode/plugin.test.ts`,
+  `src/adapters/opencode/plugin.accounts.test.ts`,
+  `src/adapters/opencode/plugin.setup.test.ts` +
+  colocated tests under each owning `src/` module/adapter
 - Docs in repo: `README.md`, `docs/README.md` (index), `docs/user/`,
   `docs/dev/` (architecture, storage, RPC/TUI, quota contract, API,
   testing, manual checklist, maintainer ops),

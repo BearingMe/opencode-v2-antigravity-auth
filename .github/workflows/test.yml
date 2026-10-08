@@ -26,8 +26,20 @@ jobs:
       - name: Run type check
         run: bun run typecheck
 
+      - name: Check architecture boundaries
+        run: bun run check:boundaries
+
+      - name: Test architecture boundary checker
+        run: bun run check:boundaries:test
+
       - name: Run tests
         run: bun run test
 
-      - name: Build
-        run: bun run build
+      - name: Run native TUI tests and build
+        run: bun run test:tui
+
+      - name: Smoke test built logging destinations
+        run: bun run test:logging:smoke
+
+      - name: Smoke test built account persistence
+        run: bun run test:account-store:smoke

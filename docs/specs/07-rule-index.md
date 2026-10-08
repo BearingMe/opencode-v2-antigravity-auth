@@ -7,7 +7,8 @@ Inferred (likely intent). Details live in the referenced sections.
 ## Routing and scope
 
 - R-ARCH-V2-DELEGATES-V1 (Explicit, §01): V2 MUST route
-  all model traffic through the native engine (`src/plugin/engine.ts`).
+  all model traffic through the application execution path
+  (`src/app/composition.ts` → `src/app/execute-request.ts`).
   No parallel router, no legacy fallback. The name is historical; the
   requirement is the current native engine.
 - R-ARCH-ANTIGRAVITY-AUTH-ISOLATION (Explicit, §01): Antigravity MUST use its
@@ -74,8 +75,9 @@ FR2` — interleaving is a 400) (Strong + External).
 - Session recovery gated by `session_recovery`; dedup in-flight errors;
   toasts never throw; recovery-success toast honors `quiet_mode` and
   `toast_scope=root_only` with explicit session ID (Explicit).
-  The `session.retry` hook is provider-agnostic: recoverable-pattern
-  errors in NON-Google sessions also trigger recovery (D-RETRY-GLOBAL) —
+  Dangling tool calls are repaired in outgoing model context by an unscoped
+  hook, so the repair applies to non-Google providers too. The `session.retry`
+  hook remains provider-agnostic for session-error repairs (D-RETRY-GLOBAL) —
   do not assume Google-only.
 - Child tracker is duplicate-safe: re-remembering a tracked id at
   capacity MUST NOT evict a different child (Explicit).
@@ -94,7 +96,7 @@ FR2` — interleaving is a 400) (Strong + External).
 
 ## Architecture hygiene
 
-- R-ARCH-PURE-TRANSFORM (Strong, §01): keep `transform/*` pure.
+- R-ARCH-PURE-TRANSFORM (Strong, §01): keep `modules/inference/transforms/*` pure.
 - `hooks/*` MUST NOT gain auth/quota/storage deps (SHOULD, §01).
 - New code MUST use `getAntigravityHeaders()/getAntigravityVersion()/
 invalidatePackage()` over deprecated exports (Explicit).

@@ -12,7 +12,7 @@ OpenCode ──▶ Plugin ──▶ Antigravity API ──▶ Claude/Gemini
                └─ THIS PLUGIN (auth, transform, recovery)
 ```
 
-1. **Routing in** (`src/v2-plugin.ts` + `src/plugin/engine.ts`)
+1. **Routing in** (`src/adapters/opencode/plugin.ts` + `src/app/composition.ts`)
    - `aisdk.hook("sdk")` matches `antigravity-*` / OAuth-routed `gemini-*`
      models on the Antigravity SDK URL and assigns the OAuth fetch bridge.
      Plain `gemini-*` models with a non-OAuth (API-key) connection keep
@@ -21,52 +21,101 @@ OpenCode ──▶ Plugin ──▶ Antigravity API ──▶ Claude/Gemini
      `generativelanguage.googleapis.com` paths, strips credentials for
      external origins, normalizes the body without consuming the original
      request, and calls `executeAntigravityRequest()`.
-2. **Execution** (`src/plugin/engine.ts`, sole router)
+2. **Execution** (`src/app/execute-request.ts`, sole request path)
    - Account selection (sticky/hybrid/round-robin, rate-limit aware),
      unified token refresh, project-context resolution, soft-quota gate,
      endpoint fallback (daily → prod), optional thinking warmup,
-     Antigravity fetch, streaming transform, success/failure bookkeeping,
+     Antigravity dispatch through `adapters/antigravity/inference-client.ts`,
+     streaming transform, success/failure bookkeeping,
      rotation and retry.
-3. **Transformation** (`src/plugin/request.ts`, `transform/*`,
-   `request-helpers.ts`, `core/streaming/*`)
-   - Model detection, thinking config, Claude thinking-strip, tool
-     normalization to `functionDeclarations[]`, schema sanitization, tool-id
-     assignment, `{ project, model, request }` wrapping; SSE streaming with
-     signature caching and `thought` → `reasoning` conversion.
+3. **Transformation** (`modules/inference/pipeline.ts`,
+   `modules/inference/transforms/*`, `modules/inference/request-helpers.ts`,
+   `modules/inference/streaming/*`, and signature policy).
+   `adapters/opencode/request.ts` supplies config, debug, fingerprint, and
+   image-storage adapters.
 
-Session recovery runs on two layers: in-request turn repair
-(`thinking-recovery.ts`) and the session-error hook (`recovery.ts`,
-gated by `session_recovery`, optional `auto_resume`).
+- Model detection, thinking config, Claude thinking-strip, tool
+  normalization to `functionDeclarations[]`, schema sanitization, tool-id
+  assignment, `{ project, model, request }` wrapping; SSE streaming with
+  signature caching and `thought` → `reasoning` conversion. Engine retains
+  account/retry orchestration; the Antigravity client owns fetch dispatch.
+
+Session recovery policy lives in `modules/session-recovery/`: pure in-request
+turn repair is separate from session-error recovery. The filesystem store and
+OpenCode session operations are composed by the OpenCode adapter through
+`adapters/filesystem/session-recovery-store.ts` and
+`adapters/opencode/session-recovery.ts`.
+
+Interrupted tool calls are repaired at the provider-agnostic V2 `context` hook:
+the hook adds canonical tool-result messages to the outgoing model history.
+This does not rewrite persisted session history; the supported V2 prompt API is
+text-only.
 
 ## Module map
 
 ```text
 src/
-├── v2-plugin.ts               # V2 entry: integration/provider/model/aisdk/tool/session/event wiring
-├── google-sdk.ts              # Isolated AI SDK module (hook routing key; models must use aisdk:<ANTIGRAVITY_SDK>)
-├── rpc.ts                     # AntigravityAccounts RPC contract (credential-free)
-├── tui.ts                     # /antigravity dialog UI (host-rendered dialogs only)
-├── constants.ts               # Endpoints, headers, OAuth identity, model routing
-├── antigravity/oauth.ts       # PKCE authorize URL + code exchange + project discovery
-├── hooks/auto-update-checker/ # Version check (root sessions only; never installs)
-└── plugin/
-    ├── engine.ts              # Native request/rotation engine (sole router)
-    ├── account-service.ts     # Shared account store service (tool + RPC backend)
-    ├── account-ui-format.ts   # Quota bars, countdowns, one-liners (pure)
-    ├── auth.ts / token.ts     # Refresh-part packing, unified refresh path
-    ├── verify.ts / verification.ts  # Access verification + error helpers
-    ├── request.ts / request-helpers.ts  # Transform core + schema/thinking utils
-    ├── transform/             # Pure per-family transforms (claude/gemini/sanitizer/resolver)
-    ├── core/streaming/        # SSE transformer
-    ├── thinking-recovery.ts / recovery/  # Turn repair + session-error hook
-    ├── quota.ts               # Antigravity fetchAvailableModels quota probing
-    ├── accounts.ts / storage.ts  # Pool manager + v4 persistent store
-    ├── fingerprint.ts / project.ts  # Device fingerprints + managed project context
-    ├── refresh-queue.ts / rotation.ts  # Proactive refresh + health/token-bucket scoring
-    ├── config/                # Zod schema, loader, model definitions, opencode.json updater
-    ├── cache/ / stores/       # Signature caches (memory + disk)
-    └── debug.ts / logger.ts / logging-utils.ts / version.ts / errors.ts / types.ts
+├── adapters/
+│   ├── antigravity/           # OAuth, project/version, and provider HTTP clients
+│   ├── filesystem/            # Account/recovery/signature stores and debug-file destination
+│   └── opencode/              # Host lifecycle, logging, facades, RPC, and TUI
+│       ├── plugin.ts          # V2 registration and host lifecycle wiring
+│       ├── account-service.ts # Account tool/RPC service facade
+│       ├── token.ts / quota.ts / verification.ts
+│       ├── project.ts / refresh-queue.ts / signature-cache.ts
+│       ├── request.ts / request-helpers.ts
+│       ├── google-sdk.ts      # Isolated AI SDK hook-routing module
+│       ├── tui/               # /antigravity dialog UI and controller
+│       ├── config/            # OpenCode config/model registration details
+│       └── hooks/             # Host event integrations, including update checks
+├── app/                       # Composition and single request executor
+├── modules/accounts/
+│   ├── account-pool.ts        # Membership, family cursors, cooldowns, and pool bookkeeping
+│   ├── account-admin.ts       # Credential-free administration use cases and mutations
+│   ├── project-context/       # Managed-project discovery, onboarding, and cache policy
+│   ├── quota/                 # Account quota aggregation, snapshots, and presentation
+│   ├── verification/          # Account verification outcomes and persistence policy
+│   ├── refresh/               # Unified credential refresh and proactive queue policy
+│   ├── persistence/           # Stored schema, migrations, dedupe, and tombstone policy
+│   └── selection/             # Health/token-bucket scoring, hybrid selection, and backoff
+├── modules/session-recovery/  # Error detection, session repair, and request-time turn repair
+├── modules/inference/         # Request helpers, transforms, schema cleaning, streaming, signatures, and ports
+├── platform/logging/          # Neutral events, policy, and safe log formatting
 ```
+
+The package-root `src/v2-plugin.ts`, `src/tui.ts`, and `src/rpc.ts` files remain
+thin compatibility entrypoints. The server plugin and TUI implementation live
+under `adapters/opencode/`; the server adapter composes account administration
+and session recovery, and delegates model execution to application composition.
+The single request executor remains `app/execute-request.ts`.
+
+Logging is split by responsibility: `platform/logging/` owns neutral policy,
+events, and formatting; OpenCode host/console delivery is in
+`adapters/opencode/logging.ts`; file paths, retention, and writes are in
+`adapters/filesystem/debug-log.ts`. Antigravity trace context and request
+logging remain in `adapters/opencode/debug.ts`.
+
+Account persistence policy now lives in `modules/accounts/persistence/` and
+the locked filesystem implementation is in
+`adapters/filesystem/account-store.ts`. Runtime callers use the owning module or
+filesystem adapter directly; the former `plugin/storage.ts` compatibility
+facade was removed in Step 14.
+
+Account membership and selection policy now live in
+`modules/accounts/account-pool.ts` and `modules/accounts/selection/`.
+`adapters/opencode/account-pool.ts` supplies the filesystem, fingerprint, and
+logging dependencies used to construct the runtime account pool.
+
+Session-recovery policy and request-time turn repair now live in
+`modules/session-recovery/`. The OpenCode adapter composes the policy with
+filesystem and OpenCode adapters; plugin recovery files remain compatibility
+facades only.
+
+Antigravity OAuth/token/project/quota/verification HTTP and response parsing
+live in `adapters/antigravity/`. Plugin-facing refresh, project-context,
+quota, verification, and OAuth modules retain their orchestration and
+compatibility APIs; credential-refresh, project-discovery, quota-probe, and
+access-verification ports connect callers to transport clients.
 
 Historical (removed, do not reintroduce): V1 `src/plugin.ts`, `cli.ts`,
 `server.ts` (localhost OAuth listener), `ui/`, and `plugin/search.ts`
@@ -76,13 +125,14 @@ search stays in the request pipeline.
 ## Boundaries
 
 - `transform/*` stays pure: `(payload, model, config)` in, transformed
-  payload out. Network, filesystem, and account mutation belong in
-  `request.ts`, `accounts.ts`, `storage.ts`, `quota.ts`, `project.ts`.
+  payload out. Network and filesystem work belongs in adapters; account
+  policy belongs in `modules/accounts/`.
 - `hooks/*` must not depend on auth/quota/accounts/storage/fingerprint/
   project. It only uses file debug logging.
 - External-origin fetches must never receive `x-goog-api-key` or
   `authorization`.
-- `transform/*` must not import `accounts.ts` / `storage.ts`.
+- `modules/inference/transforms/*` must not depend on account-selection policy
+  or filesystem persistence.
 - Runtime (non-test) imports must resolve under **both** `tsconfig.json`
   and `tsconfig.build.json`: use `.js`-suffixed or extensionless relative
   imports. `.ts`-suffixed imports pass `typecheck` but fail `bun run build`

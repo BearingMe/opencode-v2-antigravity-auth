@@ -30,8 +30,9 @@ and `https://oauth2.googleapis.com/token`, with the confidential client
 secret sent at exchange (CLI-spoofing behavior, not the public-client PKCE
 norm). Scopes: `cloud-platform`, `userinfo.email`, `userinfo.profile`,
 `cclog`, `experimentsandconfigs`. The plugin secret is committed in
-`src/constants.ts` and duplicated in `scripts/check-quota.mjs` (accepted
-risk — rotate both; scripts should one day import from a single source).
+`src/adapters/antigravity/constants.ts` and duplicated in
+`scripts/check-quota.mjs` (accepted risk — rotate both; scripts should one day
+import from a single source).
 
 ## Request envelope
 

@@ -8,7 +8,7 @@ const { loadAccounts, updateAccounts, verifyAccountAccess } = vi.hoisted(() => (
   verifyAccountAccess: vi.fn(async () => ({ status: "ok" as const, message: "verified" })),
 }))
 
-// Transactional storage mock mirroring src/plugin/storage.ts updateAccounts.
+// Transactional storage mock mirroring adapters/filesystem/account-store.ts updateAccounts.
 updateAccounts.mockImplementation(async (updater: (current: unknown) => { storage: unknown; result: unknown }) => {
   const current = (await loadAccounts()) ?? { version: 4, accounts: [], activeIndex: 0 }
   const input = structuredClone(current)
@@ -16,15 +16,15 @@ updateAccounts.mockImplementation(async (updater: (current: unknown) => { storag
   return result
 })
 
-vi.mock("./plugin/verify.js", () => ({
+vi.mock("./adapters/opencode/verification.js", () => ({
   verifyAccountAccess,
 }))
 
-vi.mock("./plugin/version.js", () => ({
+vi.mock("./adapters/opencode/version.js", () => ({
   initAntigravityVersion: vi.fn(async () => undefined),
 }))
 
-vi.mock("./antigravity/oauth.js", () => ({
+vi.mock("./adapters/opencode/oauth.js", () => ({
   authorizeAntigravity: vi.fn(async () => ({ url: "https://accounts.google.com/auth", verifier: "v", projectId: "" })),
   exchangeAntigravity: vi.fn(async () => ({
     type: "success" as const,
@@ -35,22 +35,23 @@ vi.mock("./antigravity/oauth.js", () => ({
   })),
 }))
 
-vi.mock("./plugin/storage.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./plugin/storage.js")>()
+vi.mock("./adapters/filesystem/account-store.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./adapters/filesystem/account-store.js")>()
   return { ...actual, loadAccounts, updateAccounts }
 })
 
-vi.mock("./plugin/engine.js", () => ({
+vi.mock("./app/composition.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./app/composition.js")>()),
   executeAntigravityRequest: vi.fn(),
   disposeAntigravityRuntimeResources: vi.fn(async () => undefined),
   refreshOAuthCredentialUnified: vi.fn(async (credential: unknown) => credential),
 }))
 
-vi.mock("./plugin/accounts.js", () => ({
+vi.mock("./adapters/opencode/account-pool.js", () => ({
   AccountManager: { loadFromDisk: vi.fn() },
 }))
 
-vi.mock("./plugin/refresh-queue.js", () => ({
+vi.mock("./adapters/opencode/refresh-queue.js", () => ({
   createProactiveRefreshQueue: vi.fn(() => ({ setAccountManager: vi.fn(), start: vi.fn(), stop: vi.fn() })),
 }))
 
@@ -65,12 +66,14 @@ import plugin from "./v2-plugin.js"
  */
 const transportCodec = Schema.toCodecJson(Schema.Struct({ output: Schema.Unknown }))
 
+/** Encodes a handler result through the host's JSON transport schema. */
 function encodeTransport(output: unknown): unknown {
   return Schema.encodeSync(transportCodec)({ output })
 }
 
 type RpcHandlers = Record<string, (input: never) => Promise<unknown>>
 
+/** Seeds account data containing optional and hostile values for RPC checks. */
 function seedSparseStore(): void {
   loadAccounts.mockResolvedValue({
     version: 4,
@@ -115,12 +118,14 @@ describe("Antigravity RPC transport", () => {
   let handlers: RpcHandlers
   let cleanup: (() => void) | void
 
+  /** Invokes a registered account RPC handler with one input value. */
   const call = async (name: keyof typeof AntigravityAccounts.methods, input: unknown): Promise<unknown> => {
     const handler = handlers[name]
     if (!handler) throw new Error(`missing RPC handler: ${name}`)
     return handler(input as never)
   }
 
+  /** Checks a serialized RPC result for credential-bearing internal fields. */
   const scanSecrets = (value: unknown): void => {
     const text = JSON.stringify(value)
     expect(text).not.toContain("secret-refresh-token")

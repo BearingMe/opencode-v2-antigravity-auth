@@ -5,16 +5,19 @@
 - Plugin entrypoints: V2 default plugin +
   `normalizeFetchBody`, `getFetchDestination`,
   `isGenerativeLanguageModelPath`, `parseOAuthCallbackInput`,
-  `manageAccounts` (`src/v2-plugin.ts`); `executeAntigravityRequest`,
+  `manageAccounts` (`src/adapters/opencode/plugin.ts`); `executeAntigravityRequest`,
   `refreshOAuthCredentialUnified`, `disposeAntigravityRuntimeResources`
-  (`src/plugin/engine.ts`); `verifyAccountAccess` (`src/plugin/verify.ts`).
+  (`src/app/composition.ts`); `executeAntigravityRequest` is the composition
+  entry and delegates to `src/app/execute-request.ts`; `verifyAccountAccess`
+  (`src/adapters/opencode/verification.ts`).
 - Fetch scope rule (R-FETCH-SCOPE): the interceptor MUST only route
   absolute http(s) URLs on `generativelanguage.googleapis.com` matching
   `^/v1(beta)?/models/[^/]+:(generateContent|streamGenerateContent|
 countTokens)$`. Non-model GL paths throw
   `Unsupported Google Generative Language endpoint`; external origins are
   direct-fetched with `x-goog-api-key` and `authorization` removed.
-  Evidence: `v2-plugin.ts :: antigravityFetch`; `v2-plugin.test.ts` ::
+  Evidence: `adapters/opencode/plugin.ts :: antigravityFetch`;
+  `adapters/opencode/plugin.test.ts` ::
   validates destinations, rejects `/upload/v1beta/files`, requires absolute
   URL.
 - OAuth callback rule: input is either a full localhost redirect URL
@@ -27,13 +30,13 @@ countTokens)$`. Non-model GL paths throw
   integrity/keepalive/mode/redirect/referrer/policy, MUST decode JSON bytes
   (honoring typed-array byteOffset/length) to string when content-type is
   JSON, and MUST pass binary/empty bodies through. Evidence:
-  `v2-plugin.test.ts` (4 normalize cases incl. abort-signal liveness).
+  `adapters/opencode/plugin.test.ts` (4 normalize cases incl. abort-signal liveness).
 - Tools: `antigravity_accounts{action, index?}` with `list|check_quota|verify|
 enable|disable|select|delete|delete_all` (see F3; out-of-range index is a
-  message, not a write — `v2-plugin.accounts.test.ts`).
+  message, not a write — `adapters/opencode/plugin.accounts.test.ts`).
   No search tool is registered. Model-declared `web_search` /
   `google_search` names are still recognized and sanitized by the
-  D-SEARCH-MUTEX guard in `transform/gemini.ts`.
+  D-SEARCH-MUTEX guard in `modules/inference/transforms/gemini.ts`.
 - Events consumed: `session.created` (child tracking + update check),
   `session.error` (recovery), V2 `session.retry` (forward). V2 `aisdk.hook
 ("sdk")` is beta and MAY change upstream (see §06).
@@ -41,25 +44,29 @@ enable|disable|select|delete|delete_all` (see F3; out-of-range index is a
 ## Error handling
 
 - `exchangeAntigravity` never throws (`failed{error}` with raw server text).
-- Token refresh is unified: `src/plugin/token.ts :: refreshAccessToken` is
+- Token refresh is unified: `src/adapters/opencode/token.ts :: refreshAccessToken` is
   the single implementation, reached via
-  `src/plugin/engine.ts :: refreshOAuthCredentialUnified` and via
-  `src/v2-plugin.ts :: refreshOAuthCredential` (thin wrapper preserving the
+  `src/app/composition.ts :: refreshOAuthCredentialUnified` and via
+  `src/adapters/opencode/plugin.ts :: refreshOAuthCredential` (thin wrapper preserving the
   credential shape). `invalid_grant` → evict account + clear project/auth
   caches + rotate; all-invalid → login error. Do not reintroduce a parallel
   refresh path (see D-REFRESH-DUAL).
 - Rate-limit handling: classify → backoff (`Retry-After` ≥ 2 s respected)
   → `markRateLimitedWithReason` → rotate; all-blocked → wait (capped) or
-  quota-protection throw; capacity uses tiered `[5..60 s]` delays.
+  quota-protection throw; capacity/server-busy retries use exponential 1/2/4/8 s
+  delays (capped at 8 s with ±10% jitter), three in-place retries per endpoint,
+  then one fingerprint refresh before endpoint fallback.
 - Verification-required: toast `needs verification…`, persist
   `verificationRequired*` fields, disable on blocked; error status records
   without disabling.
 - Empty responses: per-key attempts → `EmptyResponseError` → synthetic
   error response or retry per config.
-- Recovery: `tool_result_missing` → inject cancelled result + continue;
-  `thinking_block_order` → prepend synthetic thinking; `disabled_violation`
-  → strip thinking. All toast failures swallowed (`.catch(()=>{})`) by
-  design; debug log is the record.
+- Recovery: dangling `tool_result_missing` calls receive cancelled V2 tool
+  results in the outgoing context before the provider request;
+  `thinking_block_order` → prepend synthetic thinking;
+  `thinking_disabled_violation` → strip thinking. Context tool results are not
+  written to persisted session history because V2 exposes only text prompts.
+  All toast failures are swallowed by design; debug log is the record.
 - Update checker: ALL failures → `null`/`false`/no-throw; npm fetch has a
   5 s abort; config parse errors `continue`.
 - `manageAccounts` unknown actions and bad indices return message strings;

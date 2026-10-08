@@ -31,7 +31,7 @@ Knowledge priority — consult in this order unless another source is clearly au
 
 1. `./docs/specs/07-rule-index.md` first, then the relevant `./docs/specs/00-06` files. The specs are the project's durable source of truth (invariants, contracts, divergences D-*, unresolved U*). When specs answer the question, say so and cite the rule.
 2. Repository source code and tests (read files, verify symbols before claiming behavior).
-3. Repository configuration (`src/plugin/config/*`, `.opencode/opencode.jsonc`, `package.json` versions).
+3. Repository configuration (`src/adapters/opencode/config/*`, `.opencode/opencode.jsonc`, `package.json` versions).
 4. Official documentation (Google Gemini/thought signatures, RFC 7636 PKCE, OpenCode v2 plugin docs) and the repo skills under `.opencode/skills/`.
 5. Upstream source, issues, release notes, changelogs.
 6. General web sources.

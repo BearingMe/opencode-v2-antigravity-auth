@@ -58,11 +58,9 @@ until a clean rebuild. `bun run build` cleans via `prebuild`, so:
 - The auto-update checker only rewrites the plugin pin and invalidates the
   install cache — it never installs packages.
 
-## Triage runner (removed)
+## Standalone quota diagnostic
 
-The self-hosted triage workflow (`.github/workflows/issue-triage.yml`) was
-removed — it required a provisioned runner with a hardcoded checkout path.
-`scripts/` (Pi-runner setup, auth helpers, quota checker) is retained but
-currently unreferenced by CI; `scripts/check-quota.mjs` remains useful
-standalone for debugging quota outside OpenCode. Do not treat triage
-automation as plugin behavior in user docs.
+`scripts/check-quota.mjs` can inspect quota outside OpenCode and is not run by
+CI. Its duplicated OAuth client secret is an accepted compatibility risk
+documented in [the external contract notes](../specs/06-external-testing-compat.md).
+Do not treat the removed self-hosted triage workflow as plugin behavior.
