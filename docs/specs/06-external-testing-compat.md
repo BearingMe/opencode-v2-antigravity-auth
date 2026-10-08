@@ -70,15 +70,12 @@ event` transforms. V2 API explicitly "may change before stable".
   - `apiKey="antigravity-oauth"`, loader-missing/reject errors, decoded
     JSON body to routed fetch, per-session child tracker with duplicate-safe
     behavior at capacity).
-- `plugin/*` + subdirs: colocated Vitest files covering model
-  resolution, schema sanitization, cross-model sanitizer, quota fallback
-  (antigravity-first), rotation/hybrid selection, token, storage (v1–v4,
-  tombstones, replace semantics), account-service
-  presentation, account-ui-format, cache, debug/logger —
-  see `02-subsystems` and code refs (`request.test.ts`,
-  `model-resolver.test.ts`, `modules/accounts/selection/rotation.test.ts`,
-  `modules/accounts/selection/backoff.test.ts`, `quota-fallback.test.ts`,
-  `antigravity-account-rotation.test.ts`, `cross-model-integration.test.ts`).
+- `adapters/opencode/` tests cover request composition, account-service
+  persistence integration, quota/verification probes, account-pool rotation,
+  TUI/RPC, config, logging, and host setup. Policy tests live with
+  `modules/accounts/` and `modules/inference/`, including model resolution,
+  schema/cross-model sanitization, quota aggregation, selection, streaming, and
+  signature handling.
 - `modules/session-recovery/` and `adapters/opencode/session-recovery.test.ts`:
   in-request repair policy and session-error recovery behavior.
 - `src/app/execute-request.test.ts`: native-engine tests (routing decision, quota
@@ -214,12 +211,12 @@ types,logging}.ts` + `checker.test.ts`, `index.test.ts`
 fingerprint,token-client,quota-client,verification-client}.ts` and
   `src/adapters/opencode/{token,refresh-queue,signature-cache,debug,logger}.ts`
 - Accounts refresh cache: `src/modules/accounts/refresh/cache.ts`
-- Remaining composition: `src/plugin/{request,request-helpers,
-account-service}.ts`
+- Host composition: `src/adapters/opencode/{account-service,request,
+request-helpers}.ts`
 - Tests: `src/constants.test.ts`, `src/adapters/opencode/plugin.test.ts`,
   `src/adapters/opencode/plugin.accounts.test.ts`,
   `src/adapters/opencode/plugin.setup.test.ts` +
-  colocated `src/plugin/**/*.test.ts`
+  colocated tests under each owning `src/` module/adapter
 - Docs in repo: `README.md`, `docs/README.md` (index), `docs/user/`,
   `docs/dev/` (architecture, storage, RPC/TUI, quota contract, API,
   testing, manual checklist, maintainer ops),

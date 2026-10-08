@@ -34,9 +34,9 @@ bun install                          # Install dependencies (or: npx --yes bun@1
 bun run build                        # Clean dist via prebuild, then compile (tsc -p tsconfig.build.json)
 bun run typecheck                    # Type-check only (tsc --noEmit)
 bun run test                         # Run all tests (vitest run)
-bunx vitest run src/plugin/auth.test.ts          # Single test file (or: npx --yes bun@1.4.2 x vitest ...)
+bunx vitest run src/adapters/opencode/request.test.ts # Single test file (or: npx --yes bun@1.4.2 x vitest ...)
 bunx vitest run -t "test name here"              # Single test by name
-bunx vitest --watch src/plugin/auth.test.ts      # Watch mode, single file
+bunx vitest --watch src/adapters/opencode/request.test.ts # Watch mode, single file
 bun run test:coverage                # Coverage report
 bun run test:e2e:models              # E2E: model availability check (needs real quota)
 bun run test:e2e:regression          # E2E: regression suite (needs real quota)
@@ -155,14 +155,14 @@ src/
 │       ├── account-pool.ts    # OpenCode/filesystem dependencies for the account pool
 │       ├── token.ts / quota.ts / verification.ts # Host-bound provider compositions
 │       ├── project.ts / refresh-queue.ts / signature-cache.ts
+│       ├── request.ts / request-helpers.ts # Host-bound inference composition
 │       ├── account-service.ts # Account tool/RPC service facade
 │       ├── rpc.ts             # Credential-free AntigravityAccounts contract
 │       ├── tui/               # /antigravity host dialogs and controller
 │       ├── config/            # OpenCode config, model registration, and settings
 │       └── hooks/             # Host event integrations, including update checks
 ├── modules/session-recovery/  # Error policy, session repair, and request-time turn repair
-└── plugin/
-    └── request.ts / request-helpers.ts  # Transform core + schema/thinking utils
+└── platform/logging/          # Vendor- and host-neutral logging policy
 ```
 
 > Historical: V1 `src/plugin.ts`, `cli.ts`, `server.ts`, `ui/`, and
@@ -234,7 +234,7 @@ surfaces. Do not attempt to patch or touch OpenCode core codebase.
 
 - Framework: **Vitest 3** with native ESM
 - Config: `vitest.config.ts`
-- Tests colocated: `src/plugin/foo.test.ts` next to `src/plugin/foo.ts`
+- Tests colocated: `*.test.ts` next to the owning source under `src/`
 - Use `describe`/`it`/`expect` — standard Vitest API
 - Mock with `vi.fn()`, `vi.spyOn()`, `vi.mock()`
 - The full `/antigravity` dialog/toast flow has no automated coverage by

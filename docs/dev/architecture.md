@@ -30,8 +30,9 @@ OpenCode ──▶ Plugin ──▶ Antigravity API ──▶ Claude/Gemini
      rotation and retry.
 3. **Transformation** (`modules/inference/pipeline.ts`,
    `modules/inference/transforms/*`, `modules/inference/request-helpers.ts`,
-   `modules/inference/streaming/*`, and signature policy). The plugin request
-   facade supplies config, debug, fingerprint, and image-storage adapters.
+   `modules/inference/streaming/*`, and signature policy).
+   `adapters/opencode/request.ts` supplies config, debug, fingerprint, and
+   image-storage adapters.
 
 - Model detection, thinking config, Claude thinking-strip, tool
   normalization to `functionDeclarations[]`, schema sanitization, tool-id
@@ -62,6 +63,7 @@ src/
 │       ├── account-service.ts # Account tool/RPC service facade
 │       ├── token.ts / quota.ts / verification.ts
 │       ├── project.ts / refresh-queue.ts / signature-cache.ts
+│       ├── request.ts / request-helpers.ts
 │       ├── google-sdk.ts      # Isolated AI SDK hook-routing module
 │       ├── tui/               # /antigravity dialog UI and controller
 │       ├── config/            # OpenCode config/model registration details
@@ -79,8 +81,6 @@ src/
 ├── modules/session-recovery/  # Error detection, session repair, and request-time turn repair
 ├── modules/inference/         # Request helpers, transforms, schema cleaning, streaming, signatures, and ports
 ├── platform/logging/          # Neutral events, policy, and safe log formatting
-└── plugin/
-    └── request.ts / request-helpers.ts
 ```
 
 The package-root `src/v2-plugin.ts`, `src/tui.ts`, and `src/rpc.ts` files remain

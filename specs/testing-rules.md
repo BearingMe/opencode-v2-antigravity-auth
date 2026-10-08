@@ -4,19 +4,18 @@ Keep the smallest suite that detects plausible behavioral regressions. Test
 requirements and boundaries, not implementation shape. These rules govern test
 work during the migration; they do not authorize a wholesale test rewrite.
 
-Examples below identify audit targets supplied for the migration, not completed
-fixes. Validate each finding before deleting or rewriting a test. Existing
+Examples below include original audit targets and their current status. Validate
+each finding before deleting or rewriting a test. Existing
 behavioral requirements remain in `docs/specs/00-07`.
 
 ## Behavior and contracts
 
-1. Do not test private/internal helpers through `__testExports`. Audit
-   `src/plugin/request.test.ts`; test public behavior or extract a genuinely
-   cohesive module, not a test-only API.
+1. Do not test private/internal helpers through `__testExports`. The request
+   adapter tests exercise exported behavior; do not add a test-only API.
 2. Do not write runtime tests for TypeScript types. Audit the `HeaderSet` cases
    in `src/constants.test.ts`; use typechecking/type tests for type contracts.
 3. Do not test language/runtime guarantees. Audit generic Error inheritance,
-   throw/catch, and trivial assigned-field cases in `src/plugin/errors.test.ts`.
+   throw/catch, and trivial assigned-field cases in `src/modules/inference/errors.test.ts`.
 4. Do not test constructor plumbing unless it is behavior. Assigned fields and
    preserved references matter only when they are explicit contracts.
 5. Do not assert exact internal strings unless the string is contractual.

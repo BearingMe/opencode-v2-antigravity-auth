@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest"
-import { AccountManager } from "../adapters/opencode/account-pool.js"
-import type { AccountOAuthCredential } from "../modules/accounts/index.js"
+import { AccountManager } from "./account-pool.js"
+import type { AccountOAuthCredential } from "../../modules/accounts/index.js"
 
 const MODEL_PRO = "gemini-1.5-pro"
 const MODEL_FLASH = "gemini-1.5-flash"

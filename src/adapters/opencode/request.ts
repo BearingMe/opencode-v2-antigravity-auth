@@ -1,25 +1,21 @@
 import { createHash, randomUUID } from "node:crypto"
-import { ANTIGRAVITY_ENDPOINT, getRandomizedHeaders } from "../constants"
+import { ANTIGRAVITY_ENDPOINT, getRandomizedHeaders } from "../../constants.js"
 import {
   createInferencePipeline,
   type InferenceRequestOptions,
   type PreparedInferenceRequest,
-} from "../modules/inference/index.js"
-import {
-  buildFingerprintHeaders,
-  getSessionFingerprint,
-  type Fingerprint,
-} from "../adapters/antigravity/fingerprint.js"
-import { processImageData } from "../adapters/filesystem/image-saver.js"
-import { getKeepThinking } from "../adapters/opencode/config/index.js"
+} from "../../modules/inference/index.js"
+import { buildFingerprintHeaders, getSessionFingerprint, type Fingerprint } from "../antigravity/fingerprint.js"
+import { processImageData } from "../filesystem/image-saver.js"
+import { getKeepThinking } from "./config/index.js"
 import {
   DEBUG_MESSAGE_PREFIX,
   isDebugTuiEnabled,
   logAntigravityDebugResponse,
   logCacheStats,
   type AntigravityDebugContext,
-} from "../adapters/opencode/debug.js"
-import { createLogger } from "../adapters/opencode/logger.js"
+} from "./debug.js"
+import { createLogger } from "./logger.js"
 
 const log = createLogger("request")
 

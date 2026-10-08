@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { sanitizeCrossModelPayload } from "../modules/inference/index.js"
+import { sanitizeCrossModelPayload } from "../index.js"
 
 /**
  * Builds a multi-turn Gemini history payload with thinking and tool call metadata.

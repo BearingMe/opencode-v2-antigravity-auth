@@ -6,7 +6,7 @@ import {
   buildThinkingWarmupBody,
   prepareAntigravityRequest,
   transformAntigravityResponse,
-} from "../../plugin/request.js"
+} from "./request.js"
 import type { AntigravityDebugContext } from "./debug.js"
 
 /** Inference operations composed with the OpenCode plugin's runtime adapters. */

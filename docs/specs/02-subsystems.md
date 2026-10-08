@@ -63,7 +63,7 @@ refreshOAuthCredential` is a thin wrapper that delegates to the unified
 
 ## 2.3 Request preparation — `src/modules/inference/pipeline.ts`
 
-The plugin-facing `src/plugin/request.ts` compatibility API supplies the
+The OpenCode-bound `src/adapters/opencode/request.ts` composition supplies the
 config, debug, fingerprint, and image-storage callbacks; request policy remains
 inference-owned.
 
@@ -113,7 +113,7 @@ thinkingRecoveryMessage}`.
   preserves received provider signatures, then restores a session-cached
   signature or uses the sentinel when no reusable signature remains.
   `thinking-filter.ts` owns pure thinking-block filtering; legacy
-  `request-helpers.ts` supplies `keep_thinking` and logging policy.
+  `adapters/opencode/request-helpers.ts` supplies `keep_thinking` and logging policy.
 - Thinking: `DEFAULT_THINKING_BUDGET=16000`; `resolveThinkingConfig`
   default-on for thinking models; `stripAllThinkingBlocks` is the Claude
   default unless `keep_thinking`; unsigned-block filters consult
@@ -203,8 +203,8 @@ createdAt}`; history max 5 with
 `{initial|regenerated|restored}` reasons. Client metadata is reduced:
 `osVersion`,
 `arch`, `sqmId` are not sent; `buildFingerprintHeaders`
-composes ONLY `User-Agent` (applied on the antigravity path in
-`request.ts`; `X-Goog-QuotaUser`, `X-Client-Device-Id`,
+composes ONLY `User-Agent` (applied on the Antigravity path in
+`adapters/opencode/request.ts`; `X-Goog-QuotaUser`, `X-Client-Device-Id`,
 `X-Goog-Api-Client`, `Client-Metadata` no longer sent on content
 requests). `getRandomizedHeaders("antigravity")` never emits linux
 (Linux masquerades as macOS).

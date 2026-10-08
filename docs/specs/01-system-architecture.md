@@ -11,7 +11,7 @@
 | OAuth facade    | `src/adapters/opencode/oauth.ts`, `src/adapters/antigravity/oauth.ts`                                                | Preserves the package authorize/exchange API and binds provider OAuth operations to OpenCode logging                                                                          |
 | Vendor clients  | `src/adapters/antigravity/*`                                                                                         | OAuth/token/project/quota/verification HTTP, headers, endpoint order, timeouts, and response wire parsing                                                                     |
 | Auto-update     | `src/adapters/opencode/hooks/auto-update-checker/*`                                                                  | Root-session npm check, toast or pinned rewrite + cache invalidate                                                                                                            |
-| Core domains    | `src/modules/{accounts,inference,session-recovery}/*`, `src/adapters/{antigravity,filesystem}/*`, `src/plugin/*`     | Account, inference, and recovery policy; vendor and filesystem adapters; remaining plugin request/auth composition; OpenCode debug and log delivery                           |
+| Core domains    | `src/modules/{accounts,inference,session-recovery}/*`, `src/adapters/{antigravity,filesystem,opencode}/*`            | Account, inference, and recovery policy; vendor, filesystem, and OpenCode host adapters, including request composition and debug/log delivery                                 |
 
 ## Dependency direction (normative)
 
@@ -25,7 +25,7 @@ app/composition.ts ──selects──> account, inference, Antigravity transpor
 app/execute-request.ts ──coordinates──> account pool + inference policies
 adapters/opencode/* ──composes──> modules/* + vendor/filesystem adapters
 modules/inference/transforms/* ──should stay──> pure re: I/O
-plugin request boundary ──supplies──> config, environment, and diagnostics
+adapters/opencode/request.ts ──supplies──> config, environment, and diagnostics
 ```
 
 ### Rule: R-ARCH-V2-DELEGATES-V1
@@ -103,8 +103,8 @@ diagnostics are supplied or handled by the request boundary.
   `src/adapters/opencode/account-pool.ts` supplies filesystem and host-specific
   dependencies; health, token-bucket, and backoff policy remain in the module.
 - `TransformContext/Result`, request/response pipelines, signature policy, and
-  `StreamingCallbacks` live in `src/modules/inference/`; plugin request and
-  streaming paths are compatibility adapters.
+  `StreamingCallbacks` live in `src/modules/inference/`; host request
+  composition lives in `src/adapters/opencode/request.ts`.
 - `antigravity_accounts` tool (`src/adapters/opencode/plugin.ts :: manageAccounts`,
   backed by `src/modules/accounts/account-admin.ts` through the compatibility
   facade in `src/adapters/opencode/account-service.ts`).

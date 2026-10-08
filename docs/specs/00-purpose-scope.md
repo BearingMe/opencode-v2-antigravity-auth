@@ -45,9 +45,9 @@ In scope:
 - Request interception, model resolution, payload transforms, and streaming
   (`src/modules/inference/pipeline.ts`, `src/modules/inference/transforms/*`,
   `src/modules/inference/signature-*`, `src/modules/inference/streaming/*`).
-  `src/plugin/request.ts` and `src/plugin/request-helpers.ts` retain plugin
-  request adaptation and helper APIs. The former `src/plugin/core/streaming/*`
-  re-export paths were removed in Step 14; streaming policy is consumed from
+  `src/adapters/opencode/request.ts` and `request-helpers.ts` bind host
+  config/debug/fingerprint/image callbacks to inference policy. The former
+  `src/plugin/core/streaming/*` re-export paths were removed in Step 14; streaming policy is consumed from
   `modules/inference/`.
   The former `src/plugin/transform/*` re-export paths were removed in Step 14;
   transform policy is consumed from `modules/inference/`.

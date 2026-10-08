@@ -15,7 +15,7 @@ import { fetchAvailableModels, fetchQuotaSummary } from "../dist/src/adapters/an
 import { loadManagedProject } from "../dist/src/adapters/antigravity/project-client.js"
 import { onboardManagedProject } from "../dist/src/adapters/opencode/project.js"
 import { refreshOAuthToken } from "../dist/src/adapters/antigravity/token-client.js"
-import { prepareAntigravityRequest } from "../dist/src/plugin/request.js"
+import { prepareAntigravityRequest } from "../dist/src/adapters/opencode/request.js"
 import { formatRefreshParts } from "../dist/src/modules/accounts/index.js"
 import { DEFAULT_CONFIG } from "../dist/src/adapters/opencode/config/schema.js"
 import { executeAntigravityRequest } from "../dist/src/app/composition.js"

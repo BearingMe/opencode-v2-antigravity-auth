@@ -8,15 +8,15 @@ bun run build          # tsc declarations/modules + Solid/OpenTUI view compilati
 bun run typecheck      # tsc --noEmit
 bun run test           # vitest run (full suite)
 bun run test:tui       # clean build + native Bun rendering of the published view
-bunx vitest run src/plugin/auth.test.ts   # single file
+bunx vitest run src/adapters/opencode/request.test.ts   # single file
 bunx vitest run -t "name"                 # single test by name
 bun run test:coverage
 bun run test:e2e:models      # live model availability (needs real quota)
 bun run test:e2e:regression  # live regression (needs real quota)
 ```
 
-No linter or formatter is configured; style is enforced by convention
-(see `AGENTS.md`).
+Run `bun run lint` for ESLint and `bunx prettier --check <changed files>` for
+formatting (see `AGENTS.md`).
 
 ## What is covered
 
@@ -53,11 +53,12 @@ No linter or formatter is configured; style is enforced by convention
   `packages/tui`. This exercises real host keymap input, dialog replacement,
   and cleanup with fixture RPC data. It skips when the installed artifact
   path is absent.
-- `plugin/*` + subdirs: 20+ colocated suites — model resolution, schema and
-  cross-model sanitization, quota fallback (Antigravity-first), rotation and
-  hybrid selection, token, storage (v1–v4, tombstones, replace semantics),
-  cache, debug/logger, verification, version, account-service presentation,
-  account UI formatting.
+- `adapters/opencode/`: request preparation/helper behavior, account service and
+  tombstone integration, quota/verification composition, account-pool rotation,
+  TUI, config, RPC, and host setup.
+- `modules/accounts/` and `modules/inference/`: selection/quota/refresh policy,
+  request transforms, schema sanitization, cross-model behavior, streaming, and
+  signature policy.
 - `modules/session-recovery/` and `adapters/opencode/session-recovery.test.ts`:
   in-request turn repair, session-error policy, and OpenCode session adaptation.
 - `app/execute-request.test.ts`: native-engine parity (routing, quota fallback, warmup
@@ -83,6 +84,6 @@ No linter or formatter is configured; style is enforced by convention
 
 ## Conventions
 
-- Vitest 3, native ESM; tests colocated (`src/plugin/foo.test.ts`).
+- Vitest 3, native ESM; tests colocated with their owner under `src/`.
 - `describe`/`it`/`expect`; `vi.fn()`/`vi.spyOn()`/`vi.mock()`.
 - Never use `as any`, `@ts-ignore`, or `@ts-expect-error`.

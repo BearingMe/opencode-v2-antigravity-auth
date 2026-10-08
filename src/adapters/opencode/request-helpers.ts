@@ -1,6 +1,6 @@
-import { processImageData } from "../adapters/filesystem/image-saver.js"
-import { createLogger } from "../adapters/opencode/logger.js"
-import { getKeepThinking } from "../adapters/opencode/config/index.js"
+import { processImageData } from "../filesystem/image-saver.js"
+import { createLogger } from "./logger.js"
+import { getKeepThinking } from "./config/index.js"
 import {
   applyToolPairingFixes as applyInferenceToolPairingFixes,
   deepFilterThinkingBlocks as filterInferencePayload,
@@ -10,7 +10,7 @@ import {
   recursivelyParseJsonStrings as parseInferenceJsonStrings,
   transformThinkingParts as transformInferenceThinkingParts,
   validateAndFixClaudeToolPairing as fixInferenceClaudeToolPairing,
-} from "../modules/inference/index.js"
+} from "../../modules/inference/index.js"
 
 export {
   DEFAULT_THINKING_BUDGET,
@@ -34,7 +34,7 @@ export {
   resolveThinkingConfig,
   rewriteAntigravityPreviewAccessError,
   assignToolIdsToContents,
-} from "../modules/inference/index.js"
+} from "../../modules/inference/index.js"
 export type {
   AntigravityApiBody,
   AntigravityApiError,
@@ -42,8 +42,8 @@ export type {
   RequestThinkingConfig as ThinkingConfig,
   StreamingChunkCounter,
   VariantThinkingConfig,
-} from "../modules/inference/index.js"
-export { cleanJSONSchemaForAntigravity } from "../modules/inference/index.js"
+} from "../../modules/inference/index.js"
+export { cleanJSONSchemaForAntigravity } from "../../modules/inference/index.js"
 
 const log = createLogger("request-helpers")
 

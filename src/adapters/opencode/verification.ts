@@ -1,6 +1,6 @@
 import { formatRefreshParts, parseRefreshParts } from "../../modules/accounts/index.js"
 import { ensureProjectContext } from "./project.js"
-import { prepareAntigravityRequest } from "../../plugin/request.js"
+import { prepareAntigravityRequest } from "./request.js"
 import { AntigravityTokenRefreshError, refreshAccessToken } from "./token.js"
 import {
   antigravityAccessVerificationPort,

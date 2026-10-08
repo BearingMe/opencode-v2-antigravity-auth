@@ -13,8 +13,8 @@ const { mockPrepare, mockTransform, mockEnsureProjectContext, mockRefreshAccessT
   mockRefreshAccessToken: vi.fn(),
 }))
 
-vi.mock("../plugin/request.ts", async (importOriginal) => {
-  const orig = await importOriginal<typeof import("../plugin/request.ts")>()
+vi.mock("../adapters/opencode/request.ts", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("../adapters/opencode/request.ts")>()
   return {
     ...orig,
     prepareAntigravityRequest: mockPrepare,
