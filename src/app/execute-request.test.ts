@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { AccountManager } from "../adapters/opencode/account-pool.ts"
-import { formatRefreshParts } from "../modules/accounts/index.ts"
+import {
+  AccountPoolManager,
+  formatRefreshParts,
+  type AccountPoolDependencies,
+  type AccountStorageUpdater,
+  type AccountStorageV4,
+} from "../modules/accounts/index.ts"
 import { DEFAULT_CONFIG } from "../adapters/opencode/config/schema.ts"
 import { ANTIGRAVITY_ENDPOINT_FALLBACKS } from "../adapters/antigravity/constants.ts"
 import { AntigravityTokenRefreshError } from "../adapters/opencode/token.ts"
@@ -50,14 +55,14 @@ function makeClient(): PluginClient {
 }
 
 /** Builds an account manager initialized with the supplied OAuth entries. */
-function makeManager(entries: Array<{ refreshToken: string; access?: string; expires?: number }>): AccountManager {
+function makeManager(entries: Array<{ refreshToken: string; access?: string; expires?: number }>): AccountPoolManager {
   const authFallback = {
     type: "oauth" as const,
     refresh: formatRefreshParts({ refreshToken: entries[0]?.refreshToken ?? "" }),
     access: entries[0]?.access,
     expires: entries[0]?.expires,
   }
-  return new AccountManager(authFallback, {
+  let storage: AccountStorageV4 = {
     version: 4,
     accounts: entries.map((entry) => ({
       refreshToken: entry.refreshToken,
@@ -66,7 +71,33 @@ function makeManager(entries: Array<{ refreshToken: string; access?: string; exp
       enabled: true as const,
     })),
     activeIndex: 0,
-  })
+  }
+  let nextId = 0
+  const dependencies: AccountPoolDependencies = {
+    clock: { now: () => Date.now() },
+    update: async <Result>(updater: AccountStorageUpdater<Result>): Promise<Result> => {
+      const updated = await updater(storage)
+      storage = updated.storage
+      return updated.result
+    },
+    fingerprintToken: (refreshToken) => `test-fingerprint:${refreshToken}`,
+    generateId: () => `test-account-${++nextId}`,
+    generateFingerprint: () => ({
+      deviceId: "test-device",
+      sessionToken: "test-session",
+      userAgent: "antigravity/0.0.0 test",
+      apiClient: "test-client",
+      clientMetadata: { ideType: "ANTIGRAVITY", platform: "WINDOWS", pluginType: "GEMINI" },
+      createdAt: Date.now(),
+    }),
+    updateFingerprintVersion: () => false,
+    processId: 1,
+    formatAccountLabel: (email, index) => email ?? `Account ${index + 1}`,
+    logSoftQuotaSkipped: () => {},
+    logSelection: () => {},
+    random: () => 0.5,
+  }
+  return new AccountPoolManager(authFallback, storage, dependencies)
 }
 
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro:generateContent"

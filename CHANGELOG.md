@@ -2,15 +2,16 @@
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-08
+
 ### Fork
 
-- Renamed to `opencode-v2-antigravity-auth` (`0.1.0`, unpublished) as the
-  maintained OpenCode V2 port of the archived
+- First release of `opencode-v2-antigravity-auth` (`0.1.0`), the maintained
+  OpenCode V2 port of the archived
   `NoeFabris/opencode-antigravity-auth` (upstream history below is
   preserved for lineage). Package id, `PLUGIN_ID`, updater pin, and
-  auto-update package name follow the new name. Until the first npm
-  release, install from a local path — registry pins will not resolve
-  and the auto-update checker stays silent by design.
+  auto-update package name follow the new name. Install from npm after
+  publication; the auto-update checker stays silent until then.
 
 ### Added
 

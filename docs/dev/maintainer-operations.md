@@ -1,26 +1,50 @@
 # Maintainer operations
 
-## Publication status
+## First npm release
 
-The fork (`opencode-v2-antigravity-auth`, `0.1.0`) is **not published yet**.
-Until the first `npm publish`:
+The first public version is `0.1.0`; `package.json` already has that version.
+Do not publish from this release branch. Merge the release PR to `main` first,
+then publish the exact `v0.1.0` commit.
 
-- Users install from a local path (`/absolute/path` or `file://` URL);
-  registry pins like `opencode-v2-antigravity-auth@latest` will not resolve.
-- The auto-update checker stays silent: it queries npm dist-tags for a
-  package that does not exist there, and all checker failures are
-  no-throw by design.
-- Releases are manual for now: the release/beta/republish/dist-tag
-  workflows were removed (the package is unpublished and the triage bot
-  needed a provisioned self-hosted runner). Only `test.yml` runs in CI
-  (typecheck + tests + build on `main` pushes and PRs). To cut a release:
-  bump `version` in `package.json`, add the `CHANGELOG.md` entry, push,
-  tag `v<version>`, and run `npm publish --access public --provenance`
-  with `NPM_TOKEN` configured.
+Before creating the GitHub tag:
+
+1. Confirm the npm identity and package name from the account that will own it:
+   `npm whoami` and `npm view opencode-v2-antigravity-auth`. Stop if the account
+   is unexpected or the package name is already taken. A registry 404 means no
+   public package was found at check time; recheck immediately before publish.
+2. Review the release PR and wait for its checks. Confirm `package.json` is
+   still `0.1.0` and the changelog date matches the actual release date.
+3. After merge, update local `main`, verify it is clean, and create the tag from
+   that commit:
+   ```bash
+   git switch main
+   git pull --ff-only origin main
+   git status --short --branch
+   git tag -a v0.1.0 -m "v0.1.0"
+   git push origin v0.1.0
+   ```
+4. On GitHub, draft a release for the existing `v0.1.0` tag, target `main`, and
+   use the `0.1.0` changelog entry as the notes. Leave it as a draft until npm
+   publication has succeeded; this repository has no release workflow that
+   publishes npm automatically.
+
+Before the one-time public publish, authenticate locally with npm's browser
+flow (`npm login --auth-type=web`), then confirm `npm whoami` again. From a clean
+checkout of the tag, run the checks below and inspect `npm pack --dry-run`.
+Only then run `npm publish --access public`. Do not paste or commit npm tokens.
+Local publishing does not create GitHub provenance; after the first publish,
+configure npm trusted publishing for GitHub Actions before automating later
+releases. Do not add a publish workflow until its npm trusted-publisher settings
+and GitHub approval protections are configured.
+
+After publishing, verify `npm view opencode-v2-antigravity-auth@0.1.0 version`
+and install the published version in a scratch OpenCode config before publishing
+the GitHub release. npm versions are immutable; if anything looks wrong, stop
+and investigate rather than trying to overwrite `0.1.0`.
 
 ## Packaging
 
-Published files (`package.json` `files`): `dist/`, `README.md`, `LICENSE`.
+Published files (`package.json` `files`): `dist/`, `README.md`, `LICENSE.md`.
 Entry points: `.` (`dist/index.js`), `./tui` (`dist/src/tui.js`), `./rpc`
 (`dist/src/rpc.js`). The host auto-loads only `.` and `./tui` — keep RPC
 handlers registered from the production server setup.
@@ -31,10 +55,12 @@ Before publishing or testing a tarball:
 bun run clean && bun run build
 bun run typecheck
 bun run test
+bun run test:tui
+npm pack --dry-run
 ```
 
-Verify the tarball contains the entry points and no stale modules (see
-below), then exercise the packaged-install check in
+Verify the dry-run manifest includes the package entry points and license, and
+contains no stale modules or unrelated repository files. Then exercise the packaged-install check in
 [manual-testing.md](manual-testing.md) with a scratch `OPENCODE_CONFIG_DIR`.
 
 ## `dist/` hygiene
@@ -52,9 +78,10 @@ until a clean rebuild. `bun run build` cleans via `prebuild`, so:
 
 ## Version and changelog
 
-- Bump versions and add `CHANGELOG.md` entries together. Keep an
-  `## [Unreleased]` section for the V2, account-management, RPC, and
-  persistence changes until the next release cut.
+- For this first release, `package.json` is already `0.1.0`; confirm the
+  `CHANGELOG.md` release date on the day of publication. For future releases,
+  bump the version and add the matching changelog entry together, preserving an
+  `## [Unreleased]` section for work after the release.
 - The auto-update checker only rewrites the plugin pin and invalidates the
   install cache — it never installs packages.
 
