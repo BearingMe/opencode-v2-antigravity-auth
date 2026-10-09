@@ -40,6 +40,9 @@ antigravity-debug-*.log
 # Test artifacts
 test-file.ts
 
+# Keep source captures local; publish only reviewed screenshot exports.
+assets/screenshots/*.png
+
 # Local subrepos (not part of this project)
 .worktrees/
 CLIProxyAPI/
