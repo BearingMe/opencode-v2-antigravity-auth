@@ -1,153 +1,146 @@
-# Antigravity OAuth Plugin for OpenCode V2
+# Antigravity OAuth for OpenCode V2
 
+[![npm version](https://img.shields.io/npm/v/opencode-v2-antigravity-auth?logo=npm)](https://www.npmjs.com/package/opencode-v2-antigravity-auth)
+[![GitHub release](https://img.shields.io/github/v/release/BearingMe/opencode-v2-antigravity-auth?logo=github)](https://github.com/BearingMe/opencode-v2-antigravity-auth/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
 
-Authenticate OpenCode V2 against **Antigravity** (Google's IDE backend) via
-OAuth and use Antigravity quota for `gemini-3` / `claude-4.6` models with
-your Google credentials. Multi-account rotation, thinking support, and
-session recovery included.
+Use supported Gemini, Claude, and GPT-OSS models in OpenCode through Google Antigravity OAuth. Includes account rotation, quota visibility, thinking support, and session recovery.
 
-> **Maintained V2 port.** This is a fork of
-> [`NoeFabris/opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth)
-> (now archived), ported to the OpenCode V2 plugin API. Model requests flow
-> through V2's AI SDK hook and the plugin's native engine (auth, transform,
-> streaming, quota, rotation, recovery). Account files from earlier installs
-> remain in use. Onboarding is `opencode auth login` (one account per run,
-> up to 10); management is the `/antigravity` dialog (also
-> `Antigravity accounts` in the command palette) over the credential-free
-> `AntigravityAccounts` RPC. Server plugins have no toast API, so TUI toasts
-> are emitted as plugin logs.
-
-> **First release in preparation.** `opencode-v2-antigravity-auth@0.1.0` is
-> not on npm yet. Use a local path below until the package is published; after
-> release, use the registry entry shown below. The `auto_update` checker queries
-> npm dist-tags and stays silent until publication.
-
-## What you get
-
-- **Gemini 3.6/3.7/3.8 Flash, Gemini 3.1 Pro, Claude Opus/Sonnet 4.6
-  Thinking, and GPT-OSS 120B Medium** via Antigravity's Google OAuth
-- **Multi-account rotation** across up to 10 Google accounts
-- **One Antigravity quota pool** for supported models
-- **Gemini thinking variants** for low/medium/high levels where supported
-- **Auto-recovery** from interrupted tool calls
-- **Model-declared web search** sanitized by the pipeline (no dedicated
-  search tool is registered)
+> **Maintained OpenCode V2 port.** This fork of the now-archived [NoeFabris/opencode-antigravity-auth](https://github.com/NoeFabris/opencode-antigravity-auth) uses OpenCode V2's plugin API and native request engine. Existing Antigravity account files remain in use.
 
 > [!CAUTION]
-> **Terms of Service warning.** This is an unofficial tool, not endorsed by
-> Google. Proxying Antigravity may violate Google's Terms of Service; users
-> have reported bans or shadow-bans. You assume all account, legal, and
-> technical risk.
+> **Terms of Service and account risk:** This unofficial project is not endorsed by Google. Proxying Antigravity may violate Google's Terms of Service, and users have reported account restrictions. You assume all account, legal, and technical risk.
 
-## Installation
+## Install
 
-Until the first npm release, reference a local checkout. In your OpenCode
-config (`~/.config/opencode/opencode.json` or `opencode.jsonc`):
+### For people
 
-```jsonc
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugins": ["/absolute/path/to/opencode-v2-antigravity-auth"],
-}
-```
-
-Once `0.1.0` is published, replace the local path with a pinned registry entry:
-
-```jsonc
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-v2-antigravity-auth@0.1.0"],
-}
-```
-
-Local paths, `file://` URLs, and registry packages with optional `@version`
-pins are accepted. The V2 key is `plugins` (plural).
+Requires OpenCode V2 and a Google account. This command installs the plugin to your **global OpenCode configuration**:
 
 ```bash
-opencode auth login   # one account per run; repeat to add more (max 10)
+opencode plugin add opencode-v2-antigravity-auth
+opencode auth login
 ```
 
-Then manage saved accounts inside OpenCode with `/antigravity`. The plugin
-registers a fixed model catalog — verify with:
+In the login flow, choose **Antigravity**, then **Add or reconnect an account**. Complete Google's authorization yourself. Each login adds or reconnects one account; run it again to add another, up to 10. Press Ctrl+C to cancel before authorization.
+
+Check the plugin and try a model:
 
 ```bash
+opencode plugin list
 opencode run "Hello" --model=antigravity/antigravity-gemini-3.8-flash
 ```
 
-## Multi-account in 30 seconds
+The model request uses Antigravity quota. Models register automatically; no model definitions are needed. Open `/antigravity` in OpenCode to manage saved accounts and view quota.
 
-- Add: `opencode auth login` — choose Add/reconnect before the browser opens
-  (re-signing refreshes the same entry in place). Adds one account per command;
-  rerun to add another (max 10), or press Ctrl+C to cancel. No custom host needed.
-- Manage: `/antigravity` — saved quota bars, refresh-on-open and manual refresh (`ctrl+r`),
-  enable/disable, verify with reconnect guidance, confirm-guarded removal.
-- Details: [docs/user/accounts-and-quota.md](docs/user/accounts-and-quota.md).
+#### Install for one project instead
 
-## Configuration (optional)
+Add the package to that project's `opencode.json` or `opencode.jsonc`:
 
-Create `~/.config/opencode/antigravity.json` (project override:
-`.opencode/antigravity.json`). Defaults work for most users.
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["opencode-v2-antigravity-auth"],
+}
+```
 
-| Area              | Key options                                                                                                  |
-| ----------------- | ------------------------------------------------------------------------------------------------------------ |
-| Thinking/recovery | `keep_thinking` (default `false`), `session_recovery` (`true`), `auto_resume` (`false`)                      |
-| Rotation          | `account_selection_strategy` (`hybrid`), `scheduling_mode` (`cache_first`), `pid_offset_enabled` (`false`)   |
-| Quota protection  | `soft_quota_threshold_percent` (`90`), `quota_refresh_interval_minutes` (`15`)                               |
-| Behavior          | `quiet_mode` (`false`), `toast_scope` (`root_only`), `debug` / `debug_tui` (`false`), `auto_update` (`true`) |
+OpenCode V2 uses the plural `plugins` key. The CLI command above is for global installation.
 
-Full reference: [docs/user/configuration.md](docs/user/configuration.md).
-Schema: `assets/antigravity.schema.json`.
+### For AI agents
 
-Gemini CLI-only model IDs such as `gemini-2.5-pro` and `gemini-2.5-flash`
-are not served through Antigravity OAuth. Use a registered
-`antigravity-gemini-*` model instead, or keep using those IDs with an ordinary
-Google API-key connection under OpenCode's separate `google` provider.
-Antigravity has its own provider and sign-in; this plugin does not change
-OpenCode's Google integration. Existing `google/antigravity-*` model
-references need the new `antigravity/` provider prefix; saved plugin accounts
-remain in place. Verified Gemini preview aliases remain supported.
+You can give an agent these bounded instructions. They make the global configuration change explicit and leave sign-in and the first quota-using request to you:
 
-## Docs
+```text
+Install opencode-v2-antigravity-auth for OpenCode V2.
 
-- User: [installation](docs/user/installation.md) ·
-  [configuration](docs/user/configuration.md) ·
-  [models & variants](docs/user/models-and-variants.md) ·
-  [accounts & quota](docs/user/accounts-and-quota.md) ·
-  [troubleshooting](docs/user/troubleshooting.md)
-- Developer: [docs/dev/README.md](docs/dev/README.md) (architecture,
-  storage, RPC/TUI, quota contract, API, testing, manual checklist,
-  maintainer ops)
-- Normative specs: `docs/specs/00-07` (agent/reviewer source of truth)
+1. Check `opencode --version` and confirm the V2 `opencode plugin add` command is available.
+2. Explain that `opencode plugin add` changes my global OpenCode configuration. Ask me before proceeding if approval is required.
+3. Run `opencode plugin add opencode-v2-antigravity-auth`, then `opencode plugin list` to verify it is listed. Do not change or remove other plugins or settings.
+4. Stop before OAuth. Tell me to run `opencode auth login`, choose Antigravity, and complete Google's authorization myself. Never ask me to share an authorization code, redirect URL, password, or token.
+5. Do not read, copy, or delete Antigravity account files. Do not send a model request or consume quota unless I explicitly approve it.
+6. Report what was installed and whether sign-in or model verification is still needed. If a command fails, show the error and stop rather than changing unrelated configuration.
+```
+
+For a project-local install, ask the agent to add the package to the existing `plugins` array in that project's OpenCode config, preserving all other entries. Do not add a second config file or overwrite the user's settings.
+
+## A look inside OpenCode
+
+These screenshots show the login flow, automatic model registration, account management, and grouped quota view. Email addresses are covered in the published images.
+
+| Sign in                                                                                                                                                                                                            | Choose a model                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ![OpenCode login showing the Antigravity add-or-reconnect choice; account identities redacted](https://raw.githubusercontent.com/BearingMe/opencode-v2-antigravity-auth/main/assets/screenshots/redacted/auth.png) | ![OpenCode model picker showing the Antigravity model catalog](https://raw.githubusercontent.com/BearingMe/opencode-v2-antigravity-auth/main/assets/screenshots/redacted/models.png) |
+
+| Manage accounts                                                                                                                                                                      | Check quota                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ![Antigravity account list with account identities redacted](https://raw.githubusercontent.com/BearingMe/opencode-v2-antigravity-auth/main/assets/screenshots/redacted/accounts.png) | ![Grouped Antigravity quota dialog with account identity redacted](https://raw.githubusercontent.com/BearingMe/opencode-v2-antigravity-auth/main/assets/screenshots/redacted/quota.png) |
+
+## What you get
+
+- Gemini 3.6/3.7/3.8 Flash, Gemini 3.1 Pro, Claude Opus and Sonnet 4.6 Thinking, and GPT-OSS 120B Medium through Antigravity OAuth
+- Rotation across up to 10 Google accounts, using one Antigravity quota pool
+- Gemini thinking variants where supported
+- Recovery for interrupted tool calls
+- Sanitization of model-declared web search; this plugin does not register a separate search tool
+
+See the [model catalog and variants](docs/user/models-and-variants.md) for model IDs and supported options.
+
+## Accounts and quota
+
+Run `opencode auth login` to add or reconnect an account. Use `/antigravity` (or **Antigravity accounts** in the command palette) to enable or disable accounts, verify or remove them, and view quota. Adding accounts is done through login; the dialog manages saved accounts.
+
+Account files contain OAuth refresh tokens and should be treated like passwords. Never share them or include them in screenshots or support requests. See [accounts and quota](docs/user/accounts-and-quota.md) for storage and management details.
+
+## Update
+
+OpenCode V2 manages package plugin updates. Check for this plugin's update, then update only this package:
+
+```bash
+opencode plugin check opencode-v2-antigravity-auth
+opencode plugin update opencode-v2-antigravity-auth
+```
+
+The unversioned install command above tracks the package's latest release. Exact version pins are intentionally skipped by `plugin update`; change a pin in the applicable OpenCode `plugins` configuration when you want to select another version. OpenCode may need to reload the plugin before a running session uses the updated code.
+
+The plugin's optional `auto_update` checker has a known V2 config-key limitation. Use OpenCode's `plugin check` and `plugin update` commands rather than relying on that checker.
+
+## Configuration
+
+Defaults work for most users. Optional settings live in `~/.config/opencode/antigravity.json` (project override: `.opencode/antigravity.json`). Common options:
+
+| Area                  | Options                                                                                                    |
+| --------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Thinking and recovery | `keep_thinking` (`false`), `session_recovery` (`true`), `auto_resume` (`false`)                            |
+| Account rotation      | `account_selection_strategy` (`hybrid`), `scheduling_mode` (`cache_first`), `pid_offset_enabled` (`false`) |
+| Quota protection      | `soft_quota_threshold_percent` (`90`), `quota_refresh_interval_minutes` (`15`)                             |
+| Logging               | `debug` (`false`), `debug_tui` (`false`)                                                                   |
+
+Full [configuration reference](docs/user/configuration.md) · [JSON schema](assets/antigravity.schema.json).
+
+Gemini CLI-only model IDs such as `gemini-2.5-pro` and `gemini-2.5-flash` are not served through Antigravity OAuth. Use a registered `antigravity-gemini-*` model, or keep those IDs on OpenCode's separate Google API-key provider. Existing `google/antigravity-*` model references need the `antigravity/` provider prefix; saved plugin accounts remain in place.
+
+## Documentation
+
+- **User guides:** [installation](docs/user/installation.md) · [configuration](docs/user/configuration.md) · [models and variants](docs/user/models-and-variants.md) · [accounts and quota](docs/user/accounts-and-quota.md) · [troubleshooting](docs/user/troubleshooting.md)
+- **Developers and maintainers:** [developer docs](docs/dev/README.md) · [testing](docs/dev/testing.md) · [maintainer operations](docs/dev/maintainer-operations.md)
+- **Normative behavior:** [specifications](docs/specs/07-rule-index.md)
 - [Changelog](CHANGELOG.md)
-
-## Development
-
-Runtime tests stay beside their source under `src/`. Cross-cutting tests and
-smokes live under `test/`; build and repository tooling lives under `scripts/`.
-Run `bun run test`, `bun run test:tui`, `bun run typecheck`, and `bun run lint`
-before submitting changes. See [developer testing](docs/dev/testing.md) for
-the suites and live-test requirements.
 
 ## Compatibility
 
-- Works alongside other plugins (oh-my-opencode, DCP). With oh-my-opencode,
-  set `"google_auth": false`; list this plugin **before** DCP. No separate
-  gemini-auth plugin is needed.
-- Debug logs: `OPENCODE_ANTIGRAVITY_DEBUG=1` (file) or `=2`/`=verbose`
-  (verbose); `OPENCODE_ANTIGRAVITY_DEBUG_TUI=1` shows logs in the TUI panel
-  independently of file logging. See
-  [troubleshooting](docs/user/troubleshooting.md).
+- Works alongside other plugins, including oh-my-opencode and DCP. With oh-my-opencode, set `google_auth` to `false`; list this plugin before DCP. A separate Gemini-auth plugin is not needed.
+- Debug logs: set `OPENCODE_ANTIGRAVITY_DEBUG=1` for file logging or `=2` / `=verbose` for verbose logging. `OPENCODE_ANTIGRAVITY_DEBUG_TUI=1` enables TUI logs independently. See [troubleshooting](docs/user/troubleshooting.md).
+
+## Development
+
+Runtime tests live beside their source under `src/`; cross-cutting tests and smokes live under `test/`. Run `bun run test`, `bun run test:tui`, `bun run typecheck`, and `bun run lint` before submitting changes. See [developer testing](docs/dev/testing.md) for details and live-test requirements.
 
 ## Credits
 
-- Original plugin (V1, archived):
-  [NoeFabris/opencode-antigravity-auth](https://github.com/NoeFabris/opencode-antigravity-auth)
-- [opencode-gemini-auth](https://github.com/jenslys/opencode-gemini-auth)
-  by [@jenslys](https://github.com/jenslys)
+- Original V1 plugin (archived): [NoeFabris/opencode-antigravity-auth](https://github.com/NoeFabris/opencode-antigravity-auth)
+- [opencode-gemini-auth](https://github.com/jenslys/opencode-gemini-auth) by [@jenslys](https://github.com/jenslys)
 - [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)
 
 ## License
 
-MIT. See [LICENSE](LICENSE). Not affiliated with Google. "Antigravity",
-"Gemini", "Google Cloud", and "Google" are trademarks of Google LLC.
+MIT. See [LICENSE.md](LICENSE.md). Not affiliated with Google. “Antigravity,” “Gemini,” “Google Cloud,” and “Google” are trademarks of Google LLC.

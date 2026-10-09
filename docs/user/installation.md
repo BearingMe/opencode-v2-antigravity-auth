@@ -7,30 +7,28 @@
   [dev/testing.md](../dev/testing.md))
 - A Google account (each login adds one account, up to 10)
 
-## Add the plugin
+## Install the plugin
 
-> **First release in preparation.** Version `0.1.0` is not on npm yet. Until
-> publication, install from a local checkout. In your OpenCode config
-> (`~/.config/opencode/opencode.json` or `opencode.jsonc`):
+For a global install, let OpenCode add the package to your global
+configuration:
+
+```bash
+opencode plugin add opencode-v2-antigravity-auth
+```
+
+To install for one project instead, add the package to that project's
+`opencode.json` or `opencode.jsonc`:
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["/absolute/path/to/opencode-v2-antigravity-auth"],
+  "plugins": ["opencode-v2-antigravity-auth"],
 }
 ```
 
-Once `0.1.0` is published, use the pinned registry entry:
-
-```json
-"plugins": ["opencode-v2-antigravity-auth@0.1.0"]
-```
-
-You can use `@latest` instead if you prefer automatic updates. Local paths and
-`file://` URLs continue to work for development.
-
-> OpenCode V2 uses the `plugins` (plural) key. `plugin` (singular) is not
-> valid V2 configuration.
+OpenCode V2 uses the `plugins` (plural) key. Local paths and `file://` URLs
+also work for development. The CLI command installs a global package plugin;
+it does not add a project-local entry.
 
 ## Connect Antigravity
 
@@ -58,6 +56,24 @@ opencode run "Hello" --model=antigravity/antigravity-gemini-3.8-flash
 Models are registered automatically by the plugin — no manual model
 definitions are required. See [models-and-variants.md](models-and-variants.md)
 for the fixed catalog.
+
+The request sends a prompt to Antigravity and uses quota. Ask before running it
+if you are installing on someone else's behalf.
+
+## Update
+
+Check for and install an update to this package with OpenCode V2:
+
+```bash
+opencode plugin check opencode-v2-antigravity-auth
+opencode plugin update opencode-v2-antigravity-auth
+```
+
+Exact version pins are skipped by `plugin update`. Change the selected version
+in the applicable OpenCode `plugins` configuration to move a pinned install.
+For normal package maintenance, prefer OpenCode's plugin commands over the
+plugin's optional `auto_update` checker, which has a known V2 config-key
+limitation.
 
 ## Manage accounts
 
